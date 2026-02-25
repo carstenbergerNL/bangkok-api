@@ -6,4 +6,5 @@ public class AuthResponse
     public string RefreshToken { get; set; } = string.Empty;
     public DateTime ExpiresAtUtc { get; set; }
     public string TokenType { get; set; } = "Bearer";
+    public string? DisplayName { get; set; }
 }

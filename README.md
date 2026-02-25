@@ -25,6 +25,7 @@ A .NET Web API built with **Clean Architecture**, **JWT authentication** (access
 - **User registration and login** — Email/password with hashed passwords and salt
 - **Token refresh and revoke** — Exchange refresh token for new tokens; revoke refresh tokens (authenticated)
 - **Password recovery** — Forgot-password (generic success, no email enumeration); reset-password with secure recovery string and expiry
+- **User profile and list** — Get/update user (safe fields only); users can update own email; Admin can list all (paginated), update Role and IsActive
 - **Health checks** — Liveness, readiness, and full health with SQL Server check
 - **Structured logging** — Serilog with console and file sinks, correlation ID and request ID enrichers
 - **Global error handling** — Unhandled exceptions return a consistent `ApiResponse` with correlation ID
@@ -77,7 +78,7 @@ sources/
 ├── api/
 │   ├── Bangkok.sln
 │   ├── Bangkok.Api/           # Web API project
-│   │   ├── Controllers/       # AuthController
+│   │   ├── Controllers/       # AuthController, UsersController
 │   │   ├── Middleware/        # CorrelationId, RequestIdEnricher, ExceptionHandling
 │   │   ├── Program.cs
 │   │   ├── appsettings.Example.json
@@ -87,8 +88,8 @@ sources/
 │   └── Bangkok.Infrastructure/# Repositories, AuthService, JwtService, PasswordHasher, DI
 ├── sql/
 │   ├── 001_initial.sql        # User + RefreshToken tables
-│   └── alters/               # Schema change scripts (002_add_user_display_name, 003_add_password_recovery)
-├── json/                      # Example request bodies (login, register, refresh, revoke, forgot_password, reset_password)
+│   └── alters/               # Schema change scripts (002–004: display name, password recovery, is_active)
+├── json/                      # Example request bodies (login, register, refresh, revoke, forgot_password, reset_password, update_user, get_users)
 ├── .cursor/rules/             # Architecture rules
 ├── .gitignore
 └── README.md
@@ -103,14 +104,14 @@ sources/
 
 **Tables:**
 
-- **User** — `Id`, `Email` (unique), `PasswordHash`, `PasswordSalt`, `Role`, `CreatedAtUtc`, `UpdatedAtUtc`, optional `DisplayName`, `RecoverString`, `RecoverStringExpiry` (password recovery; via alters).
+- **User** — `Id`, `Email` (unique), `DisplayName`, `PasswordHash`, `PasswordSalt`, `Role`, `IsActive`, `CreatedAtUtc`, `UpdatedAtUtc`, `RecoverString`, `RecoverStringExpiry` (DisplayName and recovery columns via alters on existing DBs).
 - **RefreshToken** — `Id`, `UserId` (FK), `Token`, `ExpiresAtUtc`, `CreatedAtUtc`, `RevokedReason`, `RevokedAtUtc`.
 
 Apply schema:
 
 1. Create a database (e.g. `BangkokDb`).
 2. Run `sql/001_initial.sql`.
-3. Run any scripts in `sql/alters/` in order (e.g. `002_add_user_display_name.sql`, `003_add_password_recovery.sql`).
+3. Run any scripts in `sql/alters/` in order (e.g. `002_add_user_display_name.sql`, `003_add_password_recovery.sql`, `004_add_user_is_active.sql`).
 
 ---
 
@@ -153,7 +154,7 @@ Errors:
 | `POST` | `/api/auth/forgot-password` | No | Request password recovery; always returns generic success (no email enumeration) |
 | `POST` | `/api/auth/reset-password` | No | Reset password with recovery string from forgot-password |
 
-**Register** — Body: `{ "email": "...", "password": "...", "role": "User" }`. Password min length 8.
+**Register** — Body: `{ "email": "...", "password": "...", "displayName": "...", "role": "User" }`. Password min length 8. `displayName` optional.
 
 **Login** — Body: `{ "email": "...", "password": "..." }`.
 
@@ -172,9 +173,24 @@ Errors:
   "accessToken": "...",
   "refreshToken": "...",
   "expiresAtUtc": "2025-02-25T12:00:00Z",
-  "tokenType": "Bearer"
+  "tokenType": "Bearer",
+  "displayName": "John Doe"
 }
 ```
+
+### Users endpoints (authenticated)
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET` | `/api/users/{id}` | Bearer (self or Admin) | Get one user (safe fields only) |
+| `GET` | `/api/users` | Bearer, Admin | Paginated list; query: `pageNumber`, `pageSize` |
+| `PUT` | `/api/users/{id}` | Bearer (self or Admin) | Update profile: users own email and/or displayName; Admin can set Email, DisplayName, Role, IsActive |
+
+**Get user** — Returns `UserResponse`: `id`, `email`, `displayName`, `role`, `isActive`, `createdAtUtc`, `updatedAtUtc`. No password/recovery data.
+
+**Get users** — Query: `?pageNumber=1&pageSize=10`. Response: `items`, `totalCount`, `pageNumber`, `pageSize`.
+
+**Update user** — Body: `{ "email": "...", "displayName": "...", "role": "...", "isActive": true }`. Omit fields to leave unchanged. Users can update own email and/or displayName; Admin only for `role` and `isActive`.
 
 ---
 

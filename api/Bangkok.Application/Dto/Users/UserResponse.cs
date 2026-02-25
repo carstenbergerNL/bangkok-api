@@ -1,19 +1,15 @@
-namespace Bangkok.Domain;
+namespace Bangkok.Application.Dto.Users;
 
 /// <summary>
-/// User entity. Primary key is UNIQUEIDENTIFIER (Guid).
+/// Safe user projection; excludes PasswordHash, PasswordSalt, RecoverString, RecoverStringExpiry.
 /// </summary>
-public class User
+public class UserResponse
 {
     public Guid Id { get; set; }
     public string Email { get; set; } = string.Empty;
     public string? DisplayName { get; set; }
-    public string PasswordHash { get; set; } = string.Empty;
-    public string PasswordSalt { get; set; } = string.Empty;
     public string Role { get; set; } = "User";
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAtUtc { get; set; }
     public DateTime? UpdatedAtUtc { get; set; }
-    public string? RecoverString { get; set; }
-    public DateTime? RecoverStringExpiry { get; set; }
 }

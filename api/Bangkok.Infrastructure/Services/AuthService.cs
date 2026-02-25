@@ -46,6 +46,7 @@ public class AuthService : IAuthService
         {
             Id = Guid.NewGuid(),
             Email = request.Email,
+            DisplayName = string.IsNullOrWhiteSpace(request.DisplayName) ? null : request.DisplayName.Trim(),
             PasswordHash = hash,
             PasswordSalt = salt,
             Role = request.Role,
@@ -72,7 +73,8 @@ public class AuthService : IAuthService
             AccessToken = accessToken,
             RefreshToken = refreshTokenValue,
             ExpiresAtUtc = expiresAtUtc,
-            TokenType = "Bearer"
+            TokenType = "Bearer",
+            DisplayName = user.DisplayName
         };
     }
 
@@ -101,7 +103,8 @@ public class AuthService : IAuthService
             AccessToken = accessToken,
             RefreshToken = refreshTokenValue,
             ExpiresAtUtc = expiresAtUtc,
-            TokenType = "Bearer"
+            TokenType = "Bearer",
+            DisplayName = user.DisplayName
         };
     }
 
@@ -136,7 +139,8 @@ public class AuthService : IAuthService
             AccessToken = accessToken,
             RefreshToken = refreshTokenValue,
             ExpiresAtUtc = expiresAtUtc,
-            TokenType = "Bearer"
+            TokenType = "Bearer",
+            DisplayName = user.DisplayName
         };
     }
 

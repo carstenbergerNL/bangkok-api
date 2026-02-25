@@ -1,5 +1,6 @@
 {
   "email": "user@example.com",
   "password": "SecureP@ssw0rd",
+  "displayName": "John Doe",
   "role": "User"
 }

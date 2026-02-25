@@ -11,9 +11,11 @@ BEGIN
     (
         Id              UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
         Email           NVARCHAR(256)    NOT NULL,
+        DisplayName     NVARCHAR(256)    NULL,
         PasswordHash    NVARCHAR(500)    NOT NULL,
         PasswordSalt    NVARCHAR(500)    NOT NULL,
         Role                NVARCHAR(64)     NOT NULL DEFAULT N'User',
+        IsActive            BIT              NOT NULL DEFAULT 1,
         CreatedAtUtc        DATETIME2(7)     NOT NULL,
         UpdatedAtUtc        DATETIME2(7)     NULL,
         RecoverString       NVARCHAR(200)    NULL,
