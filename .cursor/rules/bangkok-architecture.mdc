@@ -1,0 +1,16 @@
+---
+description: Bangkok API solution architecture and conventions
+globs: api/**/*
+---
+
+# Bangkok API - Architecture Rules
+
+- **Clean Architecture**: Domain → Application → Infrastructure → Api. No backward references.
+- **Controllers**: Thin; no business logic. Delegate to Application services.
+- **Data access**: Dapper only (no Entity Framework). All SQL in Infrastructure.
+- **Patterns**: Repository + Service layer. Interfaces in Application.
+- **Async**: All I/O and service methods are async.
+- **SQL**: Stored in /sql; main schema in 001_initial.sql; changes in /sql/alters. Use UNIQUEIDENTIFIER, DATETIME2, NVARCHAR.
+- **Config**: Strongly typed options (JWT, ConnectionStrings, Serilog). Use Options pattern.
+- **Responses**: Use ApiResponse<T> and ErrorResponse from Application.Models.
+- **Auth**: JWT with access + refresh tokens; refresh tokens stored in SQL Server.

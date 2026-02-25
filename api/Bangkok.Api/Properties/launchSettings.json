@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "Bangkok.Api": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:56028;http://localhost:56029"
+    }
+  }
+}
