@@ -94,7 +94,8 @@ public class UsersController : ControllerBase
         if (currentUserId == null)
             return Unauthorized();
 
-        var result = await _userService.UpdateUserAsync(id, request ?? new UpdateUserRequest(), currentUserId.Value, currentUserRole ?? string.Empty, cancellationToken).ConfigureAwait(false);
+        var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var result = await _userService.UpdateUserAsync(id, request ?? new UpdateUserRequest(), currentUserId.Value, currentUserRole ?? string.Empty, cancellationToken, clientIp).ConfigureAwait(false);
 
         return result switch
         {
@@ -133,7 +134,8 @@ public class UsersController : ControllerBase
         if (currentUserId == null)
             return Unauthorized();
 
-        var result = await _userService.DeleteUserAsync(id, currentUserId.Value, cancellationToken).ConfigureAwait(false);
+        var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var result = await _userService.DeleteUserAsync(id, currentUserId.Value, cancellationToken, clientIp).ConfigureAwait(false);
 
         return result switch
         {
@@ -162,7 +164,8 @@ public class UsersController : ControllerBase
         if (currentUserId == null)
             return Unauthorized();
 
-        var result = await _userService.HardDeleteUserAsync(id, currentUserId.Value, confirm, cancellationToken).ConfigureAwait(false);
+        var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var result = await _userService.HardDeleteUserAsync(id, currentUserId.Value, confirm, cancellationToken, clientIp).ConfigureAwait(false);
 
         return result switch
         {

@@ -37,6 +37,9 @@ A .NET Web API built with **Clean Architecture**, **JWT authentication** (access
 - **Swagger/OpenAPI** — In Development, with Bearer JWT support
 - **Options pattern** — Strongly typed configuration (JWT, connection strings, Serilog)
 - **Docker** — Multi-stage Dockerfile (Linux, port 8080, non-root), docker-compose with API + SQL Server, optional logs volume; suitable for Ubuntu/Debian and VPS
+- **API response wrapper** — All responses use `ApiResponse<T>`: `success`, `message`, `data`, `errors` (array), `correlationId`; 400/401/403/404/429/500 use the same shape; no internal exception details in production
+- **CORS** — Configurable via appsettings (Cors:AllowedOrigins, AllowedHeaders, AllowedMethods); default allows specific origins only
+- **Audit logging** — Serilog-based audit for user created/updated/deleted, role changed, login success/failure, account lockout, IP block; no DB audit tables; no passwords or secrets logged
 
 ---
 
@@ -128,28 +131,30 @@ Apply schema:
 
 ## API overview
 
-Base path: **`/api`**. All success/error responses use the wrapper:
+Base path: **`/api`**. All success/error responses use the wrapper (`ApiResponse<T>`): `success`, `message` (optional), `data`, `error` (single, backward compatible), `errors` (array), `correlationId`. 400, 401, 403, 404, 429, 500 use the same shape. Internal exception details are not exposed in production.
+
+Success example:
 
 ```json
 {
   "success": true,
+  "message": null,
   "data": { ... },
   "error": null,
+  "errors": null,
   "correlationId": "..."
 }
 ```
 
-Errors:
+Error example:
 
 ```json
 {
   "success": false,
+  "message": "Invalid email or password.",
   "data": null,
-  "error": {
-    "code": "INVALID_CREDENTIALS",
-    "message": "Invalid email or password.",
-    "details": null
-  },
+  "error": { "code": "INVALID_CREDENTIALS", "message": "Invalid email or password.", "details": null },
+  "errors": [{ "code": "INVALID_CREDENTIALS", "message": "Invalid email or password." }],
   "correlationId": "..."
 }
 ```
@@ -230,6 +235,7 @@ Secrets and environment-specific settings are **not** committed. Use the example
    - **Jwt:SigningKey** — Symmetric key for JWT (e.g. 32+ characters).
    - **Jwt:Issuer**, **Jwt:Audience** — Token issuer and audience.
    - **Jwt:AccessTokenExpirationMinutes**, **Jwt:RefreshTokenExpirationDays** — Token lifetimes.
+   - **Cors:AllowedOrigins** — Allowed origins (e.g. `["http://localhost:3000"]`); **Cors:AllowedHeaders**, **Cors:AllowedMethods** optional.
    - **Serilog** — Minimum level, overrides, sinks (e.g. file path `Logs/log-.txt`).
 
 Example structure (values are placeholders in the repo):

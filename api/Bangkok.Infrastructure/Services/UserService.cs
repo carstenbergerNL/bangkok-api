@@ -12,11 +12,13 @@ public class UserService : IUserService
 
     private readonly IUserRepository _userRepository;
     private readonly ILogger<UserService> _logger;
+    private readonly IAuditLogger _audit;
 
-    public UserService(IUserRepository userRepository, ILogger<UserService> logger)
+    public UserService(IUserRepository userRepository, ILogger<UserService> logger, IAuditLogger audit)
     {
         _userRepository = userRepository;
         _logger = logger;
+        _audit = audit;
     }
 
     public async Task<UserResponse?> GetUserAsync(Guid id, CancellationToken cancellationToken = default)
@@ -37,7 +39,7 @@ public class UserService : IUserService
         };
     }
 
-    public async Task<UpdateUserResult> UpdateUserAsync(Guid id, UpdateUserRequest request, Guid currentUserId, string currentUserRole, CancellationToken cancellationToken = default)
+    public async Task<UpdateUserResult> UpdateUserAsync(Guid id, UpdateUserRequest request, Guid currentUserId, string currentUserRole, CancellationToken cancellationToken = default, string? clientIp = null)
     {
         var user = await _userRepository.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
         if (user == null)
@@ -75,7 +77,7 @@ public class UserService : IUserService
                 user.DisplayName = string.IsNullOrWhiteSpace(request.DisplayName) ? null : request.DisplayName.Trim();
             user.UpdatedAtUtc = DateTime.UtcNow;
             await _userRepository.UpdateAsync(user, cancellationToken).ConfigureAwait(false);
-            _logger.LogInformation("User updated their own profile. UserId: {UserId}", id);
+            _audit.LogUserUpdated(id, user.Email, clientIp);
             return UpdateUserResult.Success;
         }
 
@@ -136,6 +138,7 @@ public class UserService : IUserService
             _logger.LogWarning("Unauthorized delete attempt: user tried to delete themselves. UserId: {UserId}", currentUserId);
             return DeleteUserResult.ForbiddenSelfDelete;
         }
+        _audit.LogUserDeleted(id, user.Email, clientIp);
         await _userRepository.SoftDeleteAsync(id, cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("User soft-deleted successfully. UserId: {UserId}", id);
         return DeleteUserResult.Success;
@@ -180,6 +183,7 @@ public class UserService : IUserService
             _logger.LogWarning("Hard delete rejected: user attempted to delete themselves. ActorUserId: {ActorUserId}", currentUserId);
             return HardDeleteUserResult.ForbiddenSelfDelete;
         }
+        _audit.LogUserDeleted(id, user.Email, clientIp);
         await _userRepository.HardDeleteAsync(id, cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("User hard-deleted permanently. TargetUserId: {TargetUserId}, ActorUserId: {ActorUserId}, TimestampUtc: {TimestampUtc}",
             id, currentUserId, DateTime.UtcNow);

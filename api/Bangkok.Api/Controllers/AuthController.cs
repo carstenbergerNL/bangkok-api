@@ -34,7 +34,8 @@ public class AuthController : ControllerBase
     public async Task<ActionResult<ApiResponse<AuthResponse>>> Register([FromBody] RegisterRequest request, CancellationToken cancellationToken)
     {
         var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
-        var response = await _authService.RegisterAsync(request, cancellationToken).ConfigureAwait(false);
+        var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var response = await _authService.RegisterAsync(request, cancellationToken, clientIp).ConfigureAwait(false);
         if (response == null)
         {
             _logger.LogWarning("Registration failed: email already exists. Email: {Email}", request.Email);

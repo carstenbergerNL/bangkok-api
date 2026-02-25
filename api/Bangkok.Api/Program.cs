@@ -31,6 +31,7 @@ builder.Host.UseSerilog((context, services, configuration) =>
 
 // Options
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection(JwtSettings.SectionName));
+builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(CorsSettings.SectionName));
 
 // SQL + Application services (Dapper, Repositories, Auth)
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -65,6 +66,21 @@ builder.Services.AddHealthChecks()
         tags: new[] { "ready", "db" });
 
 builder.Services.AddControllers();
+
+// CORS: configurable origins, headers, methods (from appsettings Cors section)
+var corsSettings = builder.Configuration.GetSection(CorsSettings.SectionName).Get<CorsSettings>();
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        if (corsSettings?.AllowedOrigins?.Length > 0)
+            policy.WithOrigins(corsSettings.AllowedOrigins);
+        if (corsSettings?.AllowedHeaders?.Length > 0)
+            policy.WithHeaders(corsSettings.AllowedHeaders);
+        if (corsSettings?.AllowedMethods?.Length > 0)
+            policy.WithMethods(corsSettings.AllowedMethods);
+    });
+});
 
 // Rate limiting: IP-based, global + endpoint-specific auth limits
 builder.Services.AddRateLimiter(options =>
@@ -181,6 +197,7 @@ catch { }
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<RequestIdEnricherMiddleware>();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
+app.UseCors();
 
 app.UseRateLimiter();
 app.UseAuthentication();

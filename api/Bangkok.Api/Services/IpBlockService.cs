@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Bangkok.Application.Interfaces;
 
 namespace Bangkok.Api.Services;
 
@@ -22,10 +23,12 @@ public sealed class IpBlockService : IIpBlockService
     private readonly ConcurrentDictionary<string, SimpleEntry> _emailEntries = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, SimpleEntry> _ipEmailEntries = new(StringComparer.OrdinalIgnoreCase);
     private readonly ILogger<IpBlockService> _logger;
+    private readonly IAuditLogger _audit;
 
-    public IpBlockService(ILogger<IpBlockService> logger)
+    public IpBlockService(ILogger<IpBlockService> logger, IAuditLogger audit)
     {
         _logger = logger;
+        _audit = audit;
     }
 
     public BlockCheckResult CheckBlocked(string ip, string? email)
@@ -86,6 +89,7 @@ public sealed class IpBlockService : IIpBlockService
                 _logger.LogWarning(
                     "IP block triggered. IP: {ClientIp}, EscalationLevel: {EscalationLevel}, BlockDurationMinutes: {BlockDurationMinutes}, Timestamp: {Timestamp:O}",
                     ipKey, level, (int)duration.Value.TotalMinutes, now);
+                _audit.LogIpBlockTriggered(ipKey);
             }
         }
 

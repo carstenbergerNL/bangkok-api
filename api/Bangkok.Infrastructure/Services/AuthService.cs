@@ -20,6 +20,7 @@ public class AuthService : IAuthService
     private readonly IJwtService _jwtService;
     private readonly Bangkok.Application.Configuration.JwtSettings _jwtSettings;
     private readonly ILogger<AuthService> _logger;
+    private readonly IAuditLogger _audit;
 
     public AuthService(
         IUserRepository userRepository,
@@ -27,7 +28,8 @@ public class AuthService : IAuthService
         IPasswordHasher passwordHasher,
         IJwtService jwtService,
         IOptions<Bangkok.Application.Configuration.JwtSettings> jwtSettings,
-        ILogger<AuthService> logger)
+        ILogger<AuthService> logger,
+        IAuditLogger audit)
     {
         _userRepository = userRepository;
         _refreshTokenRepository = refreshTokenRepository;
@@ -35,9 +37,10 @@ public class AuthService : IAuthService
         _jwtService = jwtService;
         _jwtSettings = jwtSettings.Value;
         _logger = logger;
+        _audit = audit;
     }
 
-    public async Task<AuthResponse?> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
+    public async Task<AuthResponse?> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default, string? clientIp = null)
     {
         var existing = await _userRepository.GetByEmailAsync(request.Email, cancellationToken).ConfigureAwait(false);
         if (existing != null)
@@ -55,6 +58,7 @@ public class AuthService : IAuthService
             CreatedAtUtc = DateTime.UtcNow
         };
         await _userRepository.CreateAsync(user, cancellationToken).ConfigureAwait(false);
+        _audit.LogUserCreated(user.Id, user.Email, clientIp);
 
         var (refreshTokenValue, refreshExpires) = _jwtService.GenerateRefreshToken();
         var refreshToken = new RefreshToken
@@ -86,7 +90,7 @@ public class AuthService : IAuthService
 
         if (user == null)
         {
-            _logger.LogWarning("Failed login attempt. ClientIp: {ClientIp}, Timestamp: {Timestamp:O}", clientIp ?? "unknown", DateTime.UtcNow);
+            _audit.LogLoginFailure(request.Email, clientIp);
             return LoginResult.Failed();
         }
 
@@ -105,10 +109,10 @@ public class AuthService : IAuthService
                 user.LockoutEnd = DateTime.UtcNow.Add(LockoutDuration);
                 user.FailedLoginAttempts = 0;
                 lockoutTriggered = true;
-                _logger.LogWarning("Lockout triggered. Email: {Email}, ClientIp: {ClientIp}, Timestamp: {Timestamp:O}", user.Email, clientIp ?? "unknown", DateTime.UtcNow);
+                _audit.LogAccountLockoutTriggered(user.Email, clientIp);
             }
             if (!lockoutTriggered)
-                _logger.LogWarning("Failed login attempt. Email: {Email}, ClientIp: {ClientIp}, Timestamp: {Timestamp:O}", user.Email, clientIp ?? "unknown", DateTime.UtcNow);
+                _audit.LogLoginFailure(user.Email, clientIp);
             user.UpdatedAtUtc = DateTime.UtcNow;
             await _userRepository.UpdateAsync(user, cancellationToken).ConfigureAwait(false);
             return LoginResult.Failed();
@@ -133,7 +137,7 @@ public class AuthService : IAuthService
         var accessToken = _jwtService.GenerateAccessToken(user.Id, user.Email, user.Role);
         var expiresAtUtc = DateTime.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpirationMinutes);
 
-        _logger.LogInformation("User logged in. Email: {Email}, ClientIp: {ClientIp}, Timestamp: {Timestamp:O}", user.Email, clientIp ?? "unknown", DateTime.UtcNow);
+        _audit.LogLoginSuccess(user.Id, user.Email, clientIp);
 
         return LoginResult.Succeeded(new AuthResponse
         {
