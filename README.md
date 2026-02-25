@@ -14,6 +14,7 @@ A .NET Web API built with **Clean Architecture**, **JWT authentication** (access
 - [API overview](#api-overview)
 - [Configuration](#configuration)
 - [Getting started](#getting-started)
+- [Docker / Linux deployment](#docker--linux-deployment)
 - [Health endpoints](#health-endpoints)
 - [Development](#development)
 
@@ -35,6 +36,7 @@ A .NET Web API built with **Clean Architecture**, **JWT authentication** (access
 - **Global error handling** — Unhandled exceptions return a consistent `ApiResponse` with correlation ID
 - **Swagger/OpenAPI** — In Development, with Bearer JWT support
 - **Options pattern** — Strongly typed configuration (JWT, connection strings, Serilog)
+- **Docker** — Multi-stage Dockerfile (Linux, port 8080, non-root), docker-compose with API + SQL Server, optional logs volume; suitable for Ubuntu/Debian and VPS
 
 ---
 
@@ -81,6 +83,8 @@ Conventions:
 sources/
 ├── api/
 │   ├── Bangkok.sln
+│   ├── Dockerfile             # Multi-stage build (SDK → aspnet), port 8080, non-root
+│   ├── .dockerignore          # Excludes bin, obj, .git, logs, .env, etc.
 │   ├── Bangkok.Api/           # Web API project
 │   │   ├── Controllers/       # AuthController, UsersController
 │   │   ├── Middleware/        # CorrelationId, RequestIdEnricher, ExceptionHandling
@@ -94,7 +98,9 @@ sources/
 ├── sql/
 │   ├── 001_initial.sql        # User + RefreshToken tables
 │   └── alters/               # Schema change scripts (002–006: display name, password recovery, is_active, soft delete, lockout)
-├── json/                      # Example request bodies (login, register, … delete_user, restore_user, hard_delete_user)
+├── docker-compose.yml         # bangkok-api + sqlserver (Linux)
+├── .env.example               # Example env for compose (copy to .env)
+├── json/                      # Example request bodies (login, register, …)
 ├── .cursor/rules/             # Architecture rules
 ├── .gitignore
 └── README.md
@@ -263,6 +269,83 @@ Example structure (values are placeholders in the repo):
 5. In Development, Swagger UI: **https://localhost:&lt;port&gt;/swagger** (port from `launchSettings.json`).
 
 Sample request bodies for auth are in the `json/` folder (e.g. `login.json`, `register.json`, `refresh.json`, `revoke.json`).
+
+---
+
+## Docker / Linux deployment
+
+The solution includes a production-ready multi-stage **Dockerfile** (in `api/`) and **docker-compose.yml** (in the repo root) for Linux servers, local development, and VPS deployment.
+
+**Prerequisites:** Docker and Docker Compose on the host (e.g. Ubuntu/Debian).
+
+### Build and run
+
+1. **Configure environment**
+
+   Copy the example env file and set secrets (do not commit `.env`):
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   Edit `.env`: set `MSSQL_SA_PASSWORD` and use the same value in `ConnectionStrings__DefaultConnection` (password in the connection string). Set `Jwt__SigningKey` to a secure key (at least 32 characters). The API connects to SQL Server using the hostname **`sqlserver`** (the compose service name).
+
+2. **Build the image**
+
+   ```bash
+   docker compose build
+   ```
+
+3. **Start services**
+
+   ```bash
+   docker compose up -d
+   ```
+
+   The API listens on **port 8080**; SQL Server on **1433**. The API container waits for the SQL Server container to start (`depends_on`). SQL Server may take 20–30 seconds to accept connections; the app will connect when the database is ready.
+
+4. **Stop services**
+
+   ```bash
+   docker compose down
+   ```
+
+   Add `-v` to remove named volumes (e.g. database data): `docker compose down -v`.
+
+5. **View logs**
+
+   ```bash
+   docker compose logs -f
+   ```
+
+   API only: `docker compose logs -f bangkok-api`.
+
+### Compose services
+
+| Service       | Image / build        | Port  | Description                          |
+|---------------|----------------------|------|--------------------------------------|
+| `bangkok-api` | Build from `api/`    | 8080 | ASP.NET Core API (non-root, Release) |
+| `sqlserver`   | mcr.microsoft.com/mssql/server:2022-latest | 1433 | SQL Server (Linux), data in volume   |
+
+### Environment variables (API)
+
+| Variable                             | Purpose                    |
+|--------------------------------------|----------------------------|
+| `ASPNETCORE_ENVIRONMENT`             | e.g. Production            |
+| `ConnectionStrings__DefaultConnection` | SQL connection string (use `Server=sqlserver`) |
+| `Jwt__SigningKey`                    | JWT signing key (32+ chars)|
+| `Jwt__Issuer`                        | Token issuer               |
+| `Jwt__Audience`                      | Token audience             |
+
+### Logs and volumes
+
+- **API logs:** Serilog writes to **`/app/Logs`** inside the container. The compose file mounts a named volume `bangkok-logs` at `/app/Logs` so logs persist and can be inspected (e.g. `docker compose exec bangkok-api cat /app/Logs/log-*.txt` or bind-mount a host path if preferred).
+- **SQL data:** Stored in the named volume `sqlserver-data` so the database persists across restarts.
+
+### Notes
+
+- **No Kubernetes, Redis, or reverse proxy** — single compose stack, suitable for startup-level production.
+- **Swagger** is disabled when `ASPNETCORE_ENVIRONMENT=Production`; set to `Development` in `.env` only if you need Swagger in the container (not recommended on a public host).
 
 ---
 

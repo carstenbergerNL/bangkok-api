@@ -1,0 +1,39 @@
+# Build outputs
+**/bin/
+**/obj/
+
+# Version control
+.git/
+.gitignore
+
+# IDE and editor
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Node (if any tooling uses it)
+node_modules/
+
+# Logs and temp
+**/Logs/
+**/logs/
+*.log
+**/appsettings.Development.json
+
+# Secrets and env (use compose/env for secrets)
+.env
+.env.*
+!.env.example
+
+# Docker
+Dockerfile*
+.dockerignore
+docker-compose*
+.docker/
+
+# Other
+**/.DS_Store
+**/Thumbs.db
