@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Keep README in Sync
 
-When you **add, change, or remove** any of the following, **update README.md** so it stays accurate:
+**Always update README.md** when the codebase changes. When you **add, change, or remove** any of the following, **update README.md** so it stays accurate:
 
 | Change type | Update these README sections |
 |-------------|------------------------------|

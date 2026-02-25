@@ -26,8 +26,10 @@ A .NET Web API built with **Clean Architecture**, **JWT authentication** (access
 - **Token refresh and revoke** — Exchange refresh token for new tokens; revoke refresh tokens (authenticated)
 - **Password recovery** — Forgot-password (generic success, no email enumeration); reset-password with secure recovery string and expiry
 - **User profile and list** — Get/update user (safe fields only); users can update own email; Admin can list all (paginated), update Role and IsActive
+- **User lock and unlock** — Admin-only: lock user (default 15 min or custom UTC `lockoutEnd`); unlock clears lockout. Login returns 403 while locked.
 - **User soft delete and restore** — Admin-only soft delete (IsDeleted, DeletedAt); restore endpoint; all GETs exclude deleted users
 - **User hard delete** — Admin-only permanent delete with `?confirm=true`; referential integrity (refresh tokens deleted first); self-delete blocked
+- **IP brute force protection** — In-memory: 10 failed logins from same IP within 5 minutes blocks that IP for 30 minutes (429 Too Many Requests); no DB/Redis; single-instance only
 - **Health checks** — Liveness, readiness, and full health with SQL Server check
 - **Structured logging** — Serilog with console and file sinks, correlation ID and request ID enrichers
 - **Global error handling** — Unhandled exceptions return a consistent `ApiResponse` with correlation ID
@@ -82,6 +84,7 @@ sources/
 │   ├── Bangkok.Api/           # Web API project
 │   │   ├── Controllers/       # AuthController, UsersController
 │   │   ├── Middleware/        # CorrelationId, RequestIdEnricher, ExceptionHandling
+│   │   ├── Services/          # IIpBlockService, IpBlockService (in-memory brute force)
 │   │   ├── Program.cs
 │   │   ├── appsettings.Example.json
 │   │   └── Properties/launchSettings.json
@@ -90,7 +93,7 @@ sources/
 │   └── Bangkok.Infrastructure/# Repositories, AuthService, JwtService, PasswordHasher, DI
 ├── sql/
 │   ├── 001_initial.sql        # User + RefreshToken tables
-│   └── alters/               # Schema change scripts (002–004: display name, password recovery, is_active)
+│   └── alters/               # Schema change scripts (002–006: display name, password recovery, is_active, soft delete, lockout)
 ├── json/                      # Example request bodies (login, register, … delete_user, restore_user, hard_delete_user)
 ├── .cursor/rules/             # Architecture rules
 ├── .gitignore
@@ -106,14 +109,14 @@ sources/
 
 **Tables:**
 
-- **User** — `Id`, `Email` (unique), `DisplayName`, `PasswordHash`, `PasswordSalt`, `Role`, `IsActive`, `CreatedAtUtc`, `UpdatedAtUtc`, `RecoverString`, `RecoverStringExpiry`, `IsDeleted`, `DeletedAt` (soft delete; via alters on existing DBs).
+- **User** — `Id`, `Email` (unique), `DisplayName`, `PasswordHash`, `PasswordSalt`, `Role`, `IsActive`, `CreatedAtUtc`, `UpdatedAtUtc`, `RecoverString`, `RecoverStringExpiry`, `IsDeleted`, `DeletedAt`, `FailedLoginAttempts`, `LockoutEnd` (account lockout; via alters on existing DBs).
 - **RefreshToken** — `Id`, `UserId` (FK), `Token`, `ExpiresAtUtc`, `CreatedAtUtc`, `RevokedReason`, `RevokedAtUtc`.
 
 Apply schema:
 
 1. Create a database (e.g. `BangkokDb`).
 2. Run `sql/001_initial.sql`.
-3. Run any scripts in `sql/alters/` in order (e.g. `002_add_user_display_name.sql` … `005_add_soft_delete_to_users.sql`).
+3. Run any scripts in `sql/alters/` in order (e.g. `002_add_user_display_name.sql` … `006_add_lockout_columns.sql`).
 
 ---
 
@@ -150,7 +153,7 @@ Errors:
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | `POST` | `/api/auth/register` | No | Register user; returns access + refresh tokens |
-| `POST` | `/api/auth/login` | No | Login; returns access + refresh tokens |
+| `POST` | `/api/auth/login` | No | Login; returns access + refresh tokens. 403 if account locked (5 failed attempts); 429 if IP blocked (brute force). |
 | `POST` | `/api/auth/refresh` | No | Exchange refresh token for new access + refresh tokens |
 | `POST` | `/api/auth/revoke` | Bearer | Revoke a refresh token |
 | `POST` | `/api/auth/forgot-password` | No | Request password recovery; always returns generic success (no email enumeration) |
@@ -158,7 +161,7 @@ Errors:
 
 **Register** — Body: `{ "email": "...", "password": "...", "displayName": "...", "role": "User" }`. Password min length 8. `displayName` optional.
 
-**Login** — Body: `{ "email": "...", "password": "..." }`.
+**Login** — Body: `{ "email": "...", "password": "..." }`. Returns 403 with `ACCOUNT_LOCKED` if the account is locked (e.g. 5 failed attempts); returns 429 with `IP_BLOCKED` ("Too many failed attempts. Try again later.") if the client IP is blocked by brute force protection (10 failures in 5 min → 30 min block).
 
 **Refresh** — Body: `{ "refreshToken": "..." }`.
 
@@ -187,6 +190,8 @@ Errors:
 | `GET` | `/api/users/{id}` | Bearer (self or Admin) | Get one user (safe fields only) |
 | `GET` | `/api/users` | Bearer, Admin | Paginated list; query: `pageNumber`, `pageSize` |
 | `PUT` | `/api/users/{id}` | Bearer (self or Admin) | Update profile: users own email and/or displayName; Admin can set Email, DisplayName, Role, IsActive |
+| `PATCH` | `/api/users/{id}/lock` | Bearer, Admin | Lock user (login returns 403 until lockout ends). Optional body: `{ "lockoutEnd": "UTC datetime" }`; if omitted, lock 15 min. Cannot lock yourself. Returns 204. |
+| `PATCH` | `/api/users/{id}/unlock` | Bearer, Admin | Clear user lockout (failed attempts and lockout end). Returns 204. |
 | `DELETE` | `/api/users/{id}` | Bearer, Admin | Soft-delete user (sets IsDeleted, DeletedAt). Returns 204. Cannot delete yourself. |
 | `PATCH` | `/api/users/{id}/restore` | Bearer, Admin | Restore soft-deleted user. Returns 204. |
 | `DELETE` | `/api/users/{id}/hard` | Bearer, Admin | **Dangerous:** Permanently delete user and refresh tokens. Requires `?confirm=true`. Cannot delete yourself. Returns 204. |
@@ -200,6 +205,10 @@ Errors:
 **Delete user** — No body. Admin only. Soft-delete (IsDeleted = 1, DeletedAt = now). Returns 204; 404 if not found; 400 if already deleted or self-delete.
 
 **Restore user** — No body. Admin only. Sets IsDeleted = 0, DeletedAt = NULL. Returns 204; 404 if not found; 400 if not deleted. All GET queries exclude soft-deleted users.
+
+**Lock user** — Optional body: `{ "lockoutEnd": "2025-02-26T15:30:00Z" }`. Admin only. Sets lockout so login returns 403 until the given UTC time. If `lockoutEnd` is omitted, lockout ends in 15 minutes. `lockoutEnd` must be in the future (400 `INVALID_LOCKOUT_END` otherwise). Cannot lock yourself (400 `CANNOT_LOCK_SELF`). Returns 204; 404 if not found.
+
+**Unlock user** — No body. Admin only. Clears FailedLoginAttempts and LockoutEnd. Returns 204; 404 if not found.
 
 **Hard delete user** — No body. Admin only. Query: `?confirm=true` (required). Permanently deletes the user and their refresh tokens. Returns 204; 400 if `confirm` is not true or self-delete; 404 if not found. Soft delete remains the default; use this only when permanent removal is required.
 
@@ -287,6 +296,7 @@ Response format (JSON):
 ## Development
 
 - **Swagger** is enabled only in the Development environment.
-- **Middleware order:** Correlation ID → Request ID enricher → Exception handling → Authentication → Authorization.
+- **Middleware order:** Correlation ID → Request ID enricher → Exception handling → Rate limiter → Authentication → Authorization.
+- **IP brute force:** In-memory only (no DB/Redis). Threshold: 10 failed logins per IP in 5 minutes; block 30 minutes. Registered as singleton `IIpBlockService` in Api.
 - **Logs:** Serilog writes to console and to `Logs/log-YYYYMMDD.txt` (path configurable in `appsettings.json`). Correlation ID and request ID are attached for tracing.
 - **API response model:** Use `ApiResponse<T>.Ok(data, correlationId)` and `ApiResponse<T>.Fail(error, correlationId)` so all endpoints return a consistent shape.
