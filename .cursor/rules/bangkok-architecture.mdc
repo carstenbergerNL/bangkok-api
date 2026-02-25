@@ -16,7 +16,7 @@ alwaysApply: true
 
 ## Conventions
 
-- **Controllers**: Thin; no business logic. Use `[ApiController]`, `[Route("api/[controller]")]`, `[Produces("application/json")]`. Document actions with `<summary>` and `ProducesResponseType`.
+- **Controllers**: Thin; no business logic. Use `[ApiController]`, `[Route("api/[controller]")]`, `[Produces("application/json")]`. **Always add Swagger annotations**: `[SwaggerTag]` on the controller and `[SwaggerOperation(Summary, Description)]` on every action; keep `ProducesResponseType` for all response codes. See rule *controllers-swagger-annotations*.
 - **Data access**: Dapper only (no Entity Framework). All SQL in Infrastructure (inline or loaded from `/sql`). Use `ISqlConnectionFactory` and `CommandDefinition` with `CancellationToken`.
 - **Patterns**: Repository + Service. Interfaces in Application; implementations in Infrastructure. Register in Infrastructure’s `DependencyInjection`.
 - **Config**: Strongly typed options (e.g. `JwtSettings`, `SqlConnectionOptions`). Use Options pattern; bind in `Program.cs` or DI extension.

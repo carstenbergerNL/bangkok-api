@@ -5,6 +5,7 @@ using Bangkok.Application.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace Bangkok.Api.Controllers;
 
@@ -13,6 +14,7 @@ namespace Bangkok.Api.Controllers;
 [Produces("application/json")]
 [Authorize]
 [EnableRateLimiting("GlobalPolicy")]
+[SwaggerTag("User management. All endpoints require Bearer token. Admin-only where noted.")]
 public class UsersController : ControllerBase
 {
     private readonly IUserService _userService;
@@ -24,8 +26,8 @@ public class UsersController : ControllerBase
         _logger = logger;
     }
 
-    /// <summary>Get a single user by ID. Returns safe fields only. Caller must be the user or Admin.</summary>
     [HttpGet("{id:guid}")]
+    [SwaggerOperation(Summary = "Get user by ID", Description = "Returns a single user by ID (safe fields only). Caller must be the user or Admin.")]
     [ProducesResponseType(typeof(ApiResponse<UserResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -56,9 +58,9 @@ public class UsersController : ControllerBase
         return Ok(ApiResponse<UserResponse>.Ok(user, correlationId));
     }
 
-    /// <summary>Get paginated list of users. Admin only.</summary>
     [HttpGet]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "List users (Admin)", Description = "Get paginated list of users. Admin only. Query: pageNumber, pageSize (max 100).")]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<UserResponse>>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -115,9 +117,9 @@ public class UsersController : ControllerBase
         };
     }
 
-    /// <summary>Soft-delete a user. Admin only. Returns 204 on success. Cannot delete yourself.</summary>
     [HttpDelete("{id:guid}")]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "Soft-delete user (Admin)", Description = "Soft-delete a user. Admin only. Returns 204. Cannot delete yourself.")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -143,9 +145,9 @@ public class UsersController : ControllerBase
         };
     }
 
-    /// <summary>Dangerous operation: Permanently delete a user and their refresh tokens. Admin only. Requires query parameter confirm=true. Cannot delete yourself. Returns 204 on success.</summary>
     [HttpDelete("{id:guid}/hard")]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "Hard-delete user (Admin)", Description = "Permanently delete a user and their refresh tokens. Admin only. Requires query confirm=true. Cannot delete yourself. Returns 204.")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -172,9 +174,9 @@ public class UsersController : ControllerBase
         };
     }
 
-    /// <summary>Restore a soft-deleted user. Admin only. Returns 204 on success.</summary>
     [HttpPatch("{id:guid}/restore")]
     [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "Restore user (Admin)", Description = "Restore a soft-deleted user. Admin only. Returns 204.")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

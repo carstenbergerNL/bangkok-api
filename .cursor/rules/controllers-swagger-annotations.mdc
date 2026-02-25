@@ -1,0 +1,47 @@
+---
+description: Always add Swagger annotations when creating or editing API controller actions
+globs: **/Controllers/**/*.cs
+alwaysApply: false
+---
+
+# Controller Swagger Annotations
+
+When creating or editing controller actions, **always** add Swagger/OpenAPI annotations so the API docs stay accurate.
+
+## Required
+
+1. **Controller class**  
+   Add a tag so the controller is grouped in Swagger UI:
+   ```csharp
+   [SwaggerTag("Short description of what this controller does.")]
+   public class MyController : ControllerBase
+   ```
+
+2. **Every action**  
+   Add `[SwaggerOperation]` with a short summary and a clear description:
+   ```csharp
+   [HttpPost("login")]
+   [SwaggerOperation(Summary = "Login", Description = "Authenticate with email and password. Returns access and refresh tokens. After 5 failed attempts account is locked (403).")]
+   [ProducesResponseType(typeof(ApiResponse<AuthResponse>), StatusCodes.Status200OK)]
+   [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+   public async Task<ActionResult<ApiResponse<AuthResponse>>> Login(...)
+   ```
+
+## Conventions
+
+- **Summary**: Short title (e.g. "Login", "Get user by ID", "Soft-delete user (Admin)").
+- **Description**: One or two sentences covering auth (if any), rate limits, and important behavior (e.g. lockout, confirm query).
+- Keep **ProducesResponseType** for every status code the action can return.
+- Use `using Swashbuckle.AspNetCore.Annotations;` in the controller.
+
+## Example
+
+```csharp
+[HttpGet("{id:guid}")]
+[SwaggerOperation(Summary = "Get user by ID", Description = "Returns a single user by ID (safe fields only). Caller must be the user or Admin.")]
+[ProducesResponseType(typeof(ApiResponse<UserResponse>), StatusCodes.Status200OK)]
+[ProducesResponseType(StatusCodes.Status401Unauthorized)]
+[ProducesResponseType(StatusCodes.Status403Forbidden)]
+[ProducesResponseType(StatusCodes.Status404NotFound)]
+public async Task<ActionResult<ApiResponse<UserResponse>>> GetUser(...)
+```
