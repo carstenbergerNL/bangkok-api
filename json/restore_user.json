@@ -1,3 +1,3 @@
 {
-  "_comment": "PATCH /api/v1/users/{id}/restore - No request body. Admin only. Returns 204 No Content on success."
+  "_comment": "PATCH /api/users/{id}/restore - No request body. Admin only. Returns 204 No Content on success."
 }

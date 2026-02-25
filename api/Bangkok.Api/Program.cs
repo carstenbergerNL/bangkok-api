@@ -1,18 +1,17 @@
-using Asp.Versioning;
-using Asp.Versioning.ApiExplorer;
 using Bangkok.Application.Configuration;
-using Bangkok.Api.Configuration;
+using Bangkok.Application.Models;
 using Bangkok.Api.Middleware;
 using Bangkok.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
-using Swashbuckle.AspNetCore.SwaggerGen;
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -63,27 +62,83 @@ builder.Services.AddHealthChecks()
 
 builder.Services.AddControllers();
 
-builder.Services.AddApiVersioning(options =>
+// Rate limiting: IP-based, global + endpoint-specific auth limits
+builder.Services.AddRateLimiter(options =>
 {
-    options.DefaultApiVersion = new ApiVersion(1, 0);
-    options.AssumeDefaultVersionWhenUnspecified = true;
-    options.ReportApiVersions = true;
-})
-.AddMvc()
-.AddApiExplorer(options =>
-{
-    options.GroupNameFormat = "'v'VVV";
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    static string GetPartitionKey(HttpContext context) =>
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+    options.AddPolicy("GlobalPolicy", context =>
+        RateLimitPartition.GetFixedWindowLimiter(GetPartitionKey(context), _ => new FixedWindowRateLimiterOptions
+        {
+            Window = TimeSpan.FromMinutes(1),
+            PermitLimit = 100
+        }));
+
+    options.AddPolicy("LoginPolicy", context =>
+        RateLimitPartition.GetFixedWindowLimiter(GetPartitionKey(context), _ => new FixedWindowRateLimiterOptions
+        {
+            Window = TimeSpan.FromMinutes(1),
+            PermitLimit = 5
+        }));
+
+    options.AddPolicy("RegisterPolicy", context =>
+        RateLimitPartition.GetFixedWindowLimiter(GetPartitionKey(context), _ => new FixedWindowRateLimiterOptions
+        {
+            Window = TimeSpan.FromMinutes(1),
+            PermitLimit = 5
+        }));
+
+    options.AddPolicy("ForgotPasswordPolicy", context =>
+        RateLimitPartition.GetFixedWindowLimiter(GetPartitionKey(context), _ => new FixedWindowRateLimiterOptions
+        {
+            Window = TimeSpan.FromMinutes(5),
+            PermitLimit = 3
+        }));
+
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        var httpContext = context.HttpContext;
+        if (httpContext.Response.HasStarted)
+            return;
+
+        var clientIp = GetPartitionKey(httpContext);
+        var endpointName = httpContext.GetEndpoint()?.DisplayName ?? httpContext.Request.Path.ToString();
+        Log.Warning("Rate limit exceeded. Endpoint: {Endpoint}, IP: {ClientIp}, Timestamp: {Timestamp:O}",
+            endpointName, clientIp, DateTime.UtcNow);
+
+        httpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        var retrySeconds = 60;
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out TimeSpan retryAfter))
+            retrySeconds = (int)retryAfter.TotalSeconds;
+        httpContext.Response.Headers.RetryAfter = retrySeconds.ToString(CultureInfo.InvariantCulture);
+
+        httpContext.Response.ContentType = "application/json";
+        var correlationId = httpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? httpContext.TraceIdentifier;
+        var body = ApiResponse<object>.Fail(new ErrorResponse
+        {
+            Code = "RATE_LIMIT_EXCEEDED",
+            Message = "Too many requests. Please try again later."
+        }, correlationId);
+        var json = JsonSerializer.Serialize(body, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        await httpContext.Response.WriteAsync(json, cancellationToken).ConfigureAwait(false);
+    };
 });
 
 // Swagger (development only)
 if (builder.Environment.IsDevelopment())
 {
     builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddTransient<IConfigureOptions<SwaggerGenOptions>, ConfigureSwaggerOptions>();
     builder.Services.AddSwaggerGen(c =>
     {
-        c.DocInclusionPredicate((docName, apiDesc) => apiDesc.GroupName == docName);
-        c.OperationFilter<SwaggerDefaultValues>();
+        c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+        {
+            Title = "Bangkok API",
+            Version = "v1",
+            Description = "Enterprise Web API foundation with JWT authentication."
+        });
         c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
         {
             Name = "Authorization",
@@ -122,6 +177,7 @@ app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<RequestIdEnricherMiddleware>();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
@@ -147,11 +203,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
-        var provider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
-        foreach (var description in provider.ApiVersionDescriptions)
-        {
-            c.SwaggerEndpoint($"/swagger/{description.GroupName}/swagger.json", $"Bangkok API {description.GroupName}");
-        }
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Bangkok API v1");
         c.DisplayRequestDuration();
     });
 }

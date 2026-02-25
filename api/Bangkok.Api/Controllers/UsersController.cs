@@ -1,18 +1,18 @@
 using System.Security.Claims;
-using Asp.Versioning;
 using Bangkok.Application.Dto.Users;
 using Bangkok.Application.Interfaces;
 using Bangkok.Application.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
-namespace Bangkok.Api.Controllers.V1;
+namespace Bangkok.Api.Controllers;
 
 [ApiController]
-[ApiVersion("1.0")]
-[Route("api/v{version:apiVersion}/[controller]")]
+[Route("api/[controller]")]
 [Produces("application/json")]
 [Authorize]
+[EnableRateLimiting("GlobalPolicy")]
 public class UsersController : ControllerBase
 {
     private readonly IUserService _userService;
