@@ -188,7 +188,7 @@ public sealed class IpBlockService : IIpBlockService
                     return new SimpleEntry { FailedCount = 1, FirstAttemptAt = now };
 
                 var nextCount = existing.FailedCount + 1;
-                var blockedUntil = nextCount >= threshold ? now.Add(getDuration(key, existing)) : null;
+                DateTime? blockedUntil = nextCount >= threshold ? now.Add(getDuration(key, existing)) : (DateTime?)null;
                 return new SimpleEntry
                 {
                     FailedCount = nextCount,
