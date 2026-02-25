@@ -21,12 +21,33 @@ public class ApiResponse<T>
         CorrelationId = correlationId
     };
 
+    /// <summary>
+    /// Single error: use Error only; Message and Errors null to avoid duplicating error text.
+    /// </summary>
     public static ApiResponse<T> Fail(ErrorResponse error, string? correlationId = null) => new()
     {
         Success = false,
-        Message = error.Message,
+        Message = null,
+        Data = default,
         Error = error,
-        Errors = new List<ApiError> { new() { Code = error.Code, Message = error.Message } },
+        Errors = null,
         CorrelationId = correlationId
     };
+
+    /// <summary>
+    /// Multiple errors (e.g. validation): use Errors array; Error set to first for backward compatibility.
+    /// </summary>
+    public static ApiResponse<T> Fail(IReadOnlyList<ApiError> errors, string? correlationId = null)
+    {
+        var first = errors.Count > 0 ? errors[0] : new ApiError();
+        return new ApiResponse<T>
+        {
+            Success = false,
+            Message = first.Message,
+            Data = default,
+            Error = new ErrorResponse { Code = first.Code, Message = first.Message },
+            Errors = errors.ToList(),
+            CorrelationId = correlationId
+        };
+    }
 }

@@ -1,4 +1,5 @@
 using Bangkok.Application.Interfaces;
+using Microsoft.Extensions.Logging;
 
 namespace Bangkok.Infrastructure.Services;
 

@@ -119,7 +119,7 @@ public class UserService : IUserService
         return UpdateUserResult.Forbidden;
     }
 
-    public async Task<DeleteUserResult> DeleteUserAsync(Guid id, Guid currentUserId, CancellationToken cancellationToken = default)
+    public async Task<DeleteUserResult> DeleteUserAsync(Guid id, Guid currentUserId, CancellationToken cancellationToken = default, string? clientIp = null)
     {
         _logger.LogInformation("User delete attempt. TargetUserId: {TargetUserId}, ActorUserId: {ActorUserId}", id, currentUserId);
         var user = await _userRepository.GetByIdIncludeDeletedAsync(id, cancellationToken).ConfigureAwait(false);
@@ -163,7 +163,7 @@ public class UserService : IUserService
         return RestoreUserResult.Success;
     }
 
-    public async Task<HardDeleteUserResult> HardDeleteUserAsync(Guid id, Guid currentUserId, bool confirm, CancellationToken cancellationToken = default)
+    public async Task<HardDeleteUserResult> HardDeleteUserAsync(Guid id, Guid currentUserId, bool confirm, CancellationToken cancellationToken = default, string? clientIp = null)
     {
         _logger.LogInformation("Hard delete attempt. TargetUserId: {TargetUserId}, ActorUserId: {ActorUserId}, Confirm: {Confirm}, TimestampUtc: {TimestampUtc}",
             id, currentUserId, confirm, DateTime.UtcNow);

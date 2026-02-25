@@ -39,12 +39,12 @@ public class UsersController : ControllerBase
         var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
         var (currentUserId, currentUserRole) = GetCurrentUserIdentity();
         if (currentUserId == null)
-            return Unauthorized();
+            return Unauthorized(ApiResponse<UserResponse>.Fail(new ErrorResponse { Code = "UNAUTHORIZED", Message = "Authentication required." }, correlationId));
 
         if (id != currentUserId.Value && !IsAdmin(currentUserRole))
         {
             _logger.LogWarning("Unauthorized get user attempt: user {CurrentUserId} tried to get user {TargetUserId}", currentUserId, id);
-            return Forbid();
+            return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<UserResponse>.Fail(new ErrorResponse { Code = "FORBIDDEN", Message = "You do not have access to this resource." }, correlationId));
         }
 
         var user = await _userService.GetUserAsync(id, cancellationToken).ConfigureAwait(false);
@@ -130,9 +130,10 @@ public class UsersController : ControllerBase
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
+        var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
         var (currentUserId, _) = GetCurrentUserIdentity();
         if (currentUserId == null)
-            return Unauthorized();
+            return Unauthorized(ApiResponse<object>.Fail(new ErrorResponse { Code = "UNAUTHORIZED", Message = "Authentication required." }, correlationId));
 
         var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
         var result = await _userService.DeleteUserAsync(id, currentUserId.Value, cancellationToken, clientIp).ConfigureAwait(false);
@@ -140,9 +141,9 @@ public class UsersController : ControllerBase
         return result switch
         {
             DeleteUserResult.Success => NoContent(),
-            DeleteUserResult.NotFound => NotFound(),
-            DeleteUserResult.AlreadyDeleted => BadRequest(),
-            DeleteUserResult.ForbiddenSelfDelete => BadRequest(),
+            DeleteUserResult.NotFound => NotFound(ApiResponse<object>.Fail(new ErrorResponse { Code = "USER_NOT_FOUND", Message = "User not found." }, correlationId)),
+            DeleteUserResult.AlreadyDeleted => BadRequest(ApiResponse<object>.Fail(new ErrorResponse { Code = "ALREADY_DELETED", Message = "User is already soft-deleted." }, correlationId)),
+            DeleteUserResult.ForbiddenSelfDelete => BadRequest(ApiResponse<object>.Fail(new ErrorResponse { Code = "CANNOT_DELETE_SELF", Message = "You cannot delete your own account." }, correlationId)),
             _ => NoContent()
         };
     }
@@ -160,9 +161,10 @@ public class UsersController : ControllerBase
         [FromQuery] bool confirm = false,
         CancellationToken cancellationToken = default)
     {
+        var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
         var (currentUserId, _) = GetCurrentUserIdentity();
         if (currentUserId == null)
-            return Unauthorized();
+            return Unauthorized(ApiResponse<object>.Fail(new ErrorResponse { Code = "UNAUTHORIZED", Message = "Authentication required." }, correlationId));
 
         var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
         var result = await _userService.HardDeleteUserAsync(id, currentUserId.Value, confirm, cancellationToken, clientIp).ConfigureAwait(false);
@@ -170,9 +172,9 @@ public class UsersController : ControllerBase
         return result switch
         {
             HardDeleteUserResult.Success => NoContent(),
-            HardDeleteUserResult.NotFound => NotFound(),
-            HardDeleteUserResult.ForbiddenSelfDelete => BadRequest(),
-            HardDeleteUserResult.ConfirmRequired => BadRequest(),
+            HardDeleteUserResult.NotFound => NotFound(ApiResponse<object>.Fail(new ErrorResponse { Code = "USER_NOT_FOUND", Message = "User not found." }, correlationId)),
+            HardDeleteUserResult.ForbiddenSelfDelete => BadRequest(ApiResponse<object>.Fail(new ErrorResponse { Code = "CANNOT_DELETE_SELF", Message = "You cannot delete your own account." }, correlationId)),
+            HardDeleteUserResult.ConfirmRequired => BadRequest(ApiResponse<object>.Fail(new ErrorResponse { Code = "CONFIRM_REQUIRED", Message = "Query parameter confirm=true is required." }, correlationId)),
             _ => NoContent()
         };
     }
@@ -189,13 +191,14 @@ public class UsersController : ControllerBase
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
+        var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
         var result = await _userService.RestoreUserAsync(id, cancellationToken).ConfigureAwait(false);
 
         return result switch
         {
             RestoreUserResult.Success => NoContent(),
-            RestoreUserResult.NotFound => NotFound(),
-            RestoreUserResult.NotDeleted => BadRequest(),
+            RestoreUserResult.NotFound => NotFound(ApiResponse<object>.Fail(new ErrorResponse { Code = "USER_NOT_FOUND", Message = "User not found." }, correlationId)),
+            RestoreUserResult.NotDeleted => BadRequest(ApiResponse<object>.Fail(new ErrorResponse { Code = "NOT_DELETED", Message = "User is not soft-deleted." }, correlationId)),
             _ => NoContent()
         };
     }
@@ -216,14 +219,14 @@ public class UsersController : ControllerBase
         var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
         var (currentUserId, _) = GetCurrentUserIdentity();
         if (currentUserId == null)
-            return Unauthorized();
+            return Unauthorized(ApiResponse<object>.Fail(new ErrorResponse { Code = "UNAUTHORIZED", Message = "Authentication required." }, correlationId));
 
         var result = await _userService.LockUserAsync(id, currentUserId.Value, request?.LockoutEnd, cancellationToken).ConfigureAwait(false);
 
         return result switch
         {
             LockUserResult.Success => NoContent(),
-            LockUserResult.NotFound => NotFound(),
+            LockUserResult.NotFound => NotFound(ApiResponse<object>.Fail(new ErrorResponse { Code = "USER_NOT_FOUND", Message = "User not found." }, correlationId)),
             LockUserResult.ForbiddenSelfLock => BadRequest(ApiResponse<object>.Fail(new ErrorResponse
             {
                 Code = "CANNOT_LOCK_SELF",
@@ -249,12 +252,13 @@ public class UsersController : ControllerBase
         [FromRoute] Guid id,
         CancellationToken cancellationToken)
     {
+        var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
         var result = await _userService.UnlockUserAsync(id, cancellationToken).ConfigureAwait(false);
 
         return result switch
         {
             UnlockUserResult.Success => NoContent(),
-            UnlockUserResult.NotFound => NotFound(),
+            UnlockUserResult.NotFound => NotFound(ApiResponse<object>.Fail(new ErrorResponse { Code = "USER_NOT_FOUND", Message = "User not found." }, correlationId)),
             _ => NoContent()
         };
     }
