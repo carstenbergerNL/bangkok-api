@@ -24,6 +24,7 @@ A .NET Web API built with **Clean Architecture**, **JWT authentication** (access
 - **JWT authentication** — Access tokens (short-lived) and refresh tokens (long-lived), with refresh tokens stored in SQL Server
 - **User registration and login** — Email/password with hashed passwords and salt
 - **Token refresh and revoke** — Exchange refresh token for new tokens; revoke refresh tokens (authenticated)
+- **Password recovery** — Forgot-password (generic success, no email enumeration); reset-password with secure recovery string and expiry
 - **Health checks** — Liveness, readiness, and full health with SQL Server check
 - **Structured logging** — Serilog with console and file sinks, correlation ID and request ID enrichers
 - **Global error handling** — Unhandled exceptions return a consistent `ApiResponse` with correlation ID
@@ -86,8 +87,8 @@ sources/
 │   └── Bangkok.Infrastructure/# Repositories, AuthService, JwtService, PasswordHasher, DI
 ├── sql/
 │   ├── 001_initial.sql        # User + RefreshToken tables
-│   └── alters/               # Schema change scripts (e.g. 002_add_user_display_name.sql)
-├── json/                      # Example request bodies (e.g. login, register, refresh, revoke)
+│   └── alters/               # Schema change scripts (002_add_user_display_name, 003_add_password_recovery)
+├── json/                      # Example request bodies (login, register, refresh, revoke, forgot_password, reset_password)
 ├── .cursor/rules/             # Architecture rules
 ├── .gitignore
 └── README.md
@@ -102,14 +103,14 @@ sources/
 
 **Tables:**
 
-- **User** — `Id`, `Email` (unique), `PasswordHash`, `PasswordSalt`, `Role`, `CreatedAtUtc`, `UpdatedAtUtc`, optional `DisplayName` (via alter).
+- **User** — `Id`, `Email` (unique), `PasswordHash`, `PasswordSalt`, `Role`, `CreatedAtUtc`, `UpdatedAtUtc`, optional `DisplayName`, `RecoverString`, `RecoverStringExpiry` (password recovery; via alters).
 - **RefreshToken** — `Id`, `UserId` (FK), `Token`, `ExpiresAtUtc`, `CreatedAtUtc`, `RevokedReason`, `RevokedAtUtc`.
 
 Apply schema:
 
 1. Create a database (e.g. `BangkokDb`).
 2. Run `sql/001_initial.sql`.
-3. Run any scripts in `sql/alters/` in order (e.g. `002_add_user_display_name.sql`).
+3. Run any scripts in `sql/alters/` in order (e.g. `002_add_user_display_name.sql`, `003_add_password_recovery.sql`).
 
 ---
 
@@ -149,6 +150,8 @@ Errors:
 | `POST` | `/api/auth/login` | No | Login; returns access + refresh tokens |
 | `POST` | `/api/auth/refresh` | No | Exchange refresh token for new access + refresh tokens |
 | `POST` | `/api/auth/revoke` | Bearer | Revoke a refresh token |
+| `POST` | `/api/auth/forgot-password` | No | Request password recovery; always returns generic success (no email enumeration) |
+| `POST` | `/api/auth/reset-password` | No | Reset password with recovery string from forgot-password |
 
 **Register** — Body: `{ "email": "...", "password": "...", "role": "User" }`. Password min length 8.
 
@@ -157,6 +160,10 @@ Errors:
 **Refresh** — Body: `{ "refreshToken": "..." }`.
 
 **Revoke** — Body: `{ "refreshToken": "..." }`. Header: `Authorization: Bearer <accessToken>`.
+
+**Forgot password** — Body: `{ "email": "..." }`. Always returns 200 with a generic message; does not reveal if the email exists.
+
+**Reset password** — Body: `{ "recoverString": "...", "newPassword": "..." }`. New password min length 8. Returns 400 with `INVALID_RECOVERY` if token is missing or expired.
 
 **Auth response** (register/login/refresh):
 

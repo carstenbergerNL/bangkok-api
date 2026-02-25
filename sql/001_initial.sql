@@ -13,9 +13,11 @@ BEGIN
         Email           NVARCHAR(256)    NOT NULL,
         PasswordHash    NVARCHAR(500)    NOT NULL,
         PasswordSalt    NVARCHAR(500)    NOT NULL,
-        Role            NVARCHAR(64)     NOT NULL DEFAULT N'User',
-        CreatedAtUtc    DATETIME2(7)     NOT NULL,
-        UpdatedAtUtc    DATETIME2(7)     NULL,
+        Role                NVARCHAR(64)     NOT NULL DEFAULT N'User',
+        CreatedAtUtc        DATETIME2(7)     NOT NULL,
+        UpdatedAtUtc        DATETIME2(7)     NULL,
+        RecoverString       NVARCHAR(200)    NULL,
+        RecoverStringExpiry DATETIME2(7)     NULL,
         CONSTRAINT UQ_User_Email UNIQUE (Email)
     );
     CREATE NONCLUSTERED INDEX IX_User_Email ON dbo.[User] (Email);

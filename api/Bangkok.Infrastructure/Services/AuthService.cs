@@ -1,30 +1,38 @@
+using System.Security.Cryptography;
 using Bangkok.Application.Dto.Auth;
 using Bangkok.Application.Interfaces;
 using Bangkok.Domain;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Bangkok.Infrastructure.Services;
 
 public class AuthService : IAuthService
 {
+    private const int RecoveryTokenBytes = 32;
+    private const int RecoveryExpiryHours = 1;
+
     private readonly IUserRepository _userRepository;
     private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtService _jwtService;
     private readonly Bangkok.Application.Configuration.JwtSettings _jwtSettings;
+    private readonly ILogger<AuthService> _logger;
 
     public AuthService(
         IUserRepository userRepository,
         IRefreshTokenRepository refreshTokenRepository,
         IPasswordHasher passwordHasher,
         IJwtService jwtService,
-        IOptions<Bangkok.Application.Configuration.JwtSettings> jwtSettings)
+        IOptions<Bangkok.Application.Configuration.JwtSettings> jwtSettings,
+        ILogger<AuthService> logger)
     {
         _userRepository = userRepository;
         _refreshTokenRepository = refreshTokenRepository;
         _passwordHasher = passwordHasher;
         _jwtService = jwtService;
         _jwtSettings = jwtSettings.Value;
+        _logger = logger;
     }
 
     public async Task<AuthResponse?> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
@@ -139,6 +147,50 @@ public class AuthService : IAuthService
             return false;
 
         await _refreshTokenRepository.RevokeAsync(stored.Id, "User revoke", cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    public async Task ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Forgot password request received");
+        var user = await _userRepository.GetByEmailAsync(request.Email, cancellationToken).ConfigureAwait(false);
+        if (user == null)
+            return;
+
+        var recoverStringBytes = new byte[RecoveryTokenBytes];
+        RandomNumberGenerator.Fill(recoverStringBytes);
+        var recoverString = Convert.ToBase64String(recoverStringBytes);
+
+        user.RecoverString = recoverString;
+        user.RecoverStringExpiry = DateTime.UtcNow.AddHours(RecoveryExpiryHours);
+        user.UpdatedAtUtc = DateTime.UtcNow;
+        await _userRepository.UpdateAsync(user, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<bool> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken cancellationToken = default)
+    {
+        var user = await _userRepository.GetByRecoverStringAsync(request.RecoverString, cancellationToken).ConfigureAwait(false);
+        if (user == null)
+        {
+            _logger.LogWarning("Password reset failed: recovery token not found");
+            return false;
+        }
+
+        if (user.RecoverStringExpiry == null || user.RecoverStringExpiry.Value < DateTime.UtcNow)
+        {
+            _logger.LogWarning("Password reset failed: recovery token expired");
+            return false;
+        }
+
+        var (hash, salt) = _passwordHasher.HashPassword(request.NewPassword);
+        user.PasswordHash = hash;
+        user.PasswordSalt = salt;
+        user.RecoverString = null;
+        user.RecoverStringExpiry = null;
+        user.UpdatedAtUtc = DateTime.UtcNow;
+        await _userRepository.UpdateAsync(user, cancellationToken).ConfigureAwait(false);
+
+        _logger.LogInformation("Password reset completed successfully");
         return true;
     }
 }

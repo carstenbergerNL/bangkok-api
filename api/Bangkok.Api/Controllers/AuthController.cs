@@ -111,4 +111,37 @@ public class AuthController : ControllerBase
         _logger.LogInformation("Refresh token revoked. CorrelationId: {CorrelationId}", correlationId);
         return Ok(ApiResponse<object>.Ok(null!, correlationId));
     }
+
+    /// <summary>Request password recovery. Always returns success to avoid revealing whether the email exists.</summary>
+    [HttpPost("forgot-password")]
+    [ProducesResponseType(typeof(ApiResponse<ForgotPasswordResponse>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ApiResponse<ForgotPasswordResponse>>> ForgotPassword(
+        [FromBody] ForgotPasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
+        await _authService.ForgotPasswordAsync(request, cancellationToken).ConfigureAwait(false);
+        return Ok(ApiResponse<ForgotPasswordResponse>.Ok(new ForgotPasswordResponse(), correlationId));
+    }
+
+    /// <summary>Reset password using a valid recovery string from forgot-password.</summary>
+    [HttpPost("reset-password")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<ApiResponse<object>>> ResetPassword(
+        [FromBody] ResetPasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
+        var success = await _authService.ResetPasswordAsync(request, cancellationToken).ConfigureAwait(false);
+        if (!success)
+        {
+            return BadRequest(ApiResponse<object>.Fail(new ErrorResponse
+            {
+                Code = "INVALID_RECOVERY",
+                Message = "Recovery link is invalid or has expired."
+            }, correlationId));
+        }
+        return Ok(ApiResponse<object>.Ok(null!, correlationId));
+    }
 }
