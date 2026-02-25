@@ -29,7 +29,7 @@ A .NET Web API built with **Clean Architecture**, **JWT authentication** (access
 - **User lock and unlock** — Admin-only: lock user (default 15 min or custom UTC `lockoutEnd`); unlock clears lockout. Login returns 403 while locked.
 - **User soft delete and restore** — Admin-only soft delete (IsDeleted, DeletedAt); restore endpoint; all GETs exclude deleted users
 - **User hard delete** — Admin-only permanent delete with `?confirm=true`; referential integrity (refresh tokens deleted first); self-delete blocked
-- **IP brute force protection** — In-memory: 10 failed logins from same IP within 5 minutes blocks that IP for 30 minutes (429 Too Many Requests); no DB/Redis; single-instance only
+- **Brute force protection** — In-memory IP, email, and IP+email tracking. Thresholds: IP 10/5min, email 5/5min, IP+email 5/5min. Exponential IP lock escalation (30min → 2h → 24h) when re-triggered within 24h. 429 with Retry-After; no DB/Redis; single-instance only.
 - **Health checks** — Liveness, readiness, and full health with SQL Server check
 - **Structured logging** — Serilog with console and file sinks, correlation ID and request ID enrichers
 - **Global error handling** — Unhandled exceptions return a consistent `ApiResponse` with correlation ID
@@ -153,7 +153,7 @@ Errors:
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | `POST` | `/api/auth/register` | No | Register user; returns access + refresh tokens |
-| `POST` | `/api/auth/login` | No | Login; returns access + refresh tokens. 403 if account locked (5 failed attempts); 429 if IP blocked (brute force). |
+| `POST` | `/api/auth/login` | No | Login; returns access + refresh tokens. 403 if account locked (5 failed attempts); 429 if IP/email/IP+email brute force block (includes Retry-After header). |
 | `POST` | `/api/auth/refresh` | No | Exchange refresh token for new access + refresh tokens |
 | `POST` | `/api/auth/revoke` | Bearer | Revoke a refresh token |
 | `POST` | `/api/auth/forgot-password` | No | Request password recovery; always returns generic success (no email enumeration) |
@@ -161,7 +161,7 @@ Errors:
 
 **Register** — Body: `{ "email": "...", "password": "...", "displayName": "...", "role": "User" }`. Password min length 8. `displayName` optional.
 
-**Login** — Body: `{ "email": "...", "password": "..." }`. Returns 403 with `ACCOUNT_LOCKED` if the account is locked (e.g. 5 failed attempts); returns 429 with `IP_BLOCKED` ("Too many failed attempts. Try again later.") if the client IP is blocked by brute force protection (10 failures in 5 min → 30 min block).
+**Login** — Body: `{ "email": "...", "password": "..." }`. Returns 403 with `ACCOUNT_LOCKED` if the account is locked (e.g. 5 failed attempts). Returns 429 with `TOO_MANY_ATTEMPTS` ("Too many failed attempts. Try again later.") and a **Retry-After** header (seconds) when blocked by brute force: IP (10 failures in 5 min), email (5 in 5 min), or same IP+email (5 in 5 min). IP blocks use exponential escalation: first 30 min, repeat within 24h → 2h, then 24h; escalation resets after 24h with no block.
 
 **Refresh** — Body: `{ "refreshToken": "..." }`.
 
@@ -297,6 +297,6 @@ Response format (JSON):
 
 - **Swagger** is enabled only in the Development environment.
 - **Middleware order:** Correlation ID → Request ID enricher → Exception handling → Rate limiter → Authentication → Authorization.
-- **IP brute force:** In-memory only (no DB/Redis). Threshold: 10 failed logins per IP in 5 minutes; block 30 minutes. Registered as singleton `IIpBlockService` in Api.
+- **Brute force:** In-memory only (no DB/Redis). Tracks IP, email, and IP+email; thresholds 10/5/5 in 5 min. IP escalation: 30min, 2h, 24h when re-triggered within 24h. Singleton `IIpBlockService` in Api; 429 responses include Retry-After.
 - **Logs:** Serilog writes to console and to `Logs/log-YYYYMMDD.txt` (path configurable in `appsettings.json`). Correlation ID and request ID are attached for tracing.
 - **API response model:** Use `ApiResponse<T>.Ok(data, correlationId)` and `ApiResponse<T>.Fail(error, correlationId)` so all endpoints return a consistent shape.

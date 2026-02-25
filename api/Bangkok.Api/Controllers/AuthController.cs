@@ -46,7 +46,7 @@ public class AuthController : ControllerBase
 
     [HttpPost("login")]
     [EnableRateLimiting("LoginPolicy")]
-    [SwaggerOperation(Summary = "Login", Description = "Authenticate with email and password. Returns access and refresh tokens. After 5 failed attempts the account is locked for 15 minutes (403). IP-based brute force: 10 failed attempts within 5 minutes from same IP returns 429 and blocks the IP for 30 minutes. Rate limited.")]
+    [SwaggerOperation(Summary = "Login", Description = "Authenticate with email and password. Returns access and refresh tokens. Account lockout: 5 failed attempts lock account 15 min (403). Brute force: IP (10/5min), email (5/5min), IP+email (5/5min) can return 429 with exponential IP escalation (30min, 2h, 24h). Rate limited.")]
     [ProducesResponseType(typeof(ApiResponse<AuthResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
@@ -55,25 +55,30 @@ public class AuthController : ControllerBase
     {
         var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
         var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var email = request?.Email?.Trim();
 
-        if (_ipBlockService.IsBlocked(clientIp))
+        var blockResult = _ipBlockService.CheckBlocked(clientIp, email);
+        if (blockResult.IsBlocked)
         {
-            _logger.LogWarning("Blocked IP attempted login. IP: {ClientIp}, Timestamp: {Timestamp:O}", clientIp, DateTime.UtcNow);
-            return StatusCode(StatusCodes.Status429TooManyRequests, ApiResponse<AuthResponse>.Fail(
-                new ErrorResponse { Code = "IP_BLOCKED", Message = "Too many failed attempts. Try again later." }, correlationId));
+            _logger.LogWarning("Blocked login attempt. IP: {ClientIp}, Email: {Email}, Timestamp: {Timestamp:O}", clientIp, email ?? "(none)", DateTime.UtcNow);
+            var response = StatusCode(StatusCodes.Status429TooManyRequests, ApiResponse<AuthResponse>.Fail(
+                new ErrorResponse { Code = "TOO_MANY_ATTEMPTS", Message = "Too many failed attempts. Try again later." }, correlationId));
+            if (blockResult.RetryAfterSeconds is { } retryAfter)
+                Response.Headers.RetryAfter = retryAfter.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            return response;
         }
 
-        var result = await _authService.LoginAsync(request, cancellationToken, clientIp).ConfigureAwait(false);
+        var result = await _authService.LoginAsync(request!, cancellationToken, clientIp).ConfigureAwait(false);
         if (result.IsLocked)
             return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<AuthResponse>.Fail(new ErrorResponse { Code = "ACCOUNT_LOCKED", Message = "Account temporarily locked." }, correlationId));
         if (!result.Success)
         {
-            _ipBlockService.RecordFailedAttempt(clientIp);
-            _logger.LogWarning("Failed login attempt. IP: {ClientIp}, Timestamp: {Timestamp:O}", clientIp, DateTime.UtcNow);
+            _ipBlockService.RecordFailedAttempt(clientIp, email);
+            _logger.LogWarning("Failed login attempt. IP: {ClientIp}, Email: {Email}, Timestamp: {Timestamp:O}", clientIp, email ?? "(none)", DateTime.UtcNow);
             return Unauthorized(ApiResponse<AuthResponse>.Fail(new ErrorResponse { Code = "INVALID_CREDENTIALS", Message = "Invalid email or password." }, correlationId));
         }
 
-        _ipBlockService.ResetAttempts(clientIp);
+        _ipBlockService.ResetAttempts(clientIp, email);
         return Ok(ApiResponse<AuthResponse>.Ok(result.AuthResponse!, correlationId));
     }
 
