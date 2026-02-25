@@ -1,14 +1,16 @@
 using System.Security.Claims;
+using Asp.Versioning;
 using Bangkok.Application.Dto.Users;
 using Bangkok.Application.Interfaces;
 using Bangkok.Application.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Bangkok.Api.Controllers;
+namespace Bangkok.Api.Controllers.V1;
 
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 [Produces("application/json")]
 [Authorize]
 public class UsersController : ControllerBase

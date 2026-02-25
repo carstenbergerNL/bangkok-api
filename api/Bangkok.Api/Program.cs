@@ -1,11 +1,16 @@
+using Asp.Versioning;
+using Asp.Versioning.ApiExplorer;
 using Bangkok.Application.Configuration;
+using Bangkok.Api.Configuration;
 using Bangkok.Api.Middleware;
 using Bangkok.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
+using Swashbuckle.AspNetCore.SwaggerGen;
 using System.Text;
 using System.Text.Json;
 
@@ -58,18 +63,27 @@ builder.Services.AddHealthChecks()
 
 builder.Services.AddControllers();
 
+builder.Services.AddApiVersioning(options =>
+{
+    options.DefaultApiVersion = new ApiVersion(1, 0);
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    options.ReportApiVersions = true;
+})
+.AddMvc()
+.AddApiExplorer(options =>
+{
+    options.GroupNameFormat = "'v'VVV";
+});
+
 // Swagger (development only)
 if (builder.Environment.IsDevelopment())
 {
     builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddTransient<IConfigureOptions<SwaggerGenOptions>, ConfigureSwaggerOptions>();
     builder.Services.AddSwaggerGen(c =>
     {
-        c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
-        {
-            Title = "Bangkok API",
-            Version = "v1",
-            Description = "Enterprise Web API foundation with JWT authentication."
-        });
+        c.DocInclusionPredicate((docName, apiDesc) => apiDesc.GroupName == docName);
+        c.OperationFilter<SwaggerDefaultValues>();
         c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
         {
             Name = "Authorization",
@@ -133,7 +147,11 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Bangkok API v1");
+        var provider = app.Services.GetRequiredService<IApiVersionDescriptionProvider>();
+        foreach (var description in provider.ApiVersionDescriptions)
+        {
+            c.SwaggerEndpoint($"/swagger/{description.GroupName}/swagger.json", $"Bangkok API {description.GroupName}");
+        }
         c.DisplayRequestDuration();
     });
 }

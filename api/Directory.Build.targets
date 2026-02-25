@@ -1,0 +1,7 @@
+<Project>
+  <!-- Unblock output DLLs/EXEs so Windows application management policy does not block loading (0x800711C7) -->
+  <Target Name="UnblockOutputFiles" AfterTargets="Build" Condition="'$(OS)' == 'Windows_NT'">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)Unblock-Output.ps1&quot; -OutputPath &quot;$(OutputPath)&quot;"
+          IgnoreExitCode="true" />
+  </Target>
+</Project>

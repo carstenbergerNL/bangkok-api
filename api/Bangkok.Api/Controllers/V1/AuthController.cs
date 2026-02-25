@@ -1,13 +1,15 @@
+using Asp.Versioning;
 using Bangkok.Application.Dto.Auth;
 using Bangkok.Application.Interfaces;
 using Bangkok.Application.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Bangkok.Api.Controllers;
+namespace Bangkok.Api.Controllers.V1;
 
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
 [Produces("application/json")]
 public class AuthController : ControllerBase
 {

@@ -31,7 +31,8 @@ A .NET Web API built with **Clean Architecture**, **JWT authentication** (access
 - **Health checks** — Liveness, readiness, and full health with SQL Server check
 - **Structured logging** — Serilog with console and file sinks, correlation ID and request ID enrichers
 - **Global error handling** — Unhandled exceptions return a consistent `ApiResponse` with correlation ID
-- **Swagger/OpenAPI** — In Development, with Bearer JWT support
+- **API versioning** — URL segment (e.g. `/api/v1/...`); default version 1.0; supported versions reported in response headers
+- **Swagger/OpenAPI** — In Development, with Bearer JWT support and per-version documentation
 - **Options pattern** — Strongly typed configuration (JWT, connection strings, Serilog)
 
 ---
@@ -80,7 +81,8 @@ sources/
 ├── api/
 │   ├── Bangkok.sln
 │   ├── Bangkok.Api/           # Web API project
-│   │   ├── Controllers/       # AuthController, UsersController
+│   │   ├── Controllers/       # Versioned API
+│   │   │   └── V1/            # AuthController, UsersController (v1.0)
 │   │   ├── Middleware/        # CorrelationId, RequestIdEnricher, ExceptionHandling
 │   │   ├── Program.cs
 │   │   ├── appsettings.Example.json
@@ -119,7 +121,7 @@ Apply schema:
 
 ## API overview
 
-Base path: **`/api`**. All success/error responses use the wrapper:
+Base path: **`/api/v1`** (current version; URL-based versioning, default 1.0). All success/error responses use the wrapper:
 
 ```json
 {
@@ -149,12 +151,12 @@ Errors:
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `POST` | `/api/auth/register` | No | Register user; returns access + refresh tokens |
-| `POST` | `/api/auth/login` | No | Login; returns access + refresh tokens |
-| `POST` | `/api/auth/refresh` | No | Exchange refresh token for new access + refresh tokens |
-| `POST` | `/api/auth/revoke` | Bearer | Revoke a refresh token |
-| `POST` | `/api/auth/forgot-password` | No | Request password recovery; always returns generic success (no email enumeration) |
-| `POST` | `/api/auth/reset-password` | No | Reset password with recovery string from forgot-password |
+| `POST` | `/api/v1/auth/register` | No | Register user; returns access + refresh tokens |
+| `POST` | `/api/v1/auth/login` | No | Login; returns access + refresh tokens |
+| `POST` | `/api/v1/auth/refresh` | No | Exchange refresh token for new access + refresh tokens |
+| `POST` | `/api/v1/auth/revoke` | Bearer | Revoke a refresh token |
+| `POST` | `/api/v1/auth/forgot-password` | No | Request password recovery; always returns generic success (no email enumeration) |
+| `POST` | `/api/v1/auth/reset-password` | No | Reset password with recovery string from forgot-password |
 
 **Register** — Body: `{ "email": "...", "password": "...", "displayName": "...", "role": "User" }`. Password min length 8. `displayName` optional.
 
@@ -184,12 +186,12 @@ Errors:
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `GET` | `/api/users/{id}` | Bearer (self or Admin) | Get one user (safe fields only) |
-| `GET` | `/api/users` | Bearer, Admin | Paginated list; query: `pageNumber`, `pageSize` |
-| `PUT` | `/api/users/{id}` | Bearer (self or Admin) | Update profile: users own email and/or displayName; Admin can set Email, DisplayName, Role, IsActive |
-| `DELETE` | `/api/users/{id}` | Bearer, Admin | Soft-delete user (sets IsDeleted, DeletedAt). Returns 204. Cannot delete yourself. |
-| `PATCH` | `/api/users/{id}/restore` | Bearer, Admin | Restore soft-deleted user. Returns 204. |
-| `DELETE` | `/api/users/{id}/hard` | Bearer, Admin | **Dangerous:** Permanently delete user and refresh tokens. Requires `?confirm=true`. Cannot delete yourself. Returns 204. |
+| `GET` | `/api/v1/users/{id}` | Bearer (self or Admin) | Get one user (safe fields only) |
+| `GET` | `/api/v1/users` | Bearer, Admin | Paginated list; query: `pageNumber`, `pageSize` |
+| `PUT` | `/api/v1/users/{id}` | Bearer (self or Admin) | Update profile: users own email and/or displayName; Admin can set Email, DisplayName, Role, IsActive |
+| `DELETE` | `/api/v1/users/{id}` | Bearer, Admin | Soft-delete user (sets IsDeleted, DeletedAt). Returns 204. Cannot delete yourself. |
+| `PATCH` | `/api/v1/users/{id}/restore` | Bearer, Admin | Restore soft-deleted user. Returns 204. |
+| `DELETE` | `/api/v1/users/{id}/hard` | Bearer, Admin | **Dangerous:** Permanently delete user and refresh tokens. Requires `?confirm=true`. Cannot delete yourself. Returns 204. |
 
 **Get user** — Returns `UserResponse`: `id`, `email`, `displayName`, `role`, `isActive`, `createdAtUtc`, `updatedAtUtc`. No password/recovery data.
 
