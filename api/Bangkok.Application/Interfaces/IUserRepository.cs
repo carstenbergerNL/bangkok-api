@@ -14,4 +14,6 @@ public interface IUserRepository
     Task SoftDeleteAsync(Guid id, CancellationToken cancellationToken = default);
     Task RestoreAsync(Guid id, CancellationToken cancellationToken = default);
     Task HardDeleteAsync(Guid id, CancellationToken cancellationToken = default);
+    Task ClearLockoutAsync(Guid id, CancellationToken cancellationToken = default);
+    Task SetLockoutAsync(Guid id, DateTime lockoutEnd, CancellationToken cancellationToken = default);
 }

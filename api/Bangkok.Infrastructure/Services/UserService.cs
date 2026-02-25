@@ -186,6 +186,52 @@ public class UserService : IUserService
         return HardDeleteUserResult.Success;
     }
 
+    private static readonly TimeSpan LockDuration = TimeSpan.FromMinutes(15);
+
+    public async Task<LockUserResult> LockUserAsync(Guid id, Guid currentUserId, DateTime? lockoutEnd, CancellationToken cancellationToken = default)
+    {
+        if (id == currentUserId)
+        {
+            _logger.LogWarning("Admin attempted to lock themselves. UserId: {UserId}", currentUserId);
+            return LockUserResult.ForbiddenSelfLock;
+        }
+        var user = await _userRepository.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
+        if (user == null)
+        {
+            _logger.LogWarning("Lock failed: user not found. TargetUserId: {TargetUserId}", id);
+            return LockUserResult.NotFound;
+        }
+
+        var effectiveLockoutEnd = lockoutEnd.HasValue
+            ? (lockoutEnd.Value.Kind == DateTimeKind.Utc ? lockoutEnd.Value : DateTime.SpecifyKind(lockoutEnd.Value, DateTimeKind.Utc))
+            : (DateTime?)null;
+
+        if (effectiveLockoutEnd.HasValue && effectiveLockoutEnd.Value <= DateTime.UtcNow)
+        {
+            _logger.LogWarning("Lock failed: LockoutEnd must be in the future. TargetUserId: {TargetUserId}, LockoutEnd: {LockoutEnd:O}", id, effectiveLockoutEnd.Value);
+            return LockUserResult.InvalidLockoutEnd;
+        }
+
+        var end = effectiveLockoutEnd ?? DateTime.UtcNow.Add(LockDuration);
+        await _userRepository.SetLockoutAsync(id, end, cancellationToken).ConfigureAwait(false);
+        _logger.LogInformation("Admin locked user. TargetUserId: {TargetUserId}, LockoutEnd: {LockoutEnd:O}, ActorUserId: {ActorUserId}",
+            id, end, currentUserId);
+        return LockUserResult.Success;
+    }
+
+    public async Task<UnlockUserResult> UnlockUserAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var user = await _userRepository.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
+        if (user == null)
+        {
+            _logger.LogWarning("Unlock failed: user not found. TargetUserId: {TargetUserId}", id);
+            return UnlockUserResult.NotFound;
+        }
+        await _userRepository.ClearLockoutAsync(id, cancellationToken).ConfigureAwait(false);
+        _logger.LogInformation("Admin unlocked user. TargetUserId: {TargetUserId}", id);
+        return UnlockUserResult.Success;
+    }
+
     private static UserResponse MapToResponse(User user)
     {
         return new UserResponse

@@ -1,6 +1,7 @@
 using Bangkok.Application.Dto.Auth;
 using Bangkok.Application.Interfaces;
 using Bangkok.Application.Models;
+using Bangkok.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -16,11 +17,13 @@ namespace Bangkok.Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly IIpBlockService _ipBlockService;
     private readonly ILogger<AuthController> _logger;
 
-    public AuthController(IAuthService authService, ILogger<AuthController> logger)
+    public AuthController(IAuthService authService, IIpBlockService ipBlockService, ILogger<AuthController> logger)
     {
         _authService = authService;
+        _ipBlockService = ipBlockService;
         _logger = logger;
     }
 
@@ -43,19 +46,34 @@ public class AuthController : ControllerBase
 
     [HttpPost("login")]
     [EnableRateLimiting("LoginPolicy")]
-    [SwaggerOperation(Summary = "Login", Description = "Authenticate with email and password. Returns access and refresh tokens. After 5 failed attempts the account is locked for 15 minutes (403). Rate limited.")]
+    [SwaggerOperation(Summary = "Login", Description = "Authenticate with email and password. Returns access and refresh tokens. After 5 failed attempts the account is locked for 15 minutes (403). IP-based brute force: 10 failed attempts within 5 minutes from same IP returns 429 and blocks the IP for 30 minutes. Rate limited.")]
     [ProducesResponseType(typeof(ApiResponse<AuthResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status429TooManyRequests)]
     public async Task<ActionResult<ApiResponse<AuthResponse>>> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
     {
         var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
-        var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+        if (_ipBlockService.IsBlocked(clientIp))
+        {
+            _logger.LogWarning("Blocked IP attempted login. IP: {ClientIp}, Timestamp: {Timestamp:O}", clientIp, DateTime.UtcNow);
+            return StatusCode(StatusCodes.Status429TooManyRequests, ApiResponse<AuthResponse>.Fail(
+                new ErrorResponse { Code = "IP_BLOCKED", Message = "Too many failed attempts. Try again later." }, correlationId));
+        }
+
         var result = await _authService.LoginAsync(request, cancellationToken, clientIp).ConfigureAwait(false);
         if (result.IsLocked)
             return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<AuthResponse>.Fail(new ErrorResponse { Code = "ACCOUNT_LOCKED", Message = "Account temporarily locked." }, correlationId));
         if (!result.Success)
+        {
+            _ipBlockService.RecordFailedAttempt(clientIp);
+            _logger.LogWarning("Failed login attempt. IP: {ClientIp}, Timestamp: {Timestamp:O}", clientIp, DateTime.UtcNow);
             return Unauthorized(ApiResponse<AuthResponse>.Fail(new ErrorResponse { Code = "INVALID_CREDENTIALS", Message = "Invalid email or password." }, correlationId));
+        }
+
+        _ipBlockService.ResetAttempts(clientIp);
         return Ok(ApiResponse<AuthResponse>.Ok(result.AuthResponse!, correlationId));
     }
 

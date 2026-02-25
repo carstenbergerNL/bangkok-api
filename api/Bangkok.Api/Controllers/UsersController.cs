@@ -197,6 +197,65 @@ public class UsersController : ControllerBase
         };
     }
 
+    [HttpPatch("{id:guid}/lock")]
+    [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "Lock user (Admin)", Description = "Lock a user (login returns 403 until lockout expires). Admin only. Cannot lock yourself. Optional body: { \"lockoutEnd\": \"UTC datetime\" }; if omitted, lockout is 15 minutes. LockoutEnd must be in the future. Returns 204.")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> LockUser(
+        [FromRoute] Guid id,
+        [FromBody] LockUserRequest? request,
+        CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
+        var (currentUserId, _) = GetCurrentUserIdentity();
+        if (currentUserId == null)
+            return Unauthorized();
+
+        var result = await _userService.LockUserAsync(id, currentUserId.Value, request?.LockoutEnd, cancellationToken).ConfigureAwait(false);
+
+        return result switch
+        {
+            LockUserResult.Success => NoContent(),
+            LockUserResult.NotFound => NotFound(),
+            LockUserResult.ForbiddenSelfLock => BadRequest(ApiResponse<object>.Fail(new ErrorResponse
+            {
+                Code = "CANNOT_LOCK_SELF",
+                Message = "You cannot lock your own account."
+            }, correlationId)),
+            LockUserResult.InvalidLockoutEnd => BadRequest(ApiResponse<object>.Fail(new ErrorResponse
+            {
+                Code = "INVALID_LOCKOUT_END",
+                Message = "LockoutEnd must be a future UTC date and time."
+            }, correlationId)),
+            _ => NoContent()
+        };
+    }
+
+    [HttpPatch("{id:guid}/unlock")]
+    [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "Unlock user (Admin)", Description = "Clear lockout for a user (failed attempts and lockout end). Admin only. Returns 204.")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UnlockUser(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
+    {
+        var result = await _userService.UnlockUserAsync(id, cancellationToken).ConfigureAwait(false);
+
+        return result switch
+        {
+            UnlockUserResult.Success => NoContent(),
+            UnlockUserResult.NotFound => NotFound(),
+            _ => NoContent()
+        };
+    }
+
     private (Guid? UserId, string? Role) GetCurrentUserIdentity()
     {
         var idClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;

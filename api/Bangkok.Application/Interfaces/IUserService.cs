@@ -11,6 +11,8 @@ public interface IUserService
     Task<DeleteUserResult> DeleteUserAsync(Guid id, Guid currentUserId, CancellationToken cancellationToken = default);
     Task<RestoreUserResult> RestoreUserAsync(Guid id, CancellationToken cancellationToken = default);
     Task<HardDeleteUserResult> HardDeleteUserAsync(Guid id, Guid currentUserId, bool confirm, CancellationToken cancellationToken = default);
+    Task<LockUserResult> LockUserAsync(Guid id, Guid currentUserId, DateTime? lockoutEnd, CancellationToken cancellationToken = default);
+    Task<UnlockUserResult> UnlockUserAsync(Guid id, CancellationToken cancellationToken = default);
 }
 
 public enum UpdateUserResult
@@ -42,4 +44,18 @@ public enum HardDeleteUserResult
     NotFound,
     ForbiddenSelfDelete,
     ConfirmRequired
+}
+
+public enum LockUserResult
+{
+    Success,
+    NotFound,
+    ForbiddenSelfLock,
+    InvalidLockoutEnd
+}
+
+public enum UnlockUserResult
+{
+    Success,
+    NotFound
 }

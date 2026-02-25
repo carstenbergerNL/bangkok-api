@@ -195,4 +195,32 @@ public class UserRepository : IUserRepository
             }
         }
     }
+
+    public async Task ClearLockoutAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken).ConfigureAwait(false);
+        using (connection)
+        {
+            connection.Open();
+            const string sql = @"
+            UPDATE dbo.[User]
+            SET FailedLoginAttempts = 0, LockoutEnd = NULL, UpdatedAtUtc = GETUTCDATE()
+            WHERE Id = @Id AND IsDeleted = 0";
+            await connection.ExecuteAsync(new CommandDefinition(sql, new { Id = id }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        }
+    }
+
+    public async Task SetLockoutAsync(Guid id, DateTime lockoutEnd, CancellationToken cancellationToken = default)
+    {
+        var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken).ConfigureAwait(false);
+        using (connection)
+        {
+            connection.Open();
+            const string sql = @"
+            UPDATE dbo.[User]
+            SET FailedLoginAttempts = 10, LockoutEnd = @LockoutEnd, UpdatedAtUtc = GETUTCDATE()
+            WHERE Id = @Id AND IsDeleted = 0";
+            await connection.ExecuteAsync(new CommandDefinition(sql, new { Id = id, LockoutEnd = lockoutEnd }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        }
+    }
 }

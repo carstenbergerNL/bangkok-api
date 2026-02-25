@@ -1,6 +1,7 @@
 using Bangkok.Application.Configuration;
 using Bangkok.Application.Models;
 using Bangkok.Api.Middleware;
+using Bangkok.Api.Services;
 using Bangkok.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -33,6 +34,9 @@ builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection(JwtSett
 
 // SQL + Application services (Dapper, Repositories, Auth)
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// In-memory IP brute force protection (single-instance only)
+builder.Services.AddSingleton<IIpBlockService, IpBlockService>();
 
 // JWT Authentication
 var jwtSettings = builder.Configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>();
