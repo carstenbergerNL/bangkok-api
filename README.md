@@ -26,6 +26,8 @@ A .NET Web API built with **Clean Architecture**, **JWT authentication** (access
 - **Token refresh and revoke** — Exchange refresh token for new tokens; revoke refresh tokens (authenticated)
 - **Password recovery** — Forgot-password (generic success, no email enumeration); reset-password with secure recovery string and expiry
 - **User profile and list** — Get/update user (safe fields only); users can update own email; Admin can list all (paginated), update Role and IsActive
+- **User soft delete and restore** — Admin-only soft delete (IsDeleted, DeletedAt); restore endpoint; all GETs exclude deleted users
+- **User hard delete** — Admin-only permanent delete with `?confirm=true`; referential integrity (refresh tokens deleted first); self-delete blocked
 - **Health checks** — Liveness, readiness, and full health with SQL Server check
 - **Structured logging** — Serilog with console and file sinks, correlation ID and request ID enrichers
 - **Global error handling** — Unhandled exceptions return a consistent `ApiResponse` with correlation ID
@@ -89,7 +91,7 @@ sources/
 ├── sql/
 │   ├── 001_initial.sql        # User + RefreshToken tables
 │   └── alters/               # Schema change scripts (002–004: display name, password recovery, is_active)
-├── json/                      # Example request bodies (login, register, refresh, revoke, forgot_password, reset_password, update_user, get_users)
+├── json/                      # Example request bodies (login, register, … delete_user, restore_user, hard_delete_user)
 ├── .cursor/rules/             # Architecture rules
 ├── .gitignore
 └── README.md
@@ -104,14 +106,14 @@ sources/
 
 **Tables:**
 
-- **User** — `Id`, `Email` (unique), `DisplayName`, `PasswordHash`, `PasswordSalt`, `Role`, `IsActive`, `CreatedAtUtc`, `UpdatedAtUtc`, `RecoverString`, `RecoverStringExpiry` (DisplayName and recovery columns via alters on existing DBs).
+- **User** — `Id`, `Email` (unique), `DisplayName`, `PasswordHash`, `PasswordSalt`, `Role`, `IsActive`, `CreatedAtUtc`, `UpdatedAtUtc`, `RecoverString`, `RecoverStringExpiry`, `IsDeleted`, `DeletedAt` (soft delete; via alters on existing DBs).
 - **RefreshToken** — `Id`, `UserId` (FK), `Token`, `ExpiresAtUtc`, `CreatedAtUtc`, `RevokedReason`, `RevokedAtUtc`.
 
 Apply schema:
 
 1. Create a database (e.g. `BangkokDb`).
 2. Run `sql/001_initial.sql`.
-3. Run any scripts in `sql/alters/` in order (e.g. `002_add_user_display_name.sql`, `003_add_password_recovery.sql`, `004_add_user_is_active.sql`).
+3. Run any scripts in `sql/alters/` in order (e.g. `002_add_user_display_name.sql` … `005_add_soft_delete_to_users.sql`).
 
 ---
 
@@ -185,12 +187,21 @@ Errors:
 | `GET` | `/api/users/{id}` | Bearer (self or Admin) | Get one user (safe fields only) |
 | `GET` | `/api/users` | Bearer, Admin | Paginated list; query: `pageNumber`, `pageSize` |
 | `PUT` | `/api/users/{id}` | Bearer (self or Admin) | Update profile: users own email and/or displayName; Admin can set Email, DisplayName, Role, IsActive |
+| `DELETE` | `/api/users/{id}` | Bearer, Admin | Soft-delete user (sets IsDeleted, DeletedAt). Returns 204. Cannot delete yourself. |
+| `PATCH` | `/api/users/{id}/restore` | Bearer, Admin | Restore soft-deleted user. Returns 204. |
+| `DELETE` | `/api/users/{id}/hard` | Bearer, Admin | **Dangerous:** Permanently delete user and refresh tokens. Requires `?confirm=true`. Cannot delete yourself. Returns 204. |
 
 **Get user** — Returns `UserResponse`: `id`, `email`, `displayName`, `role`, `isActive`, `createdAtUtc`, `updatedAtUtc`. No password/recovery data.
 
 **Get users** — Query: `?pageNumber=1&pageSize=10`. Response: `items`, `totalCount`, `pageNumber`, `pageSize`.
 
 **Update user** — Body: `{ "email": "...", "displayName": "...", "role": "...", "isActive": true }`. Omit fields to leave unchanged. Users can update own email and/or displayName; Admin only for `role` and `isActive`.
+
+**Delete user** — No body. Admin only. Soft-delete (IsDeleted = 1, DeletedAt = now). Returns 204; 404 if not found; 400 if already deleted or self-delete.
+
+**Restore user** — No body. Admin only. Sets IsDeleted = 0, DeletedAt = NULL. Returns 204; 404 if not found; 400 if not deleted. All GET queries exclude soft-deleted users.
+
+**Hard delete user** — No body. Admin only. Query: `?confirm=true` (required). Permanently deletes the user and their refresh tokens. Returns 204; 400 if `confirm` is not true or self-delete; 404 if not found. Soft delete remains the default; use this only when permanent removal is required.
 
 ---
 

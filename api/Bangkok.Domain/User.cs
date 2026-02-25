@@ -16,4 +16,6 @@ public class User
     public DateTime? UpdatedAtUtc { get; set; }
     public string? RecoverString { get; set; }
     public DateTime? RecoverStringExpiry { get; set; }
+    public bool IsDeleted { get; set; }
+    public DateTime? DeletedAt { get; set; }
 }

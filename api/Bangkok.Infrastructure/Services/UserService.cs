@@ -117,6 +117,75 @@ public class UserService : IUserService
         return UpdateUserResult.Forbidden;
     }
 
+    public async Task<DeleteUserResult> DeleteUserAsync(Guid id, Guid currentUserId, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("User delete attempt. TargetUserId: {TargetUserId}, ActorUserId: {ActorUserId}", id, currentUserId);
+        var user = await _userRepository.GetByIdIncludeDeletedAsync(id, cancellationToken).ConfigureAwait(false);
+        if (user == null)
+        {
+            _logger.LogWarning("Delete failed: user not found. TargetUserId: {TargetUserId}", id);
+            return DeleteUserResult.NotFound;
+        }
+        if (user.IsDeleted)
+        {
+            _logger.LogWarning("Delete failed: user already deleted. TargetUserId: {TargetUserId}", id);
+            return DeleteUserResult.AlreadyDeleted;
+        }
+        if (id == currentUserId)
+        {
+            _logger.LogWarning("Unauthorized delete attempt: user tried to delete themselves. UserId: {UserId}", currentUserId);
+            return DeleteUserResult.ForbiddenSelfDelete;
+        }
+        await _userRepository.SoftDeleteAsync(id, cancellationToken).ConfigureAwait(false);
+        _logger.LogInformation("User soft-deleted successfully. UserId: {UserId}", id);
+        return DeleteUserResult.Success;
+    }
+
+    public async Task<RestoreUserResult> RestoreUserAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("User restore attempt. TargetUserId: {TargetUserId}", id);
+        var user = await _userRepository.GetByIdIncludeDeletedAsync(id, cancellationToken).ConfigureAwait(false);
+        if (user == null)
+        {
+            _logger.LogWarning("Restore failed: user not found. TargetUserId: {TargetUserId}", id);
+            return RestoreUserResult.NotFound;
+        }
+        if (!user.IsDeleted)
+        {
+            _logger.LogWarning("Restore failed: user is not deleted. TargetUserId: {TargetUserId}", id);
+            return RestoreUserResult.NotDeleted;
+        }
+        await _userRepository.RestoreAsync(id, cancellationToken).ConfigureAwait(false);
+        _logger.LogInformation("User restored successfully. UserId: {UserId}", id);
+        return RestoreUserResult.Success;
+    }
+
+    public async Task<HardDeleteUserResult> HardDeleteUserAsync(Guid id, Guid currentUserId, bool confirm, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Hard delete attempt. TargetUserId: {TargetUserId}, ActorUserId: {ActorUserId}, Confirm: {Confirm}, TimestampUtc: {TimestampUtc}",
+            id, currentUserId, confirm, DateTime.UtcNow);
+        if (!confirm)
+        {
+            _logger.LogWarning("Hard delete rejected: confirm parameter not true. TargetUserId: {TargetUserId}", id);
+            return HardDeleteUserResult.ConfirmRequired;
+        }
+        var user = await _userRepository.GetByIdIncludeDeletedAsync(id, cancellationToken).ConfigureAwait(false);
+        if (user == null)
+        {
+            _logger.LogWarning("Hard delete failed: user not found. TargetUserId: {TargetUserId}", id);
+            return HardDeleteUserResult.NotFound;
+        }
+        if (id == currentUserId)
+        {
+            _logger.LogWarning("Hard delete rejected: user attempted to delete themselves. ActorUserId: {ActorUserId}", currentUserId);
+            return HardDeleteUserResult.ForbiddenSelfDelete;
+        }
+        await _userRepository.HardDeleteAsync(id, cancellationToken).ConfigureAwait(false);
+        _logger.LogInformation("User hard-deleted permanently. TargetUserId: {TargetUserId}, ActorUserId: {ActorUserId}, TimestampUtc: {TimestampUtc}",
+            id, currentUserId, DateTime.UtcNow);
+        return HardDeleteUserResult.Success;
+    }
+
     private static UserResponse MapToResponse(User user)
     {
         return new UserResponse

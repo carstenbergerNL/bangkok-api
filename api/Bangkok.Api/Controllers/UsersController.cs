@@ -113,6 +113,86 @@ public class UsersController : ControllerBase
         };
     }
 
+    /// <summary>Soft-delete a user. Admin only. Returns 204 on success. Cannot delete yourself.</summary>
+    [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "Admin")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteUser(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
+    {
+        var (currentUserId, _) = GetCurrentUserIdentity();
+        if (currentUserId == null)
+            return Unauthorized();
+
+        var result = await _userService.DeleteUserAsync(id, currentUserId.Value, cancellationToken).ConfigureAwait(false);
+
+        return result switch
+        {
+            DeleteUserResult.Success => NoContent(),
+            DeleteUserResult.NotFound => NotFound(),
+            DeleteUserResult.AlreadyDeleted => BadRequest(),
+            DeleteUserResult.ForbiddenSelfDelete => BadRequest(),
+            _ => NoContent()
+        };
+    }
+
+    /// <summary>Dangerous operation: Permanently delete a user and their refresh tokens. Admin only. Requires query parameter confirm=true. Cannot delete yourself. Returns 204 on success.</summary>
+    [HttpDelete("{id:guid}/hard")]
+    [Authorize(Roles = "Admin")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> HardDeleteUser(
+        [FromRoute] Guid id,
+        [FromQuery] bool confirm = false,
+        CancellationToken cancellationToken = default)
+    {
+        var (currentUserId, _) = GetCurrentUserIdentity();
+        if (currentUserId == null)
+            return Unauthorized();
+
+        var result = await _userService.HardDeleteUserAsync(id, currentUserId.Value, confirm, cancellationToken).ConfigureAwait(false);
+
+        return result switch
+        {
+            HardDeleteUserResult.Success => NoContent(),
+            HardDeleteUserResult.NotFound => NotFound(),
+            HardDeleteUserResult.ForbiddenSelfDelete => BadRequest(),
+            HardDeleteUserResult.ConfirmRequired => BadRequest(),
+            _ => NoContent()
+        };
+    }
+
+    /// <summary>Restore a soft-deleted user. Admin only. Returns 204 on success.</summary>
+    [HttpPatch("{id:guid}/restore")]
+    [Authorize(Roles = "Admin")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RestoreUser(
+        [FromRoute] Guid id,
+        CancellationToken cancellationToken)
+    {
+        var result = await _userService.RestoreUserAsync(id, cancellationToken).ConfigureAwait(false);
+
+        return result switch
+        {
+            RestoreUserResult.Success => NoContent(),
+            RestoreUserResult.NotFound => NotFound(),
+            RestoreUserResult.NotDeleted => BadRequest(),
+            _ => NoContent()
+        };
+    }
+
     private (Guid? UserId, string? Role) GetCurrentUserIdentity()
     {
         var idClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;

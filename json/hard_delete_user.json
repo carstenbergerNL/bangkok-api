@@ -1,0 +1,3 @@
+{
+  "_comment": "DELETE /api/users/{id}/hard?confirm=true - No request body. Admin only. Query parameter confirm must be true. Returns 204 No Content on success. Dangerous: permanent deletion."
+}

@@ -20,6 +20,8 @@ BEGIN
         UpdatedAtUtc        DATETIME2(7)     NULL,
         RecoverString       NVARCHAR(200)    NULL,
         RecoverStringExpiry DATETIME2(7)     NULL,
+        IsDeleted           BIT              NOT NULL DEFAULT 0,
+        DeletedAt           DATETIME2(7)     NULL,
         CONSTRAINT UQ_User_Email UNIQUE (Email)
     );
     CREATE NONCLUSTERED INDEX IX_User_Email ON dbo.[User] (Email);
