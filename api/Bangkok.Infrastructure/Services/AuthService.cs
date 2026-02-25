@@ -11,6 +11,8 @@ public class AuthService : IAuthService
 {
     private const int RecoveryTokenBytes = 32;
     private const int RecoveryExpiryHours = 1;
+    private const int LockoutFailedAttemptLimit = 5;
+    private static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
 
     private readonly IUserRepository _userRepository;
     private readonly IRefreshTokenRepository _refreshTokenRepository;
@@ -78,11 +80,44 @@ public class AuthService : IAuthService
         };
     }
 
-    public async Task<AuthResponse?> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
+    public async Task<LoginResult> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default, string? clientIp = null)
     {
         var user = await _userRepository.GetByEmailAsync(request.Email, cancellationToken).ConfigureAwait(false);
-        if (user == null || !_passwordHasher.VerifyPassword(request.Password, user.PasswordHash, user.PasswordSalt))
-            return null;
+
+        if (user == null)
+        {
+            _logger.LogWarning("Failed login attempt. ClientIp: {ClientIp}, Timestamp: {Timestamp:O}", clientIp ?? "unknown", DateTime.UtcNow);
+            return LoginResult.Failed();
+        }
+
+        if (user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTime.UtcNow)
+        {
+            _logger.LogWarning("Locked account login attempt. Email: {Email}, ClientIp: {ClientIp}, Timestamp: {Timestamp:O}", user.Email, clientIp ?? "unknown", DateTime.UtcNow);
+            return LoginResult.Locked();
+        }
+
+        if (!_passwordHasher.VerifyPassword(request.Password, user.PasswordHash, user.PasswordSalt))
+        {
+            user.FailedLoginAttempts++;
+            var lockoutTriggered = false;
+            if (user.FailedLoginAttempts >= LockoutFailedAttemptLimit)
+            {
+                user.LockoutEnd = DateTime.UtcNow.Add(LockoutDuration);
+                user.FailedLoginAttempts = 0;
+                lockoutTriggered = true;
+                _logger.LogWarning("Lockout triggered. Email: {Email}, ClientIp: {ClientIp}, Timestamp: {Timestamp:O}", user.Email, clientIp ?? "unknown", DateTime.UtcNow);
+            }
+            if (!lockoutTriggered)
+                _logger.LogWarning("Failed login attempt. Email: {Email}, ClientIp: {ClientIp}, Timestamp: {Timestamp:O}", user.Email, clientIp ?? "unknown", DateTime.UtcNow);
+            user.UpdatedAtUtc = DateTime.UtcNow;
+            await _userRepository.UpdateAsync(user, cancellationToken).ConfigureAwait(false);
+            return LoginResult.Failed();
+        }
+
+        user.FailedLoginAttempts = 0;
+        user.LockoutEnd = null;
+        user.UpdatedAtUtc = DateTime.UtcNow;
+        await _userRepository.UpdateAsync(user, cancellationToken).ConfigureAwait(false);
 
         var (refreshTokenValue, refreshExpires) = _jwtService.GenerateRefreshToken();
         var refreshToken = new RefreshToken
@@ -98,14 +133,16 @@ public class AuthService : IAuthService
         var accessToken = _jwtService.GenerateAccessToken(user.Id, user.Email, user.Role);
         var expiresAtUtc = DateTime.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpirationMinutes);
 
-        return new AuthResponse
+        _logger.LogInformation("User logged in. Email: {Email}, ClientIp: {ClientIp}, Timestamp: {Timestamp:O}", user.Email, clientIp ?? "unknown", DateTime.UtcNow);
+
+        return LoginResult.Succeeded(new AuthResponse
         {
             AccessToken = accessToken,
             RefreshToken = refreshTokenValue,
             ExpiresAtUtc = expiresAtUtc,
             TokenType = "Bearer",
             DisplayName = user.DisplayName
-        };
+        });
     }
 
     public async Task<AuthResponse?> RefreshAsync(RefreshRequest request, CancellationToken cancellationToken = default)

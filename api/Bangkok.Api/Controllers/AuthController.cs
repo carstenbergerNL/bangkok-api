@@ -43,17 +43,17 @@ public class AuthController : ControllerBase
     [EnableRateLimiting("LoginPolicy")]
     [ProducesResponseType(typeof(ApiResponse<AuthResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<ApiResponse<AuthResponse>>> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
     {
         var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
-        var response = await _authService.LoginAsync(request, cancellationToken).ConfigureAwait(false);
-        if (response == null)
-        {
-            _logger.LogWarning("Login failed for email: {Email}", request.Email);
+        var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var result = await _authService.LoginAsync(request, cancellationToken, clientIp).ConfigureAwait(false);
+        if (result.IsLocked)
+            return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<AuthResponse>.Fail(new ErrorResponse { Code = "ACCOUNT_LOCKED", Message = "Account temporarily locked." }, correlationId));
+        if (!result.Success)
             return Unauthorized(ApiResponse<AuthResponse>.Fail(new ErrorResponse { Code = "INVALID_CREDENTIALS", Message = "Invalid email or password." }, correlationId));
-        }
-        _logger.LogInformation("User logged in. Email: {Email}", request.Email);
-        return Ok(ApiResponse<AuthResponse>.Ok(response, correlationId));
+        return Ok(ApiResponse<AuthResponse>.Ok(result.AuthResponse!, correlationId));
     }
 
     [HttpPost("refresh")]

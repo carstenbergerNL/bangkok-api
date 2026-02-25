@@ -22,7 +22,7 @@ public class UserRepository : IUserRepository
         {
             connection.Open();
             const string sql = @"
-            SELECT Id, Email, DisplayName, PasswordHash, PasswordSalt, Role, IsActive, CreatedAtUtc, UpdatedAtUtc, RecoverString, RecoverStringExpiry, IsDeleted, DeletedAt
+            SELECT Id, Email, DisplayName, PasswordHash, PasswordSalt, Role, IsActive, CreatedAtUtc, UpdatedAtUtc, RecoverString, RecoverStringExpiry, IsDeleted, DeletedAt, FailedLoginAttempts, LockoutEnd
             FROM dbo.[User]
             WHERE Id = @Id AND IsDeleted = 0";
             return await connection.QuerySingleOrDefaultAsync<User>(new CommandDefinition(sql, new { Id = id }, cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -36,7 +36,7 @@ public class UserRepository : IUserRepository
         {
             connection.Open();
             const string sql = @"
-            SELECT Id, Email, DisplayName, PasswordHash, PasswordSalt, Role, IsActive, CreatedAtUtc, UpdatedAtUtc, RecoverString, RecoverStringExpiry, IsDeleted, DeletedAt
+            SELECT Id, Email, DisplayName, PasswordHash, PasswordSalt, Role, IsActive, CreatedAtUtc, UpdatedAtUtc, RecoverString, RecoverStringExpiry, IsDeleted, DeletedAt, FailedLoginAttempts, LockoutEnd
             FROM dbo.[User]
             WHERE Id = @Id";
             return await connection.QuerySingleOrDefaultAsync<User>(new CommandDefinition(sql, new { Id = id }, cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -50,7 +50,7 @@ public class UserRepository : IUserRepository
         {
             connection.Open();
             const string sql = @"
-            SELECT Id, Email, DisplayName, PasswordHash, PasswordSalt, Role, IsActive, CreatedAtUtc, UpdatedAtUtc, RecoverString, RecoverStringExpiry, IsDeleted, DeletedAt
+            SELECT Id, Email, DisplayName, PasswordHash, PasswordSalt, Role, IsActive, CreatedAtUtc, UpdatedAtUtc, RecoverString, RecoverStringExpiry, IsDeleted, DeletedAt, FailedLoginAttempts, LockoutEnd
             FROM dbo.[User]
             WHERE Email = @Email AND IsDeleted = 0";
             return await connection.QuerySingleOrDefaultAsync<User>(new CommandDefinition(sql, new { Email = email }, cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -64,7 +64,7 @@ public class UserRepository : IUserRepository
         {
             connection.Open();
             const string sql = @"
-            SELECT Id, Email, DisplayName, PasswordHash, PasswordSalt, Role, IsActive, CreatedAtUtc, UpdatedAtUtc, RecoverString, RecoverStringExpiry, IsDeleted, DeletedAt
+            SELECT Id, Email, DisplayName, PasswordHash, PasswordSalt, Role, IsActive, CreatedAtUtc, UpdatedAtUtc, RecoverString, RecoverStringExpiry, IsDeleted, DeletedAt, FailedLoginAttempts, LockoutEnd
             FROM dbo.[User]
             WHERE RecoverString = @RecoverString AND IsDeleted = 0";
             return await connection.QuerySingleOrDefaultAsync<User>(new CommandDefinition(sql, new { RecoverString = recoverString }, cancellationToken: cancellationToken)).ConfigureAwait(false);
@@ -105,7 +105,7 @@ public class UserRepository : IUserRepository
             UPDATE dbo.[User]
             SET Email = @Email, DisplayName = @DisplayName, PasswordHash = @PasswordHash, PasswordSalt = @PasswordSalt, Role = @Role,
                 IsActive = @IsActive, UpdatedAtUtc = @UpdatedAtUtc, RecoverString = @RecoverString, RecoverStringExpiry = @RecoverStringExpiry,
-                IsDeleted = @IsDeleted, DeletedAt = @DeletedAt
+                IsDeleted = @IsDeleted, DeletedAt = @DeletedAt, FailedLoginAttempts = @FailedLoginAttempts, LockoutEnd = @LockoutEnd
             WHERE Id = @Id";
             await connection.ExecuteAsync(new CommandDefinition(sql, new
             {
@@ -120,7 +120,9 @@ public class UserRepository : IUserRepository
                 user.RecoverString,
                 user.RecoverStringExpiry,
                 user.IsDeleted,
-                user.DeletedAt
+                user.DeletedAt,
+                user.FailedLoginAttempts,
+                user.LockoutEnd
             }, cancellationToken: cancellationToken)).ConfigureAwait(false);
         }
     }
@@ -139,7 +141,7 @@ public class UserRepository : IUserRepository
             var totalCount = await connection.ExecuteScalarAsync<int>(new CommandDefinition(countSql, cancellationToken: cancellationToken)).ConfigureAwait(false);
 
             const string sql = @"
-            SELECT Id, Email, DisplayName, PasswordHash, PasswordSalt, Role, IsActive, CreatedAtUtc, UpdatedAtUtc, RecoverString, RecoverStringExpiry, IsDeleted, DeletedAt
+            SELECT Id, Email, DisplayName, PasswordHash, PasswordSalt, Role, IsActive, CreatedAtUtc, UpdatedAtUtc, RecoverString, RecoverStringExpiry, IsDeleted, DeletedAt, FailedLoginAttempts, LockoutEnd
             FROM dbo.[User]
             WHERE IsDeleted = 0
             ORDER BY CreatedAtUtc

@@ -18,4 +18,6 @@ public class User
     public DateTime? RecoverStringExpiry { get; set; }
     public bool IsDeleted { get; set; }
     public DateTime? DeletedAt { get; set; }
+    public int FailedLoginAttempts { get; set; }
+    public DateTime? LockoutEnd { get; set; }
 }
