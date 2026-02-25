@@ -1,0 +1,23 @@
+---
+description: Keep README.md in sync with the API, solution, and database
+alwaysApply: true
+---
+
+# Keep README in Sync
+
+When you **add, change, or remove** any of the following, **update README.md** so it stays accurate:
+
+| Change type | Update these README sections |
+|-------------|------------------------------|
+| New/removed/renamed **API endpoint** or controller | [API overview](#api-overview) — endpoint table, request/response examples |
+| New **project** or folder in solution | [Solution structure](#solution-structure) — folder tree |
+| New **NuGet package** or major tech | [Tech stack](#tech-stack) — table; [Features](#features) if user-facing |
+| New **config** (appsettings, options) | [Configuration](#configuration) — document key and purpose |
+| New **health** endpoint or check | [Health endpoints](#health-endpoints) — table and response shape |
+| New **SQL** table/script or schema change | [Database](#database) — tables list; mention new scripts in sql/ |
+| New **middleware** or pipeline change | [Development](#development) — middleware order if relevant |
+| New **feature** (e.g. new auth flow) | [Features](#features) and related sections above |
+
+**How to update:** Edit the existing README sections; preserve the same structure (tables, headings, code blocks). Do not remove sections that are still accurate—only change what the code/config now does.
+
+After editing README, say briefly what you changed (e.g. "Updated README: added /api/orders to API overview and new OrdersController in solution structure.").

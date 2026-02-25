@@ -1,16 +1,38 @@
 ---
-description: Bangkok API solution architecture and conventions
-globs: api/**/*
+description: Bangkok API solution architecture and layer conventions
+alwaysApply: true
 ---
 
-# Bangkok API - Architecture Rules
+# Bangkok API - Architecture
 
-- **Clean Architecture**: Domain → Application → Infrastructure → Api. No backward references.
-- **Controllers**: Thin; no business logic. Delegate to Application services.
-- **Data access**: Dapper only (no Entity Framework). All SQL in Infrastructure.
-- **Patterns**: Repository + Service layer. Interfaces in Application.
-- **Async**: All I/O and service methods are async.
-- **SQL**: Stored in /sql; main schema in 001_initial.sql; changes in /sql/alters. Use UNIQUEIDENTIFIER, DATETIME2, NVARCHAR.
-- **Config**: Strongly typed options (JWT, ConnectionStrings, Serilog). Use Options pattern.
-- **Responses**: Use ApiResponse<T> and ErrorResponse from Application.Models.
-- **Auth**: JWT with access + refresh tokens; refresh tokens stored in SQL Server.
+## Layer order (Clean Architecture)
+
+**Domain → Application → Infrastructure → Api.** No backward references.
+
+- **Domain**: Entities only (e.g. `User`, `RefreshToken`). No dependencies.
+- **Application**: Interfaces (repositories, services), DTOs, options classes, `ApiResponse<T>` / `ErrorResponse`. Depends only on Domain.
+- **Infrastructure**: Implements Application interfaces (repositories, services), Dapper + SQL, JWT, password hasher. No references to Api.
+- **Api**: Controllers, middleware, `Program.cs`. References Application + Infrastructure; controllers delegate to Application services only.
+
+## Conventions
+
+- **Controllers**: Thin; no business logic. Use `[ApiController]`, `[Route("api/[controller]")]`, `[Produces("application/json")]`. Document actions with `<summary>` and `ProducesResponseType`.
+- **Data access**: Dapper only (no Entity Framework). All SQL in Infrastructure (inline or loaded from `/sql`). Use `ISqlConnectionFactory` and `CommandDefinition` with `CancellationToken`.
+- **Patterns**: Repository + Service. Interfaces in Application; implementations in Infrastructure. Register in Infrastructure’s `DependencyInjection`.
+- **Config**: Strongly typed options (e.g. `JwtSettings`, `SqlConnectionOptions`). Use Options pattern; bind in `Program.cs` or DI extension.
+- **Responses**: All API responses use `ApiResponse<T>` and `ErrorResponse` from `Bangkok.Application.Models`. Include `correlationId` (from `X-Correlation-ID` header or `HttpContext.TraceIdentifier`).
+- **Auth**: JWT access + refresh tokens; refresh tokens stored in SQL Server. Auth endpoints in `AuthController`; logic in `IAuthService` / `AuthService`.
+- **SQL**: Scripts in `/sql`; main schema in `001_initial.sql`; incremental changes in `/sql/alters`. Use `UNIQUEIDENTIFIER`, `DATETIME2`, `NVARCHAR`. Keep `001_initial.sql` reflecting full current schema where practical.
+
+## Where to put new code
+
+| What | Where |
+|------|--------|
+| New entity | Bangkok.Domain |
+| New DTO / request / response | Bangkok.Application (Dto or Models) |
+| New repository or service interface | Bangkok.Application.Interfaces |
+| New options class | Bangkok.Application.Configuration (or Infrastructure if DB-specific) |
+| Repository/service implementation | Bangkok.Infrastructure (Repositories, Services, Security, Data) |
+| New API controller / endpoint | Bangkok.Api.Controllers |
+| New middleware | Bangkok.Api.Middleware; register in Program.cs |
+| New SQL table/alter | sql/ or sql/alters/ |

@@ -1,0 +1,40 @@
+---
+description: C# and API coding standards for Bangkok API
+globs: api/**/*.cs
+---
+
+# C# and API Development
+
+## Async and I/O
+
+- All I/O and service methods that perform I/O are **async** and return `Task` or `Task<T>`.
+- Use **`.ConfigureAwait(false)`** on every `await` in library/Infrastructure/Application code; optional in Api (e.g. controllers) but consistent is fine.
+- Pass **`CancellationToken`** on async methods (parameter or `CancellationToken cancellationToken = default`). Use `CommandDefinition(..., cancellationToken: cancellationToken)` with Dapper.
+
+## Controllers
+
+- Get correlation ID: `HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier`.
+- Return success: `ApiResponse<T>.Ok(data, correlationId)` with appropriate status (`Ok`, `CreatedAtAction`, etc.).
+- Return errors: `ApiResponse<T>.Fail(new ErrorResponse { Code = "...", Message = "..." }, correlationId)` with `BadRequest`, `Unauthorized`, etc.
+- Use **structured logging** (`_logger.LogInformation("...", request.Email)`) — no string interpolation in message; use named parameters for data.
+- Keep actions thin: validate input (or rely on `[Required]` etc.), call one service method, map result to `ApiResponse<T>`.
+
+## DTOs and validation
+
+- Request DTOs in Application: use **DataAnnotations** (`[Required]`, `[EmailAddress]`, `[MinLength(n)]`) for validation. Use `[FromBody]` in controller.
+- Use **nullable** where “not found” or “optional” is possible (e.g. `Task<AuthResponse?>`, `User?`).
+
+## Dependency injection
+
+- Prefer **constructor injection**. Register services in Infrastructure’s `DependencyInjection` (repositories and services **Scoped**; connection factory **Singleton**; options via `Configure<T>`).
+
+## Errors and logging
+
+- Do not swallow exceptions. In middleware, log and return a consistent `ApiResponse` with code/message.
+- In Application/Infrastructure, let exceptions bubble unless you translate to a domain/application result (e.g. return `null` for “not found” where that’s the contract).
+
+## Naming and style
+
+- Interfaces: `IUserRepository`, `IAuthService`. Implementations: `UserRepository`, `AuthService`.
+- Private fields: `_camelCase`. Public members: `PascalCase`. Async methods: suffix `Async`.
+- SQL parameters: use Dapper anonymous objects or `CommandDefinition`; never concatenate user input into SQL.
