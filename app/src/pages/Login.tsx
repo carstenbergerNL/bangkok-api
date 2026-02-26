@@ -46,9 +46,9 @@ export function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center p-6 app-bg">
       <div className="w-full max-w-[400px]">
-        <div className="card p-8 shadow-lg">
-          <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">Sign in to Bangkok</h1>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Enter your credentials to continue.</p>
+        <div className="card p-8">
+          <h1 className="text-2xl font-semibold tracking-tight" style={{ color: 'var(--card-header-color, #323130)' }}>Sign in to Bangkok</h1>
+          <p className="mt-2 text-sm" style={{ color: 'var(--card-description-color, #605e5c)' }}>Enter your credentials to continue.</p>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             {error && (
@@ -98,7 +98,7 @@ export function Login() {
             </button>
           </form>
         </div>
-        <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+        <p className="mt-6 text-center text-sm" style={{ color: '#605e5c' }}>
           Use your Bangkok API credentials. JWT is stored in memory and localStorage.
         </p>
       </div>

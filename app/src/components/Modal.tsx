@@ -11,13 +11,14 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity duration-200" onClick={onClose} aria-hidden />
       <div
-        className="relative w-full max-w-md bg-white dark:bg-gray-900 rounded-card border border-gray-200 dark:border-gray-700 shadow-modal transition-all duration-200"
+        className="relative w-full max-w-md rounded shadow-modal transition-all duration-200"
+        style={{ backgroundColor: 'var(--dropdown-bg, #ffffff)', border: '1px solid var(--dropdown-border, #edebe9)' }}
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
       >
-        <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 px-6 py-4">
-          <h2 id="modal-title" className="text-lg font-semibold text-gray-900 dark:text-white">
+        <div className="flex items-center justify-between border-b px-6 py-4" style={{ borderColor: 'var(--dropdown-border, #edebe9)' }}>
+          <h2 id="modal-title" className="text-lg font-semibold" style={{ color: 'var(--dropdown-text, #323130)' }}>
             {title}
           </h2>
           <button

@@ -1,0 +1,63 @@
+---
+description: Enforce synchronized multi-platform architecture for app (web) and app-native (Expo). Never implement in only one client; keep naming, DTOs, and API usage identical.
+alwaysApply: true
+---
+
+# Bangkok – Sync Architecture (app + app-native)
+
+## Principle
+
+**Web and native are two clients of the same system, not two separate projects.** Any feature or structural change in `app/` must be reflected in `app-native/`, and vice versa, unless explicitly documented as platform-only.
+
+## Mandatory rules
+
+1. **Never implement a feature in only one app**
+   - If you add or change a feature in `app/` (web), you must add or change the same feature in `app-native/` (Expo).
+   - If you add or change a feature in `app-native/`, you must add or change the same feature in `app/`.
+   - Exception: document explicitly (e.g. "Web-only admin tool") and note it in the relevant README.
+
+2. **Always mirror structural changes**
+   - New screens/pages in one app → add corresponding screens in the other with the same logical name and route/screen name.
+   - New services or API methods in one app → add the same in the other (same function names and endpoint usage).
+   - Folder structure must stay aligned: `api/`, `services/`, `models/`, `constants/`, `context/`, `hooks/`, etc.
+
+3. **Keep naming conventions identical**
+   - Model names: `Profile`, `User`, `LoginRequest`, `CreateProfileRequest`, etc. (defined once in `shared/`, used in both).
+   - Service method names: `getProfileByUserId`, `login`, `changePassword`, etc.
+   - Route/screen names and API path constants must match; use `shared/constants/api.ts` (`API_PATHS`) in both clients.
+
+4. **Keep DTOs identical**
+   - All API request/response types and DTOs live in `shared/src/models/` (and re-exported from `shared/src/index.ts`).
+   - Both `app` and `app-native` must import these types from `@bangkok/shared`. Do not redefine the same types in `app/src/models/` or `app-native/src/models/` except for platform-only extensions (documented).
+
+5. **Keep API usage identical**
+   - Same endpoints, same HTTP methods, same request/response shapes.
+   - Use `API_PATHS` from `@bangkok/shared` for path strings so both clients stay in sync.
+   - Validation rules and limits must match: use `VALIDATION` from `@bangkok/shared` and align backend DTOs with them.
+
+6. **Warn if logic is duplicated instead of shared**
+   - If you add validation logic, constants, or types that could apply to both platforms, prefer adding them to `shared/` and importing from both apps.
+   - Only keep logic in `app/` or `app-native/` when it is truly platform-specific (e.g. DOM, React Native APIs, or storage adapters).
+
+7. **Maintain clean architecture**
+   - API client in `api/`; services in `services/` that use the client and shared types.
+   - No business rules or API contracts defined inside UI components; use services and shared types.
+   - Auth flow (login, refresh, logout, token storage) must be identical in behavior; only the storage mechanism (localStorage vs SecureStore) differs.
+
+8. **Never break synchronization**
+   - When changing an API contract or shared type, update: (1) `shared/`, (2) backend if needed, (3) `app/`, (4) `app-native/`.
+   - When adding a new endpoint or feature, add it to shared constants and types first, then implement in both clients.
+
+## Where shared code lives
+
+- **`shared/`**: Types (models, DTOs), API path constants, validation constants, and pure utilities. No React, no DOM, no React Native imports.
+- **`app/`** and **`app-native/`**: UI, navigation, platform-specific API client (axios vs fetch), storage, and any code that cannot run in both environments.
+
+## Checklist before completing a feature
+
+- [ ] Types and constants added or updated in `shared/` (if applicable).
+- [ ] `npm run build:shared` succeeds.
+- [ ] Web app (`app/`) implements or reflects the change.
+- [ ] Native app (`app-native/`) implements or reflects the change.
+- [ ] Same endpoint usage and same DTOs in both clients.
+- [ ] No duplicate type definitions; imports from `@bangkok/shared` where possible.

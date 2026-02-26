@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { getToasts, removeToast, subscribe, type ToastMessage } from '../utils/toast';
 
 const styles: Record<ToastMessage['type'], string> = {
-  success: 'bg-emerald-50 dark:bg-emerald-900/25 border-emerald-200 dark:border-emerald-800/50 text-emerald-800 dark:text-emerald-200',
-  error: 'bg-red-50 dark:bg-red-900/25 border-red-200 dark:border-red-800/50 text-red-800 dark:text-red-200',
-  info: 'bg-gray-50 dark:bg-gray-800/80 border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200',
+  success: 'bg-[#dff6dd] dark:bg-[#0e5b0e]/30 border-[#107c10] text-[#107c10] dark:text-[#92c354]',
+  error: 'bg-[#fde7e9] dark:bg-[#a4262c]/20 border-[#a4262c] text-[#a4262c] dark:text-[#f48771]',
+  info: 'bg-[#f3f2f1] dark:bg-[#3b3a39] border-[#8a8886] text-[#323130] dark:text-[#f3f2f1]',
 };
 
 export function ToastContainer() {
@@ -21,7 +21,7 @@ export function ToastContainer() {
       {toasts.map((t) => (
         <div
           key={t.id}
-          className={`pointer-events-auto px-4 py-3 rounded-card border shadow-card transition-all duration-200 ${styles[t.type]}`}
+          className={`pointer-events-auto px-4 py-3 rounded border shadow-card transition-all duration-200 ${styles[t.type]}`}
           role="alert"
         >
           <div className="flex items-start justify-between gap-2">

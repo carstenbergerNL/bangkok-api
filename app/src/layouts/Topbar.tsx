@@ -7,9 +7,10 @@ import { getProfileByUserId } from '../services/profileService';
 
 interface TopbarProps {
   onMenuClick?: () => void;
+  sidebarCollapsed?: boolean;
 }
 
-export function Topbar({ onMenuClick }: TopbarProps) {
+export function Topbar({ onMenuClick, sidebarCollapsed }: TopbarProps) {
   const { user, logout } = useAuth();
   const [isDark, toggleDark] = useDarkMode();
   const [open, setOpen] = useState(false);
@@ -40,7 +41,17 @@ export function Topbar({ onMenuClick }: TopbarProps) {
 
   useEffect(() => {
     loadAvatar();
-    const onProfileUpdated = () => loadAvatar();
+    const onProfileUpdated = (e: Event) => {
+      const customEvent = e as CustomEvent<{ avatarBase64?: string | null } | undefined>;
+      const avatarBase64 = customEvent.detail?.avatarBase64;
+      if (avatarBase64 != null && avatarBase64 !== '') {
+        setAvatarSrc(`data:image/jpeg;base64,${avatarBase64}`);
+      } else if (avatarBase64 !== undefined) {
+        setAvatarSrc(null);
+      } else {
+        loadAvatar();
+      }
+    };
     window.addEventListener('profile-updated', onProfileUpdated);
     return () => window.removeEventListener('profile-updated', onProfileUpdated);
   }, []);
@@ -49,25 +60,36 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   const initial = displayName.charAt(0).toUpperCase();
 
   return (
-    <header className="h-14 flex-shrink-0 flex items-center justify-between px-4 lg:px-6 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm transition-colors duration-200">
-      <div className="flex items-center gap-2">
+    <header
+      className="h-12 flex-shrink-0 flex items-center justify-between transition-colors duration-200"
+      style={{
+        backgroundColor: 'var(--topbar-bg, #ffffff)',
+        borderBottom: '1px solid var(--topbar-border, #edebe9)',
+      }}
+    >
+      <div className={`flex items-center flex-1 min-w-0 lg:flex-initial p-2 ${sidebarCollapsed ? 'lg:w-16' : 'lg:w-64'} transition-[width] duration-200`}>
         {onMenuClick && (
           <button
             type="button"
             onClick={onMenuClick}
-            className="btn-icon"
+            className="flex items-center justify-center p-2 lg:px-3 lg:py-2 rounded transition-colors duration-150 hover:bg-[#f3f2f1] dark:hover:bg-[#3b3a39] focus:outline-none focus:ring-2 focus:ring-[#0078d4] focus:ring-offset-2 shrink-0"
+            style={{ color: 'var(--topbar-text, #605e5c)' }}
             aria-label="Toggle menu"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
         )}
-        <Link to="/" className="text-lg font-semibold text-gray-900 dark:text-white tracking-tight px-1">
+        <Link
+          to="/"
+          className={`text-base font-semibold px-2 truncate transition-colors duration-150 block ${sidebarCollapsed ? 'lg:hidden' : 'lg:block'}`}
+          style={{ color: 'var(--topbar-text, #323130)' }}
+        >
           Bangkok
         </Link>
       </div>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 px-4 lg:px-6 shrink-0">
         <button type="button" onClick={toggleDark} className="btn-icon" aria-label={isDark ? 'Light mode' : 'Dark mode'}>
           {isDark ? (
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
@@ -76,23 +98,61 @@ export function Topbar({ onMenuClick }: TopbarProps) {
           )}
         </button>
         <div className="relative" ref={ref}>
-          <button type="button" onClick={() => setOpen((o) => !o)} className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200">
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            className="flex items-center gap-2 px-2 py-1.5 rounded transition-colors duration-150"
+            style={{ color: 'var(--topbar-text, #323130)' }}
+          >
             {avatarSrc ? (
-              <img src={avatarSrc} alt="" className="w-8 h-8 rounded-full object-cover border border-gray-200 dark:border-gray-700" />
+              <img src={avatarSrc} alt="" className="w-8 h-8 rounded-full object-cover border border-[#edebe9] dark:border-[#3b3a39]" />
             ) : (
-              <span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/40 flex items-center justify-center text-primary-600 dark:text-primary-400 text-sm font-medium">{initial}</span>
+              <span
+                className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold"
+                style={{ backgroundColor: '#e6f4ff', color: '#0078d4' }}
+              >
+                {initial}
+              </span>
             )}
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 hidden sm:inline max-w-[140px] truncate">{displayName}</span>
-            <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            <span className="text-sm font-normal hidden sm:inline max-w-[140px] truncate">{displayName}</span>
+            <svg className="w-4 h-4 shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
           </button>
           {open && (
-            <div className="absolute right-0 mt-2 w-52 py-1 bg-white dark:bg-gray-900 rounded-card border border-gray-200 dark:border-gray-700 shadow-dropdown z-50">
-              <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-                <p className="text-xs text-gray-500 dark:text-gray-400">Signed in as</p>
-                <p className="text-sm font-medium text-gray-900 dark:text-white truncate mt-0.5">{user?.email || '—'}</p>
+            <div
+              className="absolute right-0 mt-1 w-56 py-1 z-50 rounded shadow-dropdown"
+              style={{
+                backgroundColor: 'var(--dropdown-bg, #ffffff)',
+                border: '1px solid var(--dropdown-border, #edebe9)',
+              }}
+            >
+              <div className="px-4 py-3 border-b border-[#edebe9] dark:border-[#3b3a39]">
+                <p className="text-xs opacity-80">Signed in as</p>
+                <p className="text-sm font-normal truncate mt-0.5" style={{ color: 'var(--dropdown-text, #323130)' }}>{user?.email || '—'}</p>
               </div>
-              <Link to="/" className="block px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150" onClick={() => setOpen(false)}>Dashboard</Link>
-              <button type="button" className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-150" onClick={() => { setOpen(false); logout(); }}>Log out</button>
+              <Link
+                to="/"
+                className="block px-4 py-2.5 text-sm transition-colors duration-150 hover:bg-[#f3f2f1] dark:hover:bg-[#3b3a39]"
+                style={{ color: 'var(--dropdown-text, #323130)' }}
+                onClick={() => setOpen(false)}
+              >
+                Dashboard
+              </Link>
+              <Link
+                to="/profile"
+                className="block px-4 py-2.5 text-sm transition-colors duration-150 hover:bg-[#f3f2f1] dark:hover:bg-[#3b3a39]"
+                style={{ color: 'var(--dropdown-text, #323130)' }}
+                onClick={() => setOpen(false)}
+              >
+                Profile
+              </Link>
+              <button
+                type="button"
+                className="w-full text-left px-4 py-2.5 text-sm transition-colors duration-150 hover:bg-[#f3f2f1] dark:hover:bg-[#3b3a39]"
+                style={{ color: 'var(--dropdown-text, #323130)' }}
+                onClick={() => { setOpen(false); logout(); }}
+              >
+                Sign out
+              </button>
             </div>
           )}
         </div>

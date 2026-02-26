@@ -60,9 +60,18 @@ Thumbs.db
 TestResult.xml
 nunit-*.xml
 
+# Node / npm
+node_modules/
+
+# Shared package build
+shared/dist/
+
 # Frontend (Vite/React in app/)
-app/node_modules/
 app/dist/
+
+# Expo / app-native
+app-native/.expo/
+app-native/dist/
 
 # Misc
 ~$*

@@ -12,23 +12,23 @@ export function Dashboard() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div className="card card-body">
-          <h2 className="card-header text-sm font-medium text-gray-500 dark:text-gray-400">Signed in as</h2>
-          <p className="mt-1 text-base font-medium text-gray-900 dark:text-white truncate">{user?.email || '—'}</p>
+          <h2 className="card-description text-xs font-semibold uppercase tracking-wider">Signed in as</h2>
+          <p className="mt-1 text-base font-semibold truncate" style={{ color: 'var(--card-header-color, #323130)' }}>{user?.email || '—'}</p>
         </div>
         <div className="card card-body">
-          <h2 className="card-header text-sm font-medium text-gray-500 dark:text-gray-400">Display name</h2>
-          <p className="mt-1 text-base font-medium text-gray-900 dark:text-white">{user?.displayName || '—'}</p>
+          <h2 className="card-description text-xs font-semibold uppercase tracking-wider">Display name</h2>
+          <p className="mt-1 text-base font-semibold" style={{ color: 'var(--card-header-color, #323130)' }}>{user?.displayName || '—'}</p>
         </div>
         <div className="card card-body">
-          <h2 className="card-header text-sm font-medium text-gray-500 dark:text-gray-400">Role</h2>
-          <p className="mt-1 text-base font-medium text-gray-900 dark:text-white">{user?.role || '—'}</p>
+          <h2 className="card-description text-xs font-semibold uppercase tracking-wider">Role</h2>
+          <p className="mt-1 text-base font-semibold" style={{ color: 'var(--card-header-color, #323130)' }}>{user?.role || '—'}</p>
         </div>
       </div>
 
       <div className="card card-body">
-        <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Getting started</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-          Use the sidebar to open Users or Settings. This app connects to the Bangkok API with JWT authentication.
+        <h2 className="card-header mb-2">Getting started</h2>
+        <p className="card-description leading-relaxed">
+          Use the sidebar to open Profile or Admin Settings. This app connects to the Bangkok API with JWT authentication.
         </p>
       </div>
     </div>

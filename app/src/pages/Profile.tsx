@@ -200,7 +200,7 @@ export function Profile() {
           if (res.success && res.data) {
             setProfile(res.data);
             addToast('success', 'Profile updated.');
-            window.dispatchEvent(new CustomEvent('profile-updated'));
+            window.dispatchEvent(new CustomEvent('profile-updated', { detail: { avatarBase64: res.data.avatarBase64 } }));
           } else {
             setFormError(res.error?.message ?? res.message ?? 'Failed to update profile.');
           }
@@ -222,7 +222,7 @@ export function Profile() {
           if (res.success && res.data) {
             setProfile(res.data);
             addToast('success', 'Profile created.');
-            window.dispatchEvent(new CustomEvent('profile-updated'));
+            window.dispatchEvent(new CustomEvent('profile-updated', { detail: { avatarBase64: res.data.avatarBase64 } }));
           } else {
             setFormError(res.error?.message ?? res.message ?? 'Failed to create profile.');
           }
@@ -247,8 +247,8 @@ export function Profile() {
   }
 
   return (
-    <div className="space-y-8">
-      <div className="page-header">
+    <div className="space-y-4">
+      <div className="page-header mb-4">
         <h1>Profile</h1>
         <p>Manage your personal profile and avatar.</p>
       </div>
@@ -266,13 +266,14 @@ export function Profile() {
       )}
 
       {!loading && (
-        <div className="card card-body">
-          <h2 className="card-header">{profile ? 'Edit profile' : 'Create profile'}</h2>
-          <p className="card-description mt-1">
-            {profile ? 'Update your name, date of birth, phone number and avatar.' : 'Fill in your profile. You can add an avatar (JPEG or PNG, max 2MB).'}
-          </p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+          <div className="card card-body">
+            <h2 className="card-header">{profile ? 'Edit profile' : 'Create profile'}</h2>
+            <p className="card-description mt-0.5">
+              {profile ? 'Update your name, date of birth, phone number and avatar.' : 'Fill in your profile. You can add an avatar (JPEG or PNG, max 2MB).'}
+            </p>
 
-          <form onSubmit={handleSubmit} className="mt-6 space-y-4 max-w-xl">
+            <form onSubmit={handleSubmit} className="mt-4 space-y-3">
             {formError && <div className="alert-error">{formError}</div>}
 
             <div className="form-group">
@@ -335,7 +336,7 @@ export function Profile() {
 
             <div className="form-group">
               <label className="input-label">Avatar</label>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">JPEG or PNG, max 2MB. Optional.</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">JPEG or PNG, max 2MB. Optional.</p>
               <input
                 type="file"
                 accept={ACCEPT_IMAGE}
@@ -344,72 +345,73 @@ export function Profile() {
               />
               {avatarError && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{avatarError}</p>}
               {avatarPreview && (
-                <div className="mt-3 flex items-center gap-4">
-                  <img src={avatarPreview} alt="Avatar preview" className="w-20 h-20 rounded-full object-cover border border-gray-200 dark:border-gray-700" />
+                <div className="mt-2 flex items-center gap-3">
+                  <img src={avatarPreview} alt="Avatar preview" className="w-16 h-16 rounded-full object-cover border border-gray-200 dark:border-gray-700" />
                   <button type="button" onClick={clearAvatar} className="btn-secondary text-sm">Remove avatar</button>
                 </div>
               )}
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex justify-end gap-2 pt-1">
               <button type="submit" disabled={submitting} className="btn-primary">
                 {submitting ? 'Saving…' : profile ? 'Save changes' : 'Create profile'}
               </button>
             </div>
           </form>
-        </div>
-      )}
+          </div>
 
-      {!loading && userId && (
-        <div className="card card-body">
-          <h2 className="card-header">Change password</h2>
-          <p className="card-description mt-1">Update your account password. New password must be at least 8 characters.</p>
-          <form onSubmit={handleChangePassword} className="mt-6 space-y-4 max-w-xl">
-            {passwordError && <div className="alert-error">{passwordError}</div>}
-            <div className="form-group">
-              <label htmlFor="profile-currentPassword" className="input-label">Current password *</label>
-              <input
-                id="profile-currentPassword"
-                type="password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                className="input"
-                autoComplete="current-password"
-                required
-              />
+          {userId && (
+            <div className="card card-body">
+              <h2 className="card-header">Change password</h2>
+              <p className="card-description mt-0.5">Update your account password. New password must be at least 8 characters.</p>
+              <form onSubmit={handleChangePassword} className="mt-4 space-y-3">
+                {passwordError && <div className="alert-error">{passwordError}</div>}
+                <div className="form-group">
+                  <label htmlFor="profile-currentPassword" className="input-label">Current password *</label>
+                  <input
+                    id="profile-currentPassword"
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="input"
+                    autoComplete="current-password"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="profile-newPassword" className="input-label">New password * (min 8 characters)</label>
+                  <input
+                    id="profile-newPassword"
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="input"
+                    autoComplete="new-password"
+                    minLength={8}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="profile-confirmPassword" className="input-label">Confirm new password *</label>
+                  <input
+                    id="profile-confirmPassword"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="input"
+                    autoComplete="new-password"
+                    minLength={8}
+                    required
+                  />
+                </div>
+                <div className="flex justify-end gap-2 pt-1">
+                  <button type="submit" disabled={passwordSubmitting} className="btn-primary">
+                    {passwordSubmitting ? 'Changing…' : 'Change password'}
+                  </button>
+                </div>
+              </form>
             </div>
-            <div className="form-group">
-              <label htmlFor="profile-newPassword" className="input-label">New password * (min 8 characters)</label>
-              <input
-                id="profile-newPassword"
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="input"
-                autoComplete="new-password"
-                minLength={8}
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="profile-confirmPassword" className="input-label">Confirm new password *</label>
-              <input
-                id="profile-confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="input"
-                autoComplete="new-password"
-                minLength={8}
-                required
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button type="submit" disabled={passwordSubmitting} className="btn-primary">
-                {passwordSubmitting ? 'Changing…' : 'Change password'}
-              </button>
-            </div>
-          </form>
+          )}
         </div>
       )}
     </div>
