@@ -19,7 +19,7 @@ export function Sidebar({ mobileOpen, onClose, collapsed }: SidebarProps) {
   const items = navItems.filter((item) => !item.adminOnly || isAdmin);
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
-    'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ' +
+    'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ' +
     (isActive
       ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 border-l-2 border-primary-500 -ml-px pl-[11px]'
       : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200');
@@ -27,14 +27,14 @@ export function Sidebar({ mobileOpen, onClose, collapsed }: SidebarProps) {
   return (
     <>
       <div
-        className={'fixed inset-0 z-40 bg-black/20 lg:hidden transition-opacity duration-200 ' + (mobileOpen ? 'opacity-100' : 'opacity-0 pointer-events-none')}
+        className={'fixed inset-0 z-40 bg-black/25 lg:hidden transition-opacity duration-200 ' + (mobileOpen ? 'opacity-100' : 'opacity-0 pointer-events-none')}
         onClick={onClose}
         aria-hidden
       />
       <aside
-        className={'fixed top-14 left-0 z-40 h-[calc(100vh-3.5rem)] w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 shadow-soft transition-[width,transform] duration-200 ease-out lg:translate-x-0 ' + (mobileOpen ? 'translate-x-0' : '-translate-x-full') + (collapsed ? ' lg:w-20' : ' lg:w-64')}
+        className={'fixed top-14 left-0 z-40 h-[calc(100vh-3.5rem)] w-64 bg-white dark:bg-gray-900 border-r border-gray-200/80 dark:border-gray-800 shadow-card transition-[width,transform] duration-250 ease-smooth lg:translate-x-0 ' + (mobileOpen ? 'translate-x-0' : '-translate-x-full') + (collapsed ? ' lg:w-20' : ' lg:w-64')}
       >
-        <nav className="p-3 flex flex-col gap-1">
+        <nav className="p-2 flex flex-col gap-0.5">
           {items.map(({ to, label, icon }) => (
             <NavLink key={to} to={to} className={linkClass} onClick={onClose}>
               <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

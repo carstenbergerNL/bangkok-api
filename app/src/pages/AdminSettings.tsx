@@ -43,83 +43,71 @@ export function AdminSettings() {
   }, [loadUsers]);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-800 dark:text-gray-100">Admin Settings</h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-1">Administrator-only configuration and user management.</p>
+    <div className="space-y-8">
+      <div className="page-header">
+        <h1>Admin Settings</h1>
+        <p>Administrator-only configuration and user management.</p>
       </div>
 
-      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 shadow-soft p-6">
-        <h2 className="text-lg font-medium text-gray-800 dark:text-gray-100 mb-2">Admin overview</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
+      <div className="card card-body">
+        <h2 className="card-header">Admin overview</h2>
+        <p className="card-description mt-1">
           You are signed in as an administrator ({user?.email ?? '—'}). Manage users below and use this area for other admin tasks.
         </p>
       </div>
 
-      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 shadow-soft overflow-hidden">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 pt-6 pb-2">
+      <div className="card overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 pt-6 pb-4">
           <div>
-            <h2 className="text-lg font-medium text-gray-800 dark:text-gray-100">Users</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Manage users from the Bangkok API.</p>
+            <h2 className="text-lg font-medium text-gray-900 dark:text-white">Users</h2>
+            <p className="card-description mt-0.5">Manage users from the Bangkok API.</p>
           </div>
-          <button
-            type="button"
-            onClick={() => setModal({ type: 'create' })}
-            className="shrink-0 px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium transition-colors"
-          >
+          <button type="button" onClick={() => setModal({ type: 'create' })} className="btn-primary shrink-0">
             Add user
           </button>
         </div>
-        {loading && <div className="px-6 pb-6 text-center text-gray-500">Loading users…</div>}
-        {error && !loading && <div className="px-6 pb-6 text-red-600">{error}</div>}
+        {loading && <div className="px-6 pb-8 text-center text-gray-500 dark:text-gray-400 text-sm">Loading users…</div>}
+        {error && !loading && <div className="px-6 pb-6"><div className="alert-error">{error}</div></div>}
         {!loading && !error && users.length === 0 && (
-          <div className="px-6 pb-6 text-center text-gray-500">No users found.</div>
+          <div className="px-6 pb-8 text-center text-gray-500 dark:text-gray-400 text-sm">No users found.</div>
         )}
         {!loading && !error && users.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
+          <div className="table-container">
+            <table className="table-grid">
               <thead>
-                <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Email</th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Display name</th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Role</th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Active</th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300 text-right">Actions</th>
+                <tr>
+                  <th>Email</th>
+                  <th>Display name</th>
+                  <th>Role</th>
+                  <th>Active</th>
+                  <th className="text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {users.map((u) => {
                   const isSelf = user?.email != null && u.email != null && user.email.trim().toLowerCase() === u.email.trim().toLowerCase();
                   return (
-                    <tr key={u.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
-                      <td className="px-4 py-3 text-gray-800 dark:text-gray-200">{u.email}</td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{u.displayName ?? '—'}</td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{u.role}</td>
-                      <td className="px-4 py-3">
-                        <span className={u.isActive ? 'text-emerald-600' : 'text-gray-400'}>
+                    <tr key={u.id}>
+                      <td>{u.email}</td>
+                      <td className="muted">{u.displayName ?? '—'}</td>
+                      <td className="muted">{u.role}</td>
+                      <td>
+                        <span className={u.isActive ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-gray-400 dark:text-gray-500'}>
                           {u.isActive ? 'Yes' : 'No'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setModal({ type: 'edit', user: u })}
-                          className="text-primary-600 dark:text-primary-400 hover:underline mr-3"
-                        >
-                          Edit
-                        </button>
-                        {!isSelf && (
-                          <button
-                            type="button"
-                            onClick={() => setModal({ type: 'delete', user: u })}
-                            className="text-red-600 dark:text-red-400 hover:underline"
-                          >
-                            Delete
+                      <td className="text-right">
+                        <div className="table-actions">
+                          <button type="button" onClick={() => setModal({ type: 'edit', user: u })} className="table-link">
+                            Edit
                           </button>
-                        )}
-                        {isSelf && (
-                          <span className="text-gray-400 dark:text-gray-500 text-xs">(you)</span>
-                        )}
+                          {!isSelf && (
+                            <button type="button" onClick={() => setModal({ type: 'delete', user: u })} className="table-link-danger">
+                              Delete
+                            </button>
+                          )}
+                          {isSelf && <span className="text-gray-400 dark:text-gray-500 text-xs">(you)</span>}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -131,30 +119,30 @@ export function AdminSettings() {
       </div>
 
       {deletedUsers.length > 0 && (
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 shadow-soft overflow-hidden">
-          <h2 className="text-lg font-medium text-gray-800 dark:text-gray-100 px-6 pt-6 pb-2">Deleted users</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 px-6 pb-4">Restore a soft-deleted user so they can log in again.</p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
+        <div className="card overflow-hidden">
+          <div className="px-6 pt-6 pb-2">
+            <h2 className="text-lg font-medium text-gray-900 dark:text-white">Deleted users</h2>
+            <p className="card-description mt-0.5">Restore a soft-deleted user so they can log in again.</p>
+          </div>
+          <div className="table-container">
+            <table className="table-grid">
               <thead>
-                <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Email</th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Display name</th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Role</th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Deleted at</th>
-                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300 text-right">Actions</th>
+                <tr>
+                  <th>Email</th>
+                  <th>Display name</th>
+                  <th>Role</th>
+                  <th>Deleted at</th>
+                  <th className="text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {deletedUsers.map((u) => (
-                  <tr key={u.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
-                    <td className="px-4 py-3 text-gray-800 dark:text-gray-200">{u.email}</td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{u.displayName ?? '—'}</td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{u.role}</td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
-                      {u.deletedAtUtc ? new Date(u.deletedAtUtc).toLocaleString() : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-right">
+                  <tr key={u.id}>
+                    <td>{u.email}</td>
+                    <td className="muted">{u.displayName ?? '—'}</td>
+                    <td className="muted">{u.role}</td>
+                    <td className="muted">{u.deletedAtUtc ? new Date(u.deletedAtUtc).toLocaleString() : '—'}</td>
+                    <td className="text-right">
                       <button
                         type="button"
                         onClick={() => {
@@ -173,7 +161,7 @@ export function AdminSettings() {
                             .finally(() => setRestoringId(null));
                         }}
                         disabled={restoringId !== null}
-                        className="text-primary-600 dark:text-primary-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="table-link disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {restoringId === u.id ? 'Restoring…' : 'Restore'}
                       </button>
@@ -186,9 +174,9 @@ export function AdminSettings() {
         </div>
       )}
 
-      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 shadow-soft p-6">
-        <h2 className="text-base font-medium text-gray-800 dark:text-gray-100">Configuration</h2>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Application configuration options can be added here.</p>
+      <div className="card card-body">
+        <h2 className="card-header">Configuration</h2>
+        <p className="card-description mt-1">Application configuration options can be added here.</p>
       </div>
 
       {modal?.type === 'create' && (
@@ -267,74 +255,29 @@ function CreateUserModal({
 
   return (
     <Modal open={true} title="Add user" onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {formError && (
-          <p className="text-sm text-red-600 dark:text-red-400">{formError}</p>
-        )}
-        <div>
-          <label htmlFor="create-email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Email *
-          </label>
-          <input
-            id="create-email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            required
-            autoComplete="email"
-          />
+      <form onSubmit={handleSubmit} className="space-y-1">
+        {formError && <div className="alert-error mb-4">{formError}</div>}
+        <div className="form-group">
+          <label htmlFor="create-email" className="input-label">Email *</label>
+          <input id="create-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input" required autoComplete="email" />
         </div>
-        <div>
-          <label htmlFor="create-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Password * (min 8 characters)
-          </label>
-          <input
-            id="create-password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            required
-            minLength={8}
-            autoComplete="new-password"
-          />
+        <div className="form-group">
+          <label htmlFor="create-password" className="input-label">Password * (min 8 characters)</label>
+          <input id="create-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="input" required minLength={8} autoComplete="new-password" />
         </div>
-        <div>
-          <label htmlFor="create-displayName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Display name
-          </label>
-          <input
-            id="create-displayName"
-            type="text"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            maxLength={256}
-          />
+        <div className="form-group">
+          <label htmlFor="create-displayName" className="input-label">Display name</label>
+          <input id="create-displayName" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="input" maxLength={256} />
         </div>
-        <div>
-          <label htmlFor="create-role" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Role
-          </label>
-          <select
-            id="create-role"
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-          >
-            {ROLES.map((r) => (
-              <option key={r} value={r}>{r}</option>
-            ))}
+        <div className="form-group">
+          <label htmlFor="create-role" className="input-label">Role</label>
+          <select id="create-role" value={role} onChange={(e) => setRole(e.target.value)} className="input">
+            {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
           </select>
         </div>
-        <div className="flex justify-end gap-2 pt-2">
-          <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-            Cancel
-          </button>
-          <button type="submit" disabled={submitting} className="px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-            {submitting ? 'Creating…' : 'Create user'}
-          </button>
+        <div className="flex justify-end gap-2 pt-4">
+          <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
+          <button type="submit" disabled={submitting} className="btn-primary">{submitting ? 'Creating…' : 'Create user'}</button>
         </div>
       </form>
     </Modal>
@@ -383,52 +326,23 @@ function EditUserModal({
 
   return (
     <Modal open={true} title="Edit user" onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {formError && (
-          <p className="text-sm text-red-600 dark:text-red-400">{formError}</p>
-        )}
-        <div>
-          <label htmlFor="edit-email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Email
-          </label>
-          <input
-            id="edit-email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            autoComplete="email"
-          />
+      <form onSubmit={handleSubmit} className="space-y-1">
+        {formError && <div className="alert-error mb-4">{formError}</div>}
+        <div className="form-group">
+          <label htmlFor="edit-email" className="input-label">Email</label>
+          <input id="edit-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input" autoComplete="email" />
         </div>
-        <div>
-          <label htmlFor="edit-displayName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Display name
-          </label>
-          <input
-            id="edit-displayName"
-            type="text"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            maxLength={256}
-          />
+        <div className="form-group">
+          <label htmlFor="edit-displayName" className="input-label">Display name</label>
+          <input id="edit-displayName" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="input" maxLength={256} />
         </div>
-        <div>
-          <label htmlFor="edit-role" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Role
-          </label>
-          <select
-            id="edit-role"
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-          >
-            {ROLES.map((r) => (
-              <option key={r} value={r}>{r}</option>
-            ))}
+        <div className="form-group">
+          <label htmlFor="edit-role" className="input-label">Role</label>
+          <select id="edit-role" value={role} onChange={(e) => setRole(e.target.value)} className="input">
+            {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
           </select>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 py-1">
           <input
             id="edit-isActive"
             type="checkbox"
@@ -439,18 +353,12 @@ function EditUserModal({
           />
           <label htmlFor="edit-isActive" className="text-sm font-medium text-gray-700 dark:text-gray-300">
             Active
-            {isEditingSelf && (
-              <span className="ml-1 text-gray-400 dark:text-gray-500 font-normal">(you cannot change your own)</span>
-            )}
+            {isEditingSelf && <span className="ml-1 text-gray-400 dark:text-gray-500 font-normal">(you cannot change your own)</span>}
           </label>
         </div>
-        <div className="flex justify-end gap-2 pt-2">
-          <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-            Cancel
-          </button>
-          <button type="submit" disabled={submitting} className="px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-            {submitting ? 'Saving…' : 'Save'}
-          </button>
+        <div className="flex justify-end gap-2 pt-4">
+          <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
+          <button type="submit" disabled={submitting} className="btn-primary">{submitting ? 'Saving…' : 'Save'}</button>
         </div>
       </form>
     </Modal>
@@ -490,24 +398,20 @@ function DeleteUserModal({
   return (
     <Modal open={true} title="Delete user" onClose={onClose}>
       <div className="space-y-4">
-        {formError && (
-          <p className="text-sm text-red-600 dark:text-red-400">{formError}</p>
-        )}
+        {formError && <div className="alert-error">{formError}</div>}
         {isSelf ? (
           <p className="text-sm text-amber-600 dark:text-amber-400">You cannot delete your own account.</p>
         ) : (
-          <p className="text-gray-600 dark:text-gray-400">
-            Are you sure you want to delete <strong className="text-gray-800 dark:text-gray-200">{user.email}</strong>? This will soft-delete the user (they cannot log in until restored by an admin).
+          <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+            Are you sure you want to delete <strong className="text-gray-900 dark:text-white">{user.email}</strong>? This will soft-delete the user (they cannot log in until restored by an admin).
           </p>
         )}
         <div className="flex justify-end gap-2 pt-2">
-          <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-            Cancel
-          </button>
+          <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
           {!isSelf && (
-            <button type="button" onClick={handleConfirm} disabled={submitting} className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-            {submitting ? 'Deleting…' : 'Delete'}
-          </button>
+            <button type="button" onClick={handleConfirm} disabled={submitting} className="btn-danger">
+              {submitting ? 'Deleting…' : 'Delete'}
+            </button>
           )}
         </div>
       </div>
