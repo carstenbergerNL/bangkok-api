@@ -5,7 +5,12 @@ alwaysApply: true
 
 # Bangkok API - Architecture
 
-## Layer order (Clean Architecture)
+## Repo layout
+
+- **api/** – Backend (Bangkok API): .NET solution, Clean Architecture layers.
+- **app/** – Frontend: React + TypeScript + Vite + Tailwind; admin UI that consumes the API (JWT auth, user management). See `app/README.md` for setup and structure.
+
+## Layer order (Clean Architecture) – api/
 
 **Domain → Application → Infrastructure → Api.** No backward references.
 
@@ -23,8 +28,11 @@ alwaysApply: true
 - **Responses**: All API responses use `ApiResponse<T>` and `ErrorResponse` from `Bangkok.Application.Models`. Include `correlationId` (from `X-Correlation-ID` header or `HttpContext.TraceIdentifier`).
 - **Auth**: JWT access + refresh tokens; refresh tokens stored in SQL Server. Auth endpoints in `AuthController`; logic in `IAuthService` / `AuthService`.
 - **SQL**: Scripts in `/sql`; main schema in `001_initial.sql`; incremental changes in `/sql/alters`. Use `UNIQUEIDENTIFIER`, `DATETIME2`, `NVARCHAR`. Keep `001_initial.sql` reflecting full current schema where practical.
+- **READMEs**: When you change the API, solution, or app, update the relevant README in the same change (root `README.md` for api/, `app/README.md` for app/). See rule *readme-sync*.
 
 ## Where to put new code
+
+### Backend (api/)
 
 | What | Where |
 |------|--------|
@@ -36,3 +44,17 @@ alwaysApply: true
 | New API controller / endpoint | Bangkok.Api.Controllers |
 | New middleware | Bangkok.Api.Middleware; register in Program.cs |
 | New SQL table/alter | sql/ or sql/alters/ |
+
+### Frontend (app/)
+
+| What | Where |
+|------|--------|
+| API client / base URL / interceptors | app/src/api/ |
+| Types / DTOs for API | app/src/models/ |
+| Auth, users, etc. | app/src/services/ |
+| Shared UI (routes, modals, toasts) | app/src/components/ |
+| Layout (sidebar, topbar) | app/src/layouts/ |
+| Screens | app/src/pages/ |
+| Auth state | app/src/context/AuthContext.tsx |
+| Hooks, utilities | app/src/hooks/, app/src/utils/ |
+| Env vars | app/.env (see app/.env.example); use `VITE_` prefix |

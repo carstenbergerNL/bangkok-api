@@ -1,0 +1,36 @@
+---
+description: React app (app/) – TypeScript, Vite, Tailwind, API client, and auth conventions
+globs: app/**/*.ts,app/**/*.tsx
+---
+
+# Bangkok Admin App – Frontend Conventions
+
+## Stack
+
+- **React 19** + **TypeScript**. **Vite** for dev/build. **Tailwind CSS** for styling. **React Router 7**. **Axios** for HTTP; JWT in `Authorization` header.
+
+## Structure
+
+- **api/** – `client.ts`: base URL from `import.meta.env.VITE_API_BASE_URL`, 401 → logout + redirect to login. No business logic in api/.
+- **models/** – Types and DTOs matching API (e.g. `User`, `ApiResponse<T>`, `LoginRequest`, `PagedResult<T>`). Use for request/response shapes.
+- **services/** – `authService` (login, logout, getStoredUser, setAuthFromLoginResponse), `userService` (getUsers, getUserById, createUser, updateUser, deleteUser, restoreUser). Call API here; return promises with `ApiResponse<T>`-like shape.
+- **context/** – `AuthContext`: user, token, isAuthenticated, login, logout, setUser. Use `useAuth()` in components that need current user or role.
+- **components/** – Reusable UI: `PrivateRoute`, `AdminRoute`, `Modal`, `Toast`. Route guards use `useAuth()` and redirect as needed.
+- **layouts/** – `MainLayout`, `Sidebar`, `Topbar`. Sidebar nav items; admin-only items when `user?.role` is Admin (case-insensitive).
+- **pages/** – One component per route. Admin-only logic (e.g. user CRUD, restore) lives under Admin Settings; use `AdminRoute` for `/admin-settings`.
+
+## Conventions
+
+- **Env**: Only `VITE_*` vars are exposed. See `app/.env.example`. Use `import.meta.env.VITE_API_BASE_URL` etc.
+- **Auth**: After login, store token and user (including `role`) in localStorage via authService. Admin check: `user?.role != null && user.role.localeCompare('Admin', undefined, { sensitivity: 'accent' }) === 0`.
+- **API errors**: Services catch and return `{ success: false, error: { message } }` or use response body. Show to user via toasts or inline error state.
+- **Styling**: Tailwind only. Prefer existing classes: `primary-500`, `primary-600`, `gray-*`, `rounded-lg`, `border`, `shadow-soft`. Keep layout consistent with MainLayout/Topbar/Sidebar.
+- **Routing**: Protected routes wrapped in `PrivateRoute`; admin-only in `AdminRoute`. No route logic inside pages beyond what’s needed for the page.
+- **State**: Prefer local state (`useState`) and `useCallback` for loaders (e.g. `loadUsers`). No global store unless the app grows.
+
+## When adding or changing
+
+- New API call → add or update function in the right **service**; use types from **models**.
+- New page or admin feature → add route in **App.tsx**; use **AdminRoute** if admin-only; add nav item in **Sidebar** (and gate by role if admin-only).
+- New reusable UI (modal, form, list) → **components/** or inline in page if single use.
+- **Always update app/README.md** when you add or change: pages, features, routes, env vars, scripts, setup steps, or API usage. Keep it in sync in the same change as the code (see rule *readme-sync*).

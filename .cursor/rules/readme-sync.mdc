@@ -1,23 +1,37 @@
 ---
-description: Keep README.md in sync with the API, solution, and database
+description: Always update the relevant README when the codebase changes
 alwaysApply: true
 ---
 
-# Keep README in Sync
+# Always Update READMEs When Things Change
 
-**Always update README.md** when the codebase changes. When you **add, change, or remove** any of the following, **update README.md** so it stays accurate:
+**Rule: whenever you add, change, or remove code, config, or features, update the relevant README so it stays accurate.** Do this in the same change set as the code—not later.
 
-| Change type | Update these README sections |
-|-------------|------------------------------|
-| New/removed/renamed **API endpoint** or controller | [API overview](#api-overview) — endpoint table, request/response examples |
-| New **project** or folder in solution | [Solution structure](#solution-structure) — folder tree |
-| New **NuGet package** or major tech | [Tech stack](#tech-stack) — table; [Features](#features) if user-facing |
-| New **config** (appsettings, options) | [Configuration](#configuration) — document key and purpose |
-| New **health** endpoint or check | [Health endpoints](#health-endpoints) — table and response shape |
-| New **SQL** table/script or schema change | [Database](#database) — tables list; mention new scripts in sql/ |
-| New **middleware** or pipeline change | [Development](#development) — middleware order if relevant |
-| New **feature** (e.g. new auth flow) | [Features](#features) and related sections above |
+## Which README to update
 
-**How to update:** Edit the existing README sections; preserve the same structure (tables, headings, code blocks). Do not remove sections that are still accurate—only change what the code/config now does.
+- **Root `README.md`** – API/solution/database (api/), repo overview, backend config, SQL, health, middleware.
+- **`app/README.md`** – Frontend (app/): structure, setup, env vars, scripts, features, API usage.
 
-After editing README, say briefly what you changed (e.g. "Updated README: added /api/orders to API overview and new OrdersController in solution structure.").
+If a change affects both (e.g. new API endpoint used by the app), update both.
+
+## What triggers an update
+
+| Change type | Update this README | Sections to touch |
+|-------------|--------------------|-------------------|
+| New/removed/renamed **API endpoint** or controller | Root README.md | API overview, endpoint table, examples |
+| New **project** or folder in **api/** solution | Root README.md | Solution structure, folder tree |
+| New **NuGet package** or backend tech | Root README.md | Tech stack, Features if user-facing |
+| New **config** (appsettings, options) | Root README.md | Configuration — key and purpose |
+| New **health** endpoint or check | Root README.md | Health endpoints — table and response |
+| New **SQL** table/script or schema change | Root README.md | Database — tables list, sql/ scripts |
+| New **middleware** or pipeline change | Root README.md | Development — middleware order if relevant |
+| New **feature** (e.g. auth flow) in API | Root README.md | Features and related sections above |
+| New **frontend** page, feature, or route in **app/** | **app/README.md** | Structure, setup, scripts, Features, API usage |
+| New **env var** or script in **app/** | **app/README.md** | Setup, Scripts, env table/description |
+| New **dependency** or major change in **app/** | **app/README.md** | Tech stack, Scripts, Prerequisites |
+
+## How to update
+
+- Edit the existing README; preserve structure (tables, headings, code blocks).
+- Only change what the code/config now does; leave accurate sections as-is.
+- After editing, say briefly what you changed (e.g. "Updated README: added /api/orders and app/README: new Restore section in Features.").
