@@ -27,9 +27,9 @@ public class UserService : IUserService
         return user == null ? null : MapToResponse(user);
     }
 
-    public async Task<PagedResult<UserResponse>> GetUsersAsync(int pageNumber, int pageSize, CancellationToken cancellationToken = default)
+    public async Task<PagedResult<UserResponse>> GetUsersAsync(int pageNumber, int pageSize, bool includeDeleted = false, CancellationToken cancellationToken = default)
     {
-        var (items, totalCount) = await _userRepository.GetAllPagedAsync(pageNumber, pageSize, cancellationToken).ConfigureAwait(false);
+        var (items, totalCount) = await _userRepository.GetAllPagedAsync(pageNumber, pageSize, includeDeleted, cancellationToken).ConfigureAwait(false);
         return new PagedResult<UserResponse>
         {
             Items = items.Select(MapToResponse).ToList(),
@@ -246,7 +246,9 @@ public class UserService : IUserService
             Role = user.Role,
             IsActive = user.IsActive,
             CreatedAtUtc = user.CreatedAtUtc,
-            UpdatedAtUtc = user.UpdatedAtUtc
+            UpdatedAtUtc = user.UpdatedAtUtc,
+            IsDeleted = user.IsDeleted,
+            DeletedAtUtc = user.DeletedAt
         };
     }
 }

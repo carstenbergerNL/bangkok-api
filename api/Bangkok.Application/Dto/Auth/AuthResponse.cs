@@ -7,4 +7,5 @@ public class AuthResponse
     public DateTime ExpiresAtUtc { get; set; }
     public string TokenType { get; set; } = "Bearer";
     public string? DisplayName { get; set; }
+    public string? Role { get; set; }
 }

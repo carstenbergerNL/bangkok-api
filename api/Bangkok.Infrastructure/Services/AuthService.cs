@@ -80,7 +80,8 @@ public class AuthService : IAuthService
             RefreshToken = refreshTokenValue,
             ExpiresAtUtc = expiresAtUtc,
             TokenType = "Bearer",
-            DisplayName = user.DisplayName
+            DisplayName = user.DisplayName,
+            Role = user.Role
         };
     }
 
@@ -145,7 +146,8 @@ public class AuthService : IAuthService
             RefreshToken = refreshTokenValue,
             ExpiresAtUtc = expiresAtUtc,
             TokenType = "Bearer",
-            DisplayName = user.DisplayName
+            DisplayName = user.DisplayName,
+            Role = user.Role
         });
     }
 
@@ -181,7 +183,8 @@ public class AuthService : IAuthService
             RefreshToken = refreshTokenValue,
             ExpiresAtUtc = expiresAtUtc,
             TokenType = "Bearer",
-            DisplayName = user.DisplayName
+            DisplayName = user.DisplayName,
+            Role = user.Role
         };
     }
 

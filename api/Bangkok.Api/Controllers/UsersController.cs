@@ -60,20 +60,22 @@ public class UsersController : ControllerBase
 
     [HttpGet]
     [Authorize(Roles = "Admin")]
-    [SwaggerOperation(Summary = "List users (Admin)", Description = "Get paginated list of users. Admin only. Query: pageNumber, pageSize (max 100).")]
+    [SwaggerOperation(Summary = "List users (Admin)", Description = "Get paginated list of users. Admin only. Query: pageNumber, pageSize (max 100, or 500 when includeDeleted=true), includeDeleted (when true, returns active and soft-deleted users with IsDeleted set).")]
     [ProducesResponseType(typeof(ApiResponse<PagedResult<UserResponse>>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<ApiResponse<PagedResult<UserResponse>>>> GetUsers(
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 10,
+        [FromQuery] bool includeDeleted = false,
         CancellationToken cancellationToken = default)
     {
         var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
         if (pageNumber < 1) pageNumber = 1;
-        if (pageSize < 1 || pageSize > 100) pageSize = 10;
+        var maxSize = includeDeleted ? 500 : 100;
+        if (pageSize < 1 || pageSize > maxSize) pageSize = includeDeleted ? 500 : 10;
 
-        var result = await _userService.GetUsersAsync(pageNumber, pageSize, cancellationToken).ConfigureAwait(false);
+        var result = await _userService.GetUsersAsync(pageNumber, pageSize, includeDeleted, cancellationToken).ConfigureAwait(false);
         return Ok(ApiResponse<PagedResult<UserResponse>>.Ok(result, correlationId));
     }
 

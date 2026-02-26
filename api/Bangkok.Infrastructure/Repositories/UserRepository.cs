@@ -127,20 +127,27 @@ public class UserRepository : IUserRepository
         }
     }
 
-    public async Task<(IReadOnlyList<User> Items, int TotalCount)> GetAllPagedAsync(int pageNumber, int pageSize, CancellationToken cancellationToken = default)
+    public async Task<(IReadOnlyList<User> Items, int TotalCount)> GetAllPagedAsync(int pageNumber, int pageSize, bool includeDeleted = false, CancellationToken cancellationToken = default)
     {
         if (pageNumber < 1) pageNumber = 1;
-        if (pageSize < 1 || pageSize > 100) pageSize = 10;
+        var maxPageSize = includeDeleted ? 500 : 100;
+        if (pageSize < 1 || pageSize > maxPageSize) pageSize = includeDeleted ? 500 : 10;
         var offset = (pageNumber - 1) * pageSize;
 
         var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken).ConfigureAwait(false);
         using (connection)
         {
             connection.Open();
-            const string countSql = "SELECT COUNT(*) FROM dbo.[User] WHERE IsDeleted = 0";
+            var countSql = includeDeleted ? "SELECT COUNT(*) FROM dbo.[User]" : "SELECT COUNT(*) FROM dbo.[User] WHERE IsDeleted = 0";
             var totalCount = await connection.ExecuteScalarAsync<int>(new CommandDefinition(countSql, cancellationToken: cancellationToken)).ConfigureAwait(false);
 
-            const string sql = @"
+            var sql = includeDeleted
+                ? @"
+            SELECT Id, Email, DisplayName, PasswordHash, PasswordSalt, Role, IsActive, CreatedAtUtc, UpdatedAtUtc, RecoverString, RecoverStringExpiry, IsDeleted, DeletedAt, FailedLoginAttempts, LockoutEnd
+            FROM dbo.[User]
+            ORDER BY IsDeleted ASC, DeletedAt DESC, CreatedAtUtc
+            OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY"
+                : @"
             SELECT Id, Email, DisplayName, PasswordHash, PasswordSalt, Role, IsActive, CreatedAtUtc, UpdatedAtUtc, RecoverString, RecoverStringExpiry, IsDeleted, DeletedAt, FailedLoginAttempts, LockoutEnd
             FROM dbo.[User]
             WHERE IsDeleted = 0

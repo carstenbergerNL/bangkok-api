@@ -60,6 +60,10 @@ Thumbs.db
 TestResult.xml
 nunit-*.xml
 
+# Frontend (Vite/React in app/)
+app/node_modules/
+app/dist/
+
 # Misc
 ~$*
 *~

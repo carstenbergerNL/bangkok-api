@@ -10,7 +10,7 @@ public interface IUserRepository
     Task<User?> GetByRecoverStringAsync(string recoverString, CancellationToken cancellationToken = default);
     Task<Guid> CreateAsync(User user, CancellationToken cancellationToken = default);
     Task UpdateAsync(User user, CancellationToken cancellationToken = default);
-    Task<(IReadOnlyList<User> Items, int TotalCount)> GetAllPagedAsync(int pageNumber, int pageSize, CancellationToken cancellationToken = default);
+    Task<(IReadOnlyList<User> Items, int TotalCount)> GetAllPagedAsync(int pageNumber, int pageSize, bool includeDeleted = false, CancellationToken cancellationToken = default);
     Task SoftDeleteAsync(Guid id, CancellationToken cancellationToken = default);
     Task RestoreAsync(Guid id, CancellationToken cancellationToken = default);
     Task HardDeleteAsync(Guid id, CancellationToken cancellationToken = default);
