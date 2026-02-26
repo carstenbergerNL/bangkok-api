@@ -7,7 +7,7 @@ import { ToastContainer } from './components/Toast';
 import { MainLayout } from './layouts/MainLayout';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
-import { Settings } from './pages/Settings';
+import { Profile } from './pages/Profile';
 import { AdminSettings } from './pages/AdminSettings';
 import { initAuthUnauthorizedHandler } from './services/authService';
 
@@ -39,7 +39,7 @@ function AppRoutes() {
         }
       >
         <Route index element={<Dashboard />} />
-        <Route path="settings" element={<Settings />} />
+        <Route path="profile" element={<Profile />} />
         <Route path="admin-settings" element={<AdminRoute><AdminSettings /></AdminRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

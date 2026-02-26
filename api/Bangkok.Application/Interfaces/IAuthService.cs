@@ -10,4 +10,13 @@ public interface IAuthService
     Task<bool> RevokeAsync(RevokeRequest request, CancellationToken cancellationToken = default);
     Task ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken cancellationToken = default);
     Task<bool> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken cancellationToken = default);
+    /// <summary>Change password for authenticated user. Returns true on success.</summary>
+    Task<ChangePasswordResult> ChangePasswordAsync(Guid userId, ChangePasswordRequest request, CancellationToken cancellationToken = default);
+}
+
+public enum ChangePasswordResult
+{
+    Success,
+    InvalidCurrentPassword,
+    NotFound
 }

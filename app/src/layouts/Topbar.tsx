@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useDarkMode } from '../hooks/useDarkMode';
+import { getCurrentUserId } from '../services/authService';
+import { getProfileByUserId } from '../services/profileService';
 
 interface TopbarProps {
   onMenuClick?: () => void;
@@ -11,6 +13,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   const { user, logout } = useAuth();
   const [isDark, toggleDark] = useDarkMode();
   const [open, setOpen] = useState(false);
+  const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -19,6 +22,27 @@ export function Topbar({ onMenuClick }: TopbarProps) {
     }
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  const loadAvatar = () => {
+    const userId = getCurrentUserId();
+    if (!userId) return;
+    getProfileByUserId(userId)
+      .then((res) => {
+        if (res.success && res.data?.avatarBase64) {
+          setAvatarSrc(`data:image/jpeg;base64,${res.data.avatarBase64}`);
+        } else {
+          setAvatarSrc(null);
+        }
+      })
+      .catch(() => setAvatarSrc(null));
+  };
+
+  useEffect(() => {
+    loadAvatar();
+    const onProfileUpdated = () => loadAvatar();
+    window.addEventListener('profile-updated', onProfileUpdated);
+    return () => window.removeEventListener('profile-updated', onProfileUpdated);
   }, []);
 
   const displayName = user?.displayName || user?.email || 'User';
@@ -53,7 +77,11 @@ export function Topbar({ onMenuClick }: TopbarProps) {
         </button>
         <div className="relative" ref={ref}>
           <button type="button" onClick={() => setOpen((o) => !o)} className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200">
-            <span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/40 flex items-center justify-center text-primary-600 dark:text-primary-400 text-sm font-medium">{initial}</span>
+            {avatarSrc ? (
+              <img src={avatarSrc} alt="" className="w-8 h-8 rounded-full object-cover border border-gray-200 dark:border-gray-700" />
+            ) : (
+              <span className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/40 flex items-center justify-center text-primary-600 dark:text-primary-400 text-sm font-medium">{initial}</span>
+            )}
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300 hidden sm:inline max-w-[140px] truncate">{displayName}</span>
             <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
           </button>

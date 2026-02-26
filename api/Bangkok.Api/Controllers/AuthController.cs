@@ -136,4 +136,32 @@ public class AuthController : ControllerBase
             return BadRequest(ApiResponse<object>.Fail(new ErrorResponse { Code = "INVALID_RECOVERY", Message = "Recovery link is invalid or has expired." }, correlationId));
         return Ok(ApiResponse<object>.Ok(null!, correlationId));
     }
+
+    [HttpPost("change-password")]
+    [Authorize]
+    [SwaggerOperation(Summary = "Change password", Description = "Change your password. Requires Bearer token. Current password must be correct; new password min length 8.")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<ApiResponse<object>>> ChangePassword([FromBody] ChangePasswordRequest request, CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            return Unauthorized(ApiResponse<object>.Fail(new ErrorResponse { Code = "UNAUTHORIZED", Message = "Authentication required." }, correlationId));
+
+        if (request == null)
+            return BadRequest(ApiResponse<object>.Fail(new ErrorResponse { Code = "BAD_REQUEST", Message = "Request body is required." }, correlationId));
+        if (!ModelState.IsValid)
+            return BadRequest(ApiResponse<object>.Fail(new ErrorResponse { Code = "VALIDATION_ERROR", Message = "Current password and new password (min 8 characters) are required." }, correlationId));
+
+        var result = await _authService.ChangePasswordAsync(userId, request, cancellationToken).ConfigureAwait(false);
+        return result switch
+        {
+            ChangePasswordResult.Success => Ok(ApiResponse<object>.Ok(null!, correlationId, "Password changed.")),
+            ChangePasswordResult.InvalidCurrentPassword => BadRequest(ApiResponse<object>.Fail(new ErrorResponse { Code = "INVALID_CURRENT_PASSWORD", Message = "Current password is incorrect." }, correlationId)),
+            ChangePasswordResult.NotFound => NotFound(ApiResponse<object>.Fail(new ErrorResponse { Code = "USER_NOT_FOUND", Message = "User not found." }, correlationId)),
+            _ => BadRequest(ApiResponse<object>.Fail(new ErrorResponse { Code = "BAD_REQUEST", Message = "Failed to change password." }, correlationId))
+        };
+    }
 }

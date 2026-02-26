@@ -80,6 +80,7 @@ public class AuthService : IAuthService
             RefreshToken = refreshTokenValue,
             ExpiresAtUtc = expiresAtUtc,
             TokenType = "Bearer",
+            ApplicationId = user.Id.ToString(),
             DisplayName = user.DisplayName,
             Role = user.Role
         };
@@ -183,6 +184,7 @@ public class AuthService : IAuthService
             RefreshToken = refreshTokenValue,
             ExpiresAtUtc = expiresAtUtc,
             TokenType = "Bearer",
+            ApplicationId = user.Id.ToString(),
             DisplayName = user.DisplayName,
             Role = user.Role
         };
@@ -240,5 +242,27 @@ public class AuthService : IAuthService
 
         _logger.LogInformation("Password reset completed successfully");
         return true;
+    }
+
+    public async Task<ChangePasswordResult> ChangePasswordAsync(Guid userId, ChangePasswordRequest request, CancellationToken cancellationToken = default)
+    {
+        var user = await _userRepository.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false);
+        if (user == null)
+            return ChangePasswordResult.NotFound;
+
+        if (!_passwordHasher.VerifyPassword(request.CurrentPassword, user.PasswordHash, user.PasswordSalt))
+        {
+            _logger.LogWarning("Change password failed: invalid current password. UserId: {UserId}", userId);
+            return ChangePasswordResult.InvalidCurrentPassword;
+        }
+
+        var (hash, salt) = _passwordHasher.HashPassword(request.NewPassword);
+        user.PasswordHash = hash;
+        user.PasswordSalt = salt;
+        user.UpdatedAtUtc = DateTime.UtcNow;
+        await _userRepository.UpdateAsync(user, cancellationToken).ConfigureAwait(false);
+
+        _logger.LogInformation("Password changed successfully. UserId: {UserId}", userId);
+        return ChangePasswordResult.Success;
     }
 }

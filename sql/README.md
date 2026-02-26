@@ -13,6 +13,7 @@ Database scripts for the **Bangkok API**. Target: **SQL Server**. Use `UNIQUEIDE
 
 - **dbo.[User]** – Users: Id, Email, DisplayName, PasswordHash, PasswordSalt, Role, IsActive, CreatedAtUtc, UpdatedAtUtc, RecoverString, RecoverStringExpiry, IsDeleted, DeletedAt, FailedLoginAttempts, LockoutEnd. Unique constraint on Email.
 - **dbo.RefreshToken** – Refresh tokens: Id, UserId (FK to User), Token, ExpiresAtUtc, CreatedAtUtc, RevokedReason, RevokedAtUtc.
+- **dbo.Profile** – User profile (1:1 with User): Id, UserId (FK, unique), FirstName, MiddleName, LastName, DateOfBirth, PhoneNumber, AvatarBase64, CreatedAtUtc, UpdatedAtUtc.
 
 ## Alter scripts (order)
 
@@ -23,6 +24,7 @@ Database scripts for the **Bangkok API**. Target: **SQL Server**. Use `UNIQUEIDE
 | 004_add_user_is_active.sql | Add `IsActive` to User |
 | 005_add_soft_delete_to_users.sql | Add `IsDeleted`, `DeletedAt` to User |
 | 006_add_lockout_columns.sql | Add `FailedLoginAttempts`, `LockoutEnd` to User |
+| 007_add_profiles_table.sql | Add `Profile` table (1:1 with User) |
 
 ## Conventions
 
