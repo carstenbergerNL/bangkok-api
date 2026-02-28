@@ -5,9 +5,9 @@ namespace Bangkok.Application.Interfaces;
 public interface IProfileService
 {
     Task<ProfileDto?> GetByUserIdAsync(Guid userId, CancellationToken cancellationToken = default);
-    Task<(CreateProfileResult Result, string? ErrorMessage)> CreateProfileAsync(CreateProfileDto dto, Guid currentUserId, string? currentUserRole, CancellationToken cancellationToken = default);
-    Task<(UpdateProfileResult Result, string? ErrorMessage)> UpdateProfileAsync(Guid userId, UpdateProfileDto dto, Guid currentUserId, string? currentUserRole, CancellationToken cancellationToken = default);
-    Task<DeleteProfileResult> DeleteProfileAsync(Guid userId, Guid currentUserId, string? currentUserRole, CancellationToken cancellationToken = default);
+    Task<(CreateProfileResult Result, string? ErrorMessage)> CreateProfileAsync(CreateProfileDto dto, Guid currentUserId, bool isAdmin, CancellationToken cancellationToken = default);
+    Task<(UpdateProfileResult Result, string? ErrorMessage)> UpdateProfileAsync(Guid userId, UpdateProfileDto dto, Guid currentUserId, bool isAdmin, CancellationToken cancellationToken = default);
+    Task<DeleteProfileResult> DeleteProfileAsync(Guid userId, Guid currentUserId, bool isAdmin, CancellationToken cancellationToken = default);
 }
 
 public enum CreateProfileResult

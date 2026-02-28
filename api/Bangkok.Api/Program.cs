@@ -193,6 +193,18 @@ try
 }
 catch { }
 
+// Seed role management (Roles, Permissions, RolePermissions, assign Admin to legacy admins)
+try
+{
+    using var scope = app.Services.CreateScope();
+    var seedRunner = scope.ServiceProvider.GetRequiredService<Bangkok.Infrastructure.Services.RoleSeedRunner>();
+    await seedRunner.RunAsync(CancellationToken.None).ConfigureAwait(false);
+}
+catch (Exception ex)
+{
+    Log.Warning(ex, "Role seed failed (tables may not exist yet). Run SQL migrations first.");
+}
+
 // Correlation ID (sets TraceIdentifier), RequestId for Serilog, then Exception handling
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<RequestIdEnricherMiddleware>();

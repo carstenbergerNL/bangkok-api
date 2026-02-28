@@ -37,7 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUserState({
           email: credentials.email,
           displayName: res.data.displayName,
-          role: res.data.role,
+          roles: res.data.roles ?? [],
           applicationId: res.data.applicationId,
         });
         return { success: true };

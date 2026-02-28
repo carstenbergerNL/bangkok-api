@@ -15,6 +15,8 @@ public class AuthService : IAuthService
     private static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
 
     private readonly IUserRepository _userRepository;
+    private readonly IUserRoleRepository _userRoleRepository;
+    private readonly IRoleRepository _roleRepository;
     private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtService _jwtService;
@@ -24,6 +26,8 @@ public class AuthService : IAuthService
 
     public AuthService(
         IUserRepository userRepository,
+        IUserRoleRepository userRoleRepository,
+        IRoleRepository roleRepository,
         IRefreshTokenRepository refreshTokenRepository,
         IPasswordHasher passwordHasher,
         IJwtService jwtService,
@@ -32,6 +36,8 @@ public class AuthService : IAuthService
         IAuditLogger audit)
     {
         _userRepository = userRepository;
+        _userRoleRepository = userRoleRepository;
+        _roleRepository = roleRepository;
         _refreshTokenRepository = refreshTokenRepository;
         _passwordHasher = passwordHasher;
         _jwtService = jwtService;
@@ -47,6 +53,7 @@ public class AuthService : IAuthService
             return null;
 
         var (hash, salt) = _passwordHasher.HashPassword(request.Password);
+        var roleName = string.IsNullOrWhiteSpace(request.Role) ? "User" : request.Role.Trim();
         var user = new User
         {
             Id = Guid.NewGuid(),
@@ -54,11 +61,14 @@ public class AuthService : IAuthService
             DisplayName = string.IsNullOrWhiteSpace(request.DisplayName) ? null : request.DisplayName.Trim(),
             PasswordHash = hash,
             PasswordSalt = salt,
-            Role = request.Role,
             CreatedAtUtc = DateTime.UtcNow
         };
         await _userRepository.CreateAsync(user, cancellationToken).ConfigureAwait(false);
         _audit.LogUserCreated(user.Id, user.Email, clientIp);
+
+        var roleByName = await _roleRepository.GetByNameAsync(roleName, cancellationToken).ConfigureAwait(false);
+        if (roleByName != null)
+            await _userRoleRepository.AssignAsync(user.Id, roleByName.Id, cancellationToken).ConfigureAwait(false);
 
         var (refreshTokenValue, refreshExpires) = _jwtService.GenerateRefreshToken();
         var refreshToken = new RefreshToken
@@ -71,7 +81,8 @@ public class AuthService : IAuthService
         };
         await _refreshTokenRepository.CreateAsync(refreshToken, cancellationToken).ConfigureAwait(false);
 
-        var accessToken = _jwtService.GenerateAccessToken(user.Id, user.Email, user.Role);
+        var roles = await GetUserRolesAsync(user.Id, cancellationToken).ConfigureAwait(false);
+        var accessToken = _jwtService.GenerateAccessToken(user.Id, user.Email, roles);
         var expiresAtUtc = DateTime.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpirationMinutes);
 
         return new AuthResponse
@@ -82,7 +93,7 @@ public class AuthService : IAuthService
             TokenType = "Bearer",
             ApplicationId = user.Id.ToString(),
             DisplayName = user.DisplayName,
-            Role = user.Role
+            Roles = roles
         };
     }
 
@@ -136,7 +147,8 @@ public class AuthService : IAuthService
         };
         await _refreshTokenRepository.CreateAsync(refreshToken, cancellationToken).ConfigureAwait(false);
 
-        var accessToken = _jwtService.GenerateAccessToken(user.Id, user.Email, user.Role);
+        var roles = await GetUserRolesAsync(user.Id, cancellationToken).ConfigureAwait(false);
+        var accessToken = _jwtService.GenerateAccessToken(user.Id, user.Email, roles);
         var expiresAtUtc = DateTime.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpirationMinutes);
 
         _audit.LogLoginSuccess(user.Id, user.Email, clientIp);
@@ -147,8 +159,9 @@ public class AuthService : IAuthService
             RefreshToken = refreshTokenValue,
             ExpiresAtUtc = expiresAtUtc,
             TokenType = "Bearer",
+            ApplicationId = user.Id.ToString(),
             DisplayName = user.DisplayName,
-            Role = user.Role
+            Roles = roles
         });
     }
 
@@ -164,6 +177,7 @@ public class AuthService : IAuthService
 
         await _refreshTokenRepository.RevokeAsync(stored.Id, "Refreshed", cancellationToken).ConfigureAwait(false);
 
+        var roles = await GetUserRolesAsync(user.Id, cancellationToken).ConfigureAwait(false);
         var (refreshTokenValue, refreshExpires) = _jwtService.GenerateRefreshToken();
         var newRefreshToken = new RefreshToken
         {
@@ -175,7 +189,7 @@ public class AuthService : IAuthService
         };
         await _refreshTokenRepository.CreateAsync(newRefreshToken, cancellationToken).ConfigureAwait(false);
 
-        var accessToken = _jwtService.GenerateAccessToken(user.Id, user.Email, user.Role);
+        var accessToken = _jwtService.GenerateAccessToken(user.Id, user.Email, roles);
         var expiresAtUtc = DateTime.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpirationMinutes);
 
         return new AuthResponse
@@ -186,8 +200,14 @@ public class AuthService : IAuthService
             TokenType = "Bearer",
             ApplicationId = user.Id.ToString(),
             DisplayName = user.DisplayName,
-            Role = user.Role
+            Roles = roles
         };
+    }
+
+    private async Task<IReadOnlyList<string>> GetUserRolesAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var roleEntities = await _userRoleRepository.GetRolesByUserIdAsync(userId, cancellationToken).ConfigureAwait(false);
+        return roleEntities.Select(r => r.Name).ToList();
     }
 
     public async Task<bool> RevokeAsync(RevokeRequest request, CancellationToken cancellationToken = default)

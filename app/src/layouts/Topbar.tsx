@@ -1,6 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+
+function useIsAdmin() {
+  const { user } = useAuth();
+  const roles = user?.roles ?? [];
+  return roles.some((r) => r?.localeCompare('Admin', undefined, { sensitivity: 'accent' }) === 0);
+}
 import { useDarkMode } from '../hooks/useDarkMode';
 import { getCurrentUserId } from '../services/authService';
 import { getProfileByUserId } from '../services/profileService';
@@ -12,6 +18,8 @@ interface TopbarProps {
 
 export function Topbar({ onMenuClick, sidebarCollapsed }: TopbarProps) {
   const { user, logout } = useAuth();
+  const isAdmin = useIsAdmin();
+  const rolesDisplay = (user?.roles ?? []).filter(Boolean).join(', ') || '—';
   const [isDark, toggleDark] = useDarkMode();
   const [open, setOpen] = useState(false);
   const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
@@ -128,6 +136,7 @@ export function Topbar({ onMenuClick, sidebarCollapsed }: TopbarProps) {
               <div className="px-4 py-3 border-b border-[#edebe9] dark:border-[#3b3a39]">
                 <p className="text-xs opacity-80">Signed in as</p>
                 <p className="text-sm font-normal truncate mt-0.5" style={{ color: 'var(--dropdown-text, #323130)' }}>{user?.email || '—'}</p>
+                <p className="text-xs opacity-80 mt-1">Roles: {rolesDisplay}</p>
               </div>
               <Link
                 to="/"
@@ -145,6 +154,16 @@ export function Topbar({ onMenuClick, sidebarCollapsed }: TopbarProps) {
               >
                 Profile
               </Link>
+              {isAdmin && (
+                <Link
+                  to="/roles"
+                  className="block px-4 py-2.5 text-sm transition-colors duration-150 hover:bg-[#f3f2f1] dark:hover:bg-[#3b3a39]"
+                  style={{ color: 'var(--dropdown-text, #323130)' }}
+                  onClick={() => setOpen(false)}
+                >
+                  Roles
+                </Link>
+              )}
               <button
                 type="button"
                 className="w-full text-left px-4 py-2.5 text-sm transition-colors duration-150 hover:bg-[#f3f2f1] dark:hover:bg-[#3b3a39]"

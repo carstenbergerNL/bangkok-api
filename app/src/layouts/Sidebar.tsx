@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 const navItems: Array<{ to: string; label: string; icon: string; adminOnly?: boolean }> = [
   { to: '/', label: 'Dashboard', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z' },
   { to: '/profile', label: 'Profile', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
+  { to: '/roles', label: 'Roles', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', adminOnly: true },
   { to: '/admin-settings', label: 'Admin Settings', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', adminOnly: true },
 ];
 
@@ -15,7 +16,8 @@ interface SidebarProps {
 
 export function Sidebar({ mobileOpen, onClose, collapsed }: SidebarProps) {
   const { user } = useAuth();
-  const isAdmin = user?.role != null && user.role.localeCompare('Admin', undefined, { sensitivity: 'accent' }) === 0;
+  const roles = user?.roles ?? [];
+  const isAdmin = roles.some((r) => r?.localeCompare('Admin', undefined, { sensitivity: 'accent' }) === 0);
   const items = navItems.filter((item) => !item.adminOnly || isAdmin);
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>

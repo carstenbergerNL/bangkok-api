@@ -5,5 +5,5 @@ export interface LoginResponse {
   tokenType: string;
   displayName?: string;
   applicationId?: string;
-  role?: string;
+  roles: string[];
 }

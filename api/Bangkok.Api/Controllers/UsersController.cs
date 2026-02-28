@@ -18,12 +18,31 @@ namespace Bangkok.Api.Controllers;
 public class UsersController : ControllerBase
 {
     private readonly IUserService _userService;
+    private readonly IRoleService _roleService;
     private readonly ILogger<UsersController> _logger;
 
-    public UsersController(IUserService userService, ILogger<UsersController> logger)
+    public UsersController(IUserService userService, IRoleService roleService, ILogger<UsersController> logger)
     {
         _userService = userService;
+        _roleService = roleService;
         _logger = logger;
+    }
+
+    [HttpPost("{id:guid}/roles/{roleId:guid}")]
+    [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "Assign role to user", Description = "Assign a role to a user. Admin only.")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> AssignRole([FromRoute] Guid id, [FromRoute] Guid roleId, CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
+        var assigned = await _roleService.AssignRoleToUserAsync(id, roleId, cancellationToken).ConfigureAwait(false);
+        if (!assigned)
+            return NotFound(ApiResponse<object>.Fail(new ErrorResponse { Code = "USER_OR_ROLE_NOT_FOUND", Message = "User or role not found." }, correlationId));
+
+        return NoContent();
     }
 
     [HttpGet("{id:guid}")]
@@ -37,11 +56,11 @@ public class UsersController : ControllerBase
         CancellationToken cancellationToken)
     {
         var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
-        var (currentUserId, currentUserRole) = GetCurrentUserIdentity();
+        var (currentUserId, isAdmin) = GetCurrentUserIdentity();
         if (currentUserId == null)
             return Unauthorized(ApiResponse<UserResponse>.Fail(new ErrorResponse { Code = "UNAUTHORIZED", Message = "Authentication required." }, correlationId));
 
-        if (id != currentUserId.Value && !IsAdmin(currentUserRole))
+        if (id != currentUserId.Value && !isAdmin)
         {
             _logger.LogWarning("Unauthorized get user attempt: user {CurrentUserId} tried to get user {TargetUserId}", currentUserId, id);
             return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<UserResponse>.Fail(new ErrorResponse { Code = "FORBIDDEN", Message = "You do not have access to this resource." }, correlationId));
@@ -92,12 +111,12 @@ public class UsersController : ControllerBase
         CancellationToken cancellationToken)
     {
         var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
-        var (currentUserId, currentUserRole) = GetCurrentUserIdentity();
+        var (currentUserId, isAdmin) = GetCurrentUserIdentity();
         if (currentUserId == null)
             return Unauthorized();
 
         var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
-        var result = await _userService.UpdateUserAsync(id, request ?? new UpdateUserRequest(), currentUserId.Value, currentUserRole ?? string.Empty, cancellationToken, clientIp).ConfigureAwait(false);
+        var result = await _userService.UpdateUserAsync(id, request ?? new UpdateUserRequest(), currentUserId.Value, isAdmin, cancellationToken, clientIp).ConfigureAwait(false);
 
         return result switch
         {
@@ -265,14 +284,12 @@ public class UsersController : ControllerBase
         };
     }
 
-    private (Guid? UserId, string? Role) GetCurrentUserIdentity()
+    private (Guid? UserId, bool IsAdmin) GetCurrentUserIdentity()
     {
         var idClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        var roleClaim = User.FindFirst(ClaimTypes.Role)?.Value;
         if (string.IsNullOrEmpty(idClaim) || !Guid.TryParse(idClaim, out var userId))
-            return (null, roleClaim);
-        return (userId, roleClaim);
+            return (null, false);
+        var isAdmin = User.FindAll(ClaimTypes.Role).Any(c => string.Equals(c.Value, "Admin", StringComparison.OrdinalIgnoreCase));
+        return (userId, isAdmin);
     }
-
-    private static bool IsAdmin(string? role) => string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase);
 }

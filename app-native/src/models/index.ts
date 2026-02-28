@@ -15,3 +15,4 @@ export type {
   RegisterRequest,
   ChangePasswordRequest,
 } from './auth';
+export type { Role, CreateRoleRequest, UpdateRoleRequest } from './Role';

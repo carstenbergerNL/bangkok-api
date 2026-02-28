@@ -23,4 +23,9 @@ export const API_PATHS = {
     BASE: '/api/Profile',
     BY_USER_ID: (userId: string) => `/api/Profile/${userId}`,
   },
+  ROLES: {
+    BASE: '/api/Roles',
+    BY_ID: (id: string) => `/api/Roles/${id}`,
+    ASSIGN_TO_USER: (userId: string, roleId: string) => `/api/Users/${userId}/roles/${roleId}`,
+  },
 } as const;

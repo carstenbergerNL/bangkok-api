@@ -8,7 +8,8 @@ export function AdminRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
-  const isAdmin = user?.role != null && user.role.localeCompare('Admin', undefined, { sensitivity: 'accent' }) === 0;
+  const roles = user?.roles ?? [];
+  const isAdmin = roles.some((r) => r?.localeCompare('Admin', undefined, { sensitivity: 'accent' }) === 0);
   if (!isAdmin) {
     return <Navigate to="/" replace />;
   }

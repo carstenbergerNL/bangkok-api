@@ -20,8 +20,8 @@ export function Dashboard() {
           <p className="mt-1 text-base font-semibold" style={{ color: 'var(--card-header-color, #323130)' }}>{user?.displayName || '—'}</p>
         </div>
         <div className="card card-body">
-          <h2 className="card-description text-xs font-semibold uppercase tracking-wider">Role</h2>
-          <p className="mt-1 text-base font-semibold" style={{ color: 'var(--card-header-color, #323130)' }}>{user?.role || '—'}</p>
+          <h2 className="card-description text-xs font-semibold uppercase tracking-wider">Roles</h2>
+          <p className="mt-1 text-base font-semibold" style={{ color: 'var(--card-header-color, #323130)' }}>{(user?.roles ?? []).join(', ') || '—'}</p>
         </div>
       </div>
 

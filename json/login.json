@@ -1,5 +1,4 @@
 {
-  "_comment": "POST /api/auth/login. After 5 failed attempts the account is locked for 15 minutes. 403 = Account temporarily locked.",
   "email": "admin@lost-platform.nl",
   "password": "Sophia0647!"
 }

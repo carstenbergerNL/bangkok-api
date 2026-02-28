@@ -9,5 +9,6 @@ public class AuthResponse
     /// <summary>User id (Guid) for API calls that require the current user, e.g. profile.</summary>
     public string? ApplicationId { get; set; }
     public string? DisplayName { get; set; }
-    public string? Role { get; set; }
+    /// <summary>Roles assigned to the user.</summary>
+    public IReadOnlyList<string> Roles { get; set; } = Array.Empty<string>();
 }

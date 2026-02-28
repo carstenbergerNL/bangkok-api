@@ -12,7 +12,7 @@ const AUTH_STORAGE_KEYS = {
 export interface StoredUser {
   email: string;
   displayName?: string;
-  role?: string;
+  roles: string[];
   applicationId?: string;
 }
 
@@ -65,7 +65,7 @@ export function setAuthFromLoginResponse(data: LoginResponse, email?: string): v
   const user: StoredUser = {
     email: email ?? '',
     displayName: data.displayName ?? undefined,
-    role: data.role,
+    roles: data.roles ?? [],
     applicationId: data.applicationId,
   };
   localStorage.setItem(AUTH_STORAGE_KEYS.user, JSON.stringify(user));

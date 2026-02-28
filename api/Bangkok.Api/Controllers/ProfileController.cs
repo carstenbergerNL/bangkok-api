@@ -37,11 +37,11 @@ public class ProfileController : ControllerBase
         CancellationToken cancellationToken)
     {
         var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
-        var (currentUserId, currentUserRole) = GetCurrentUserIdentity();
+        var (currentUserId, isAdmin) = GetCurrentUserIdentity();
         if (currentUserId == null)
             return Unauthorized(ApiResponse<ProfileDto>.Fail(new ErrorResponse { Code = "UNAUTHORIZED", Message = "Authentication required." }, correlationId));
 
-        if (userId != currentUserId.Value && !IsAdmin(currentUserRole))
+        if (userId != currentUserId.Value && !isAdmin)
         {
             _logger.LogWarning("Unauthorized get profile: user {CurrentUserId} tried to get profile for user {TargetUserId}", currentUserId, userId);
             return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<ProfileDto>.Fail(new ErrorResponse { Code = "FORBIDDEN", Message = "You do not have access to this resource." }, correlationId));
@@ -67,7 +67,7 @@ public class ProfileController : ControllerBase
         CancellationToken cancellationToken)
     {
         var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
-        var (currentUserId, currentUserRole) = GetCurrentUserIdentity();
+        var (currentUserId, isAdmin) = GetCurrentUserIdentity();
         if (currentUserId == null)
             return Unauthorized(ApiResponse<ProfileDto>.Fail(new ErrorResponse { Code = "UNAUTHORIZED", Message = "Authentication required." }, correlationId));
 
@@ -79,7 +79,7 @@ public class ProfileController : ControllerBase
             return BadRequest(ApiResponse<ProfileDto>.Fail(errors, correlationId));
         }
 
-        var (result, errorMessage) = await _profileService.CreateProfileAsync(dto, currentUserId.Value, currentUserRole, cancellationToken).ConfigureAwait(false);
+        var (result, errorMessage) = await _profileService.CreateProfileAsync(dto, currentUserId.Value, isAdmin, cancellationToken).ConfigureAwait(false);
 
         return result switch
         {
@@ -106,7 +106,7 @@ public class ProfileController : ControllerBase
         CancellationToken cancellationToken)
     {
         var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
-        var (currentUserId, currentUserRole) = GetCurrentUserIdentity();
+        var (currentUserId, isAdmin) = GetCurrentUserIdentity();
         if (currentUserId == null)
             return Unauthorized(ApiResponse<ProfileDto>.Fail(new ErrorResponse { Code = "UNAUTHORIZED", Message = "Authentication required." }, correlationId));
 
@@ -118,7 +118,7 @@ public class ProfileController : ControllerBase
             return BadRequest(ApiResponse<ProfileDto>.Fail(errors, correlationId));
         }
 
-        var (result, errorMessage) = await _profileService.UpdateProfileAsync(userId, dto, currentUserId.Value, currentUserRole, cancellationToken).ConfigureAwait(false);
+        var (result, errorMessage) = await _profileService.UpdateProfileAsync(userId, dto, currentUserId.Value, isAdmin, cancellationToken).ConfigureAwait(false);
 
         return result switch
         {
@@ -142,11 +142,11 @@ public class ProfileController : ControllerBase
         CancellationToken cancellationToken)
     {
         var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
-        var (currentUserId, currentUserRole) = GetCurrentUserIdentity();
+        var (currentUserId, isAdmin) = GetCurrentUserIdentity();
         if (currentUserId == null)
             return Unauthorized(ApiResponse<object>.Fail(new ErrorResponse { Code = "UNAUTHORIZED", Message = "Authentication required." }, correlationId));
 
-        var result = await _profileService.DeleteProfileAsync(userId, currentUserId.Value, currentUserRole, cancellationToken).ConfigureAwait(false);
+        var result = await _profileService.DeleteProfileAsync(userId, currentUserId.Value, isAdmin, cancellationToken).ConfigureAwait(false);
 
         return result switch
         {
@@ -157,14 +157,12 @@ public class ProfileController : ControllerBase
         };
     }
 
-    private (Guid? UserId, string? Role) GetCurrentUserIdentity()
+    private (Guid? UserId, bool IsAdmin) GetCurrentUserIdentity()
     {
         var idClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        var roleClaim = User.FindFirst(ClaimTypes.Role)?.Value;
         if (string.IsNullOrEmpty(idClaim) || !Guid.TryParse(idClaim, out var userId))
-            return (null, roleClaim);
-        return (userId, roleClaim);
+            return (null, false);
+        var isAdmin = User.FindAll(ClaimTypes.Role).Any(c => string.Equals(c.Value, "Admin", StringComparison.OrdinalIgnoreCase));
+        return (userId, isAdmin);
     }
-
-    private static bool IsAdmin(string? role) => string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase);
 }

@@ -78,7 +78,7 @@ export function AdminSettings() {
                 <tr>
                   <th>Email</th>
                   <th>Display name</th>
-                  <th>Role</th>
+                  <th>Roles</th>
                   <th>Active</th>
                   <th className="text-right">Actions</th>
                 </tr>
@@ -90,7 +90,7 @@ export function AdminSettings() {
                     <tr key={u.id}>
                       <td>{u.email}</td>
                       <td className="muted">{u.displayName ?? '—'}</td>
-                      <td className="muted">{u.role}</td>
+                      <td className="muted">{(u.roles ?? []).join(', ') || '—'}</td>
                       <td>
                         <span className={u.isActive ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-gray-400 dark:text-gray-500'}>
                           {u.isActive ? 'Yes' : 'No'}
@@ -130,7 +130,7 @@ export function AdminSettings() {
                 <tr>
                   <th>Email</th>
                   <th>Display name</th>
-                  <th>Role</th>
+                  <th>Roles</th>
                   <th>Deleted at</th>
                   <th className="text-right">Actions</th>
                 </tr>
@@ -140,7 +140,7 @@ export function AdminSettings() {
                   <tr key={u.id}>
                     <td>{u.email}</td>
                     <td className="muted">{u.displayName ?? '—'}</td>
-                    <td className="muted">{u.role}</td>
+                    <td className="muted">{(u.roles ?? []).join(', ') || '—'}</td>
                     <td className="muted">{u.deletedAtUtc ? new Date(u.deletedAtUtc).toLocaleString() : '—'}</td>
                     <td className="text-right">
                       <button
@@ -297,7 +297,7 @@ function EditUserModal({
   const isEditingSelf = currentUser?.email != null && user.email != null && currentUser.email.trim().toLowerCase() === user.email.trim().toLowerCase();
   const [email, setEmail] = useState(user.email);
   const [displayName, setDisplayName] = useState(user.displayName ?? '');
-  const [role, setRole] = useState(user.role);
+  const [role, setRole] = useState(user.roles?.[0] ?? 'User');
   const [isActive, setIsActive] = useState(user.isActive);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);

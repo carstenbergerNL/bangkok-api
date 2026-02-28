@@ -8,7 +8,6 @@ namespace Bangkok.Infrastructure.Services;
 
 public class ProfileService : IProfileService
 {
-    private const string AdminRole = "Admin";
     /// <summary>Max decoded image size 2MB; base64 length ≈ 2*1024*1024*4/3.</summary>
     private const int MaxAvatarBase64Length = 2_796_203;
 
@@ -31,9 +30,9 @@ public class ProfileService : IProfileService
         return profile == null ? null : MapToDto(profile);
     }
 
-    public async Task<(CreateProfileResult Result, string? ErrorMessage)> CreateProfileAsync(CreateProfileDto dto, Guid currentUserId, string? currentUserRole, CancellationToken cancellationToken = default)
+    public async Task<(CreateProfileResult Result, string? ErrorMessage)> CreateProfileAsync(CreateProfileDto dto, Guid currentUserId, bool isAdmin, CancellationToken cancellationToken = default)
     {
-        if (dto.UserId != currentUserId && !IsAdmin(currentUserRole))
+        if (dto.UserId != currentUserId && !isAdmin)
         {
             _logger.LogWarning("Unauthorized create profile: user {CurrentUserId} tried to create profile for user {TargetUserId}", currentUserId, dto.UserId);
             return (CreateProfileResult.Forbidden, null);
@@ -68,9 +67,9 @@ public class ProfileService : IProfileService
         return (CreateProfileResult.Success, null);
     }
 
-    public async Task<(UpdateProfileResult Result, string? ErrorMessage)> UpdateProfileAsync(Guid userId, UpdateProfileDto dto, Guid currentUserId, string? currentUserRole, CancellationToken cancellationToken = default)
+    public async Task<(UpdateProfileResult Result, string? ErrorMessage)> UpdateProfileAsync(Guid userId, UpdateProfileDto dto, Guid currentUserId, bool isAdmin, CancellationToken cancellationToken = default)
     {
-        if (userId != currentUserId && !IsAdmin(currentUserRole))
+        if (userId != currentUserId && !isAdmin)
         {
             _logger.LogWarning("Unauthorized update profile: user {CurrentUserId} tried to update profile for user {TargetUserId}", currentUserId, userId);
             return (UpdateProfileResult.Forbidden, null);
@@ -106,9 +105,9 @@ public class ProfileService : IProfileService
         return (UpdateProfileResult.Success, null);
     }
 
-    public async Task<DeleteProfileResult> DeleteProfileAsync(Guid userId, Guid currentUserId, string? currentUserRole, CancellationToken cancellationToken = default)
+    public async Task<DeleteProfileResult> DeleteProfileAsync(Guid userId, Guid currentUserId, bool isAdmin, CancellationToken cancellationToken = default)
     {
-        if (userId != currentUserId && !IsAdmin(currentUserRole))
+        if (userId != currentUserId && !isAdmin)
         {
             _logger.LogWarning("Unauthorized delete profile: user {CurrentUserId} tried to delete profile for user {TargetUserId}", currentUserId, userId);
             return DeleteProfileResult.Forbidden;
@@ -121,8 +120,6 @@ public class ProfileService : IProfileService
         await _profileRepository.DeleteAsync(profile.Id, cancellationToken).ConfigureAwait(false);
         return DeleteProfileResult.Success;
     }
-
-    private static bool IsAdmin(string? role) => string.Equals(role, AdminRole, StringComparison.OrdinalIgnoreCase);
 
     private static ProfileDto MapToDto(Profile p) => new()
     {

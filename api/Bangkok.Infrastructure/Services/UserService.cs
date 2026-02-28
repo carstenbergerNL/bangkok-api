@@ -8,15 +8,17 @@ namespace Bangkok.Infrastructure.Services;
 
 public class UserService : IUserService
 {
-    private const string AdminRole = "Admin";
-
     private readonly IUserRepository _userRepository;
+    private readonly IUserRoleRepository _userRoleRepository;
+    private readonly IRoleRepository _roleRepository;
     private readonly ILogger<UserService> _logger;
     private readonly IAuditLogger _audit;
 
-    public UserService(IUserRepository userRepository, ILogger<UserService> logger, IAuditLogger audit)
+    public UserService(IUserRepository userRepository, IUserRoleRepository userRoleRepository, IRoleRepository roleRepository, ILogger<UserService> logger, IAuditLogger audit)
     {
         _userRepository = userRepository;
+        _userRoleRepository = userRoleRepository;
+        _roleRepository = roleRepository;
         _logger = logger;
         _audit = audit;
     }
@@ -24,28 +26,30 @@ public class UserService : IUserService
     public async Task<UserResponse?> GetUserAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var user = await _userRepository.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
-        return user == null ? null : MapToResponse(user);
+        return user == null ? null : await MapToResponseAsync(user, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<PagedResult<UserResponse>> GetUsersAsync(int pageNumber, int pageSize, bool includeDeleted = false, CancellationToken cancellationToken = default)
     {
         var (items, totalCount) = await _userRepository.GetAllPagedAsync(pageNumber, pageSize, includeDeleted, cancellationToken).ConfigureAwait(false);
+        var responses = new List<UserResponse>();
+        foreach (var user in items)
+            responses.Add(await MapToResponseAsync(user, cancellationToken).ConfigureAwait(false));
         return new PagedResult<UserResponse>
         {
-            Items = items.Select(MapToResponse).ToList(),
+            Items = responses,
             TotalCount = totalCount,
             PageNumber = pageNumber,
             PageSize = pageSize
         };
     }
 
-    public async Task<UpdateUserResult> UpdateUserAsync(Guid id, UpdateUserRequest request, Guid currentUserId, string currentUserRole, CancellationToken cancellationToken = default, string? clientIp = null)
+    public async Task<UpdateUserResult> UpdateUserAsync(Guid id, UpdateUserRequest request, Guid currentUserId, bool isAdmin, CancellationToken cancellationToken = default, string? clientIp = null)
     {
         var user = await _userRepository.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
         if (user == null)
             return UpdateUserResult.NotFound;
 
-        var isAdmin = string.Equals(currentUserRole, AdminRole, StringComparison.OrdinalIgnoreCase);
         var isSelf = id == currentUserId;
 
         if (!isSelf && !isAdmin)
@@ -56,7 +60,7 @@ public class UserService : IUserService
 
         if (isSelf && !isAdmin)
         {
-            if (request.Role != null || request.IsActive.HasValue)
+            if (request.IsActive.HasValue)
             {
                 _logger.LogWarning("Unauthorized: non-admin user {UserId} attempted to change Role or IsActive", currentUserId);
                 return UpdateUserResult.Forbidden;
@@ -83,7 +87,17 @@ public class UserService : IUserService
 
         if (isAdmin)
         {
-            var roleChanged = request.Role != null && request.Role != user.Role;
+            var roleChanged = false;
+            if (request.Role != null)
+            {
+                await _userRoleRepository.RemoveAllForUserAsync(id, cancellationToken).ConfigureAwait(false);
+                var roleByName = await _roleRepository.GetByNameAsync(request.Role, cancellationToken).ConfigureAwait(false);
+                if (roleByName != null)
+                {
+                    await _userRoleRepository.AssignAsync(id, roleByName.Id, cancellationToken).ConfigureAwait(false);
+                    roleChanged = true;
+                }
+            }
             var activeChanged = request.IsActive.HasValue && request.IsActive.Value != user.IsActive;
 
             if (!string.IsNullOrWhiteSpace(request.Email))
@@ -94,8 +108,6 @@ public class UserService : IUserService
                     return UpdateUserResult.BadRequest;
                 user.Email = newEmail;
             }
-            if (request.Role != null)
-                user.Role = request.Role;
             if (request.IsActive.HasValue)
                 user.IsActive = request.IsActive.Value;
             if (request.DisplayName != null)
@@ -105,7 +117,7 @@ public class UserService : IUserService
             await _userRepository.UpdateAsync(user, cancellationToken).ConfigureAwait(false);
 
             if (roleChanged)
-                _logger.LogInformation("Admin changed role for user {UserId} to {Role}", id, user.Role);
+                _logger.LogInformation("Admin changed roles for user {UserId} to {Role}", id, request.Role);
             if (activeChanged && !user.IsActive)
                 _logger.LogInformation("Admin deactivated user {UserId}", id);
             if (activeChanged && user.IsActive)
@@ -236,14 +248,16 @@ public class UserService : IUserService
         return UnlockUserResult.Success;
     }
 
-    private static UserResponse MapToResponse(User user)
+    private async Task<UserResponse> MapToResponseAsync(User user, CancellationToken cancellationToken)
     {
+        var roles = await _userRoleRepository.GetRolesByUserIdAsync(user.Id, cancellationToken).ConfigureAwait(false);
+        var roleNames = roles.Select(r => r.Name).ToList();
         return new UserResponse
         {
             Id = user.Id,
             Email = user.Email,
             DisplayName = user.DisplayName,
-            Role = user.Role,
+            Roles = roleNames,
             IsActive = user.IsActive,
             CreatedAtUtc = user.CreatedAtUtc,
             UpdatedAtUtc = user.UpdatedAtUtc,
