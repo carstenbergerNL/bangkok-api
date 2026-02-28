@@ -8,7 +8,6 @@ import { MainLayout } from './layouts/MainLayout';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Profile } from './pages/Profile';
-import { Roles } from './pages/Roles';
 import { AdminSettings } from './pages/AdminSettings';
 import { initAuthUnauthorizedHandler } from './services/authService';
 
@@ -41,7 +40,6 @@ function AppRoutes() {
       >
         <Route index element={<Dashboard />} />
         <Route path="profile" element={<Profile />} />
-        <Route path="roles" element={<AdminRoute><Roles /></AdminRoute>} />
         <Route path="admin-settings" element={<AdminRoute><AdminSettings /></AdminRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

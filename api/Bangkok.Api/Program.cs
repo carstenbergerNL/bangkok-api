@@ -69,15 +69,20 @@ builder.Services.AddControllers();
 
 // CORS: configurable origins, headers, methods (from appsettings Cors section)
 var corsSettings = builder.Configuration.GetSection(CorsSettings.SectionName).Get<CorsSettings>();
+var isDev = builder.Environment.IsDevelopment();
+if (corsSettings == null || (corsSettings.AllowedOrigins.Length == 0 && isDev))
+    corsSettings = new CorsSettings { AllowedOrigins = new[] { "http://localhost:5173", "http://localhost:3000" }, AllowedHeaders = new[] { "Content-Type", "Authorization", "X-Correlation-ID" }, AllowedMethods = new[] { "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" } };
+if (corsSettings.AllowedMethods.Length == 0)
+    corsSettings.AllowedMethods = new[] { "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" };
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        if (corsSettings?.AllowedOrigins?.Length > 0)
+        if (corsSettings!.AllowedOrigins.Length > 0)
             policy.WithOrigins(corsSettings.AllowedOrigins);
-        if (corsSettings?.AllowedHeaders?.Length > 0)
+        if (corsSettings.AllowedHeaders.Length > 0)
             policy.WithHeaders(corsSettings.AllowedHeaders);
-        if (corsSettings?.AllowedMethods?.Length > 0)
+        if (corsSettings.AllowedMethods.Length > 0)
             policy.WithMethods(corsSettings.AllowedMethods);
     });
 });

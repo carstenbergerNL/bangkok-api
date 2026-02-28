@@ -27,5 +27,12 @@ export const API_PATHS = {
     BASE: '/api/Roles',
     BY_ID: (id: string) => `/api/Roles/${id}`,
     ASSIGN_TO_USER: (userId: string, roleId: string) => `/api/Users/${userId}/roles/${roleId}`,
+    REMOVE_FROM_USER: (userId: string, roleId: string) => `/api/Users/${userId}/roles/${roleId}`,
+    PERMISSIONS: (roleId: string) => `/api/Roles/${roleId}/permissions`,
+    ASSIGN_PERMISSION: (roleId: string, permissionId: string) => `/api/Roles/${roleId}/permissions/${permissionId}`,
+  },
+  PERMISSIONS: {
+    BASE: '/api/Permissions',
+    BY_ID: (id: string) => `/api/Permissions/${id}`,
   },
 } as const;

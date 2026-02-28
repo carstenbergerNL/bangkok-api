@@ -45,6 +45,23 @@ public class UsersController : ControllerBase
         return NoContent();
     }
 
+    [HttpDelete("{id:guid}/roles/{roleId:guid}")]
+    [Authorize(Roles = "Admin")]
+    [SwaggerOperation(Summary = "Remove role from user", Description = "Remove a role from a user. Admin only. User can have multiple roles; this removes only the specified one.")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RemoveRole([FromRoute] Guid id, [FromRoute] Guid roleId, CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
+        var removed = await _roleService.RemoveRoleFromUserAsync(id, roleId, cancellationToken).ConfigureAwait(false);
+        if (!removed)
+            return NotFound(ApiResponse<object>.Fail(new ErrorResponse { Code = "USER_OR_ROLE_NOT_FOUND", Message = "User or role not found." }, correlationId));
+
+        return NoContent();
+    }
+
     [HttpGet("{id:guid}")]
     [SwaggerOperation(Summary = "Get user by ID", Description = "Returns a single user by ID (safe fields only). Caller must be the user or Admin.")]
     [ProducesResponseType(typeof(ApiResponse<UserResponse>), StatusCodes.Status200OK)]

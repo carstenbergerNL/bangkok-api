@@ -38,6 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: credentials.email,
           displayName: res.data.displayName,
           roles: res.data.roles ?? [],
+          permissions: res.data.permissions ?? [],
           applicationId: res.data.applicationId,
         });
         return { success: true };

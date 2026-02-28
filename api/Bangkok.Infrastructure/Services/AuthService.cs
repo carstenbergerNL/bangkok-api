@@ -17,6 +17,7 @@ public class AuthService : IAuthService
     private readonly IUserRepository _userRepository;
     private readonly IUserRoleRepository _userRoleRepository;
     private readonly IRoleRepository _roleRepository;
+    private readonly IPermissionService _permissionService;
     private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtService _jwtService;
@@ -28,6 +29,7 @@ public class AuthService : IAuthService
         IUserRepository userRepository,
         IUserRoleRepository userRoleRepository,
         IRoleRepository roleRepository,
+        IPermissionService permissionService,
         IRefreshTokenRepository refreshTokenRepository,
         IPasswordHasher passwordHasher,
         IJwtService jwtService,
@@ -38,6 +40,7 @@ public class AuthService : IAuthService
         _userRepository = userRepository;
         _userRoleRepository = userRoleRepository;
         _roleRepository = roleRepository;
+        _permissionService = permissionService;
         _refreshTokenRepository = refreshTokenRepository;
         _passwordHasher = passwordHasher;
         _jwtService = jwtService;
@@ -82,6 +85,7 @@ public class AuthService : IAuthService
         await _refreshTokenRepository.CreateAsync(refreshToken, cancellationToken).ConfigureAwait(false);
 
         var roles = await GetUserRolesAsync(user.Id, cancellationToken).ConfigureAwait(false);
+        var permissions = await GetUserPermissionsAsync(user.Id, cancellationToken).ConfigureAwait(false);
         var accessToken = _jwtService.GenerateAccessToken(user.Id, user.Email, roles);
         var expiresAtUtc = DateTime.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpirationMinutes);
 
@@ -93,7 +97,8 @@ public class AuthService : IAuthService
             TokenType = "Bearer",
             ApplicationId = user.Id.ToString(),
             DisplayName = user.DisplayName,
-            Roles = roles
+            Roles = roles,
+            Permissions = permissions
         };
     }
 
@@ -148,6 +153,7 @@ public class AuthService : IAuthService
         await _refreshTokenRepository.CreateAsync(refreshToken, cancellationToken).ConfigureAwait(false);
 
         var roles = await GetUserRolesAsync(user.Id, cancellationToken).ConfigureAwait(false);
+        var permissions = await GetUserPermissionsAsync(user.Id, cancellationToken).ConfigureAwait(false);
         var accessToken = _jwtService.GenerateAccessToken(user.Id, user.Email, roles);
         var expiresAtUtc = DateTime.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpirationMinutes);
 
@@ -161,7 +167,8 @@ public class AuthService : IAuthService
             TokenType = "Bearer",
             ApplicationId = user.Id.ToString(),
             DisplayName = user.DisplayName,
-            Roles = roles
+            Roles = roles,
+            Permissions = permissions
         });
     }
 
@@ -178,6 +185,7 @@ public class AuthService : IAuthService
         await _refreshTokenRepository.RevokeAsync(stored.Id, "Refreshed", cancellationToken).ConfigureAwait(false);
 
         var roles = await GetUserRolesAsync(user.Id, cancellationToken).ConfigureAwait(false);
+        var permissions = await GetUserPermissionsAsync(user.Id, cancellationToken).ConfigureAwait(false);
         var (refreshTokenValue, refreshExpires) = _jwtService.GenerateRefreshToken();
         var newRefreshToken = new RefreshToken
         {
@@ -200,8 +208,32 @@ public class AuthService : IAuthService
             TokenType = "Bearer",
             ApplicationId = user.Id.ToString(),
             DisplayName = user.DisplayName,
-            Roles = roles
+            Roles = roles,
+            Permissions = permissions
         };
+    }
+
+    private async Task<IReadOnlyList<string>> GetUserPermissionsAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var roleEntities = await _userRoleRepository.GetRolesByUserIdAsync(userId, cancellationToken).ConfigureAwait(false);
+        if (roleEntities == null || roleEntities.Count == 0)
+            return Array.Empty<string>();
+
+        var permissionNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var role in roleEntities)
+        {
+            if (role == null)
+                continue;
+            var perms = await _permissionService.GetByRoleIdAsync(role.Id, cancellationToken).ConfigureAwait(false);
+            if (perms == null)
+                continue;
+            foreach (var p in perms)
+            {
+                if (p?.Name != null)
+                    permissionNames.Add(p.Name);
+            }
+        }
+        return permissionNames.ToList();
     }
 
     private async Task<IReadOnlyList<string>> GetUserRolesAsync(Guid userId, CancellationToken cancellationToken)

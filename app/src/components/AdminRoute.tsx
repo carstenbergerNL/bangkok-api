@@ -1,16 +1,17 @@
 import { Navigate } from 'react-router-dom';
+import { PERMISSIONS } from '../constants/permissions';
 import { useAuth } from '../context/AuthContext';
+import { usePermissions } from '../hooks/usePermissions';
 
 export function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
+  const { hasPermission } = usePermissions();
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
-  const roles = user?.roles ?? [];
-  const isAdmin = roles.some((r) => r?.localeCompare('Admin', undefined, { sensitivity: 'accent' }) === 0);
-  if (!isAdmin) {
+  if (!hasPermission(PERMISSIONS.ViewAdminSettings)) {
     return <Navigate to="/" replace />;
   }
 

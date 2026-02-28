@@ -97,4 +97,20 @@ public class RoleService : IRoleService
         _logger.LogInformation("Role assigned. UserId: {UserId}, RoleId: {RoleId}, RoleName: {RoleName}", userId, roleId, role.Name);
         return true;
     }
+
+    public async Task<bool> RemoveRoleFromUserAsync(Guid userId, Guid roleId, CancellationToken cancellationToken = default)
+    {
+        var user = await _userRepository.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false);
+        var role = await _roleRepository.GetByIdAsync(roleId, cancellationToken).ConfigureAwait(false);
+        if (user == null || role == null)
+            return false;
+
+        var exists = await _userRoleRepository.ExistsAsync(userId, roleId, cancellationToken).ConfigureAwait(false);
+        if (!exists)
+            return true;
+
+        await _userRoleRepository.RemoveAsync(userId, roleId, cancellationToken).ConfigureAwait(false);
+        _logger.LogInformation("Role removed from user. UserId: {UserId}, RoleId: {RoleId}, RoleName: {RoleName}", userId, roleId, role.Name);
+        return true;
+    }
 }

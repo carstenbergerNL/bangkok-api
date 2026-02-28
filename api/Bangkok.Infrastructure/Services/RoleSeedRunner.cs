@@ -32,6 +32,7 @@ public class RoleSeedRunner
                     "SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.[User]') AND name = N'Role'", cancellationToken: cancellationToken)).ConfigureAwait(false);
                 if (roleColumnExists == 1)
                     await AssignAdminRoleToLegacyAdminsAsync(connection, adminRole.Id, cancellationToken).ConfigureAwait(false);
+                await EnsureViewAdminSettingsPermissionAsync(connection, adminRole.Id, cancellationToken).ConfigureAwait(false);
                 return;
             }
 
@@ -39,6 +40,7 @@ public class RoleSeedRunner
             var userId = Guid.NewGuid();
             var manageUsersId = Guid.NewGuid();
             var manageRolesId = Guid.NewGuid();
+            var viewAdminSettingsId = Guid.NewGuid();
             var now = DateTime.UtcNow;
 
             await connection.ExecuteAsync(new CommandDefinition(@"
@@ -51,20 +53,48 @@ public class RoleSeedRunner
             await connection.ExecuteAsync(new CommandDefinition(@"
                 INSERT INTO dbo.Permission (Id, Name, Description) VALUES
                 (@ManageUsersId, N'ManageUsers', N'Manage users'),
-                (@ManageRolesId, N'ManageRoles', N'Manage roles')",
-                new { ManageUsersId = manageUsersId, ManageRolesId = manageRolesId },
+                (@ManageRolesId, N'ManageRoles', N'Manage roles'),
+                (@ViewAdminSettingsId, N'ViewAdminSettings', N'View and access Admin Settings')",
+                new { ManageUsersId = manageUsersId, ManageRolesId = manageRolesId, ViewAdminSettingsId = viewAdminSettingsId },
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
 
             await connection.ExecuteAsync(new CommandDefinition(@"
                 INSERT INTO dbo.RolePermission (Id, RoleId, PermissionId) VALUES
                 (NEWID(), @AdminId, @ManageUsersId),
-                (NEWID(), @AdminId, @ManageRolesId)",
-                new { AdminId = adminId, ManageUsersId = manageUsersId, ManageRolesId = manageRolesId },
+                (NEWID(), @AdminId, @ManageRolesId),
+                (NEWID(), @AdminId, @ViewAdminSettingsId)",
+                new { AdminId = adminId, ManageUsersId = manageUsersId, ManageRolesId = manageRolesId, ViewAdminSettingsId = viewAdminSettingsId },
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
 
-            _logger.LogInformation("Role management seed completed. Roles: Admin, User. Permissions: ManageUsers, ManageRoles.");
+            _logger.LogInformation("Role management seed completed. Roles: Admin, User. Permissions: ManageUsers, ManageRoles, ViewAdminSettings.");
 
             await AssignAdminRoleToLegacyAdminsAsync(connection, adminId, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private static async Task EnsureViewAdminSettingsPermissionAsync(IDbConnection connection, Guid adminRoleId, CancellationToken cancellationToken)
+    {
+        var existingId = await connection.ExecuteScalarAsync<Guid?>(new CommandDefinition(
+            "SELECT Id FROM dbo.Permission WHERE Name = N'ViewAdminSettings'", cancellationToken: cancellationToken)).ConfigureAwait(false);
+        var viewAdminSettingsId = existingId ?? Guid.NewGuid();
+        if (!existingId.HasValue)
+        {
+            await connection.ExecuteAsync(new CommandDefinition(@"
+                INSERT INTO dbo.Permission (Id, Name, Description) VALUES (@Id, N'ViewAdminSettings', N'View and access Admin Settings')",
+                new { Id = viewAdminSettingsId },
+                cancellationToken: cancellationToken)).ConfigureAwait(false);
+        }
+
+        var assigned = await connection.ExecuteScalarAsync<int?>(new CommandDefinition(
+            "SELECT 1 FROM dbo.RolePermission WHERE RoleId = @RoleId AND PermissionId = @PermissionId",
+            new { RoleId = adminRoleId, PermissionId = viewAdminSettingsId },
+            cancellationToken: cancellationToken)).ConfigureAwait(false);
+        if (assigned != 1)
+        {
+            await connection.ExecuteAsync(new CommandDefinition(@"
+                INSERT INTO dbo.RolePermission (Id, RoleId, PermissionId) VALUES (NEWID(), @RoleId, @PermissionId)",
+                new { RoleId = adminRoleId, PermissionId = viewAdminSettingsId },
+                cancellationToken: cancellationToken)).ConfigureAwait(false);
         }
     }
 

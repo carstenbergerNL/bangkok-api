@@ -11,4 +11,6 @@ public class AuthResponse
     public string? DisplayName { get; set; }
     /// <summary>Roles assigned to the user.</summary>
     public IReadOnlyList<string> Roles { get; set; } = Array.Empty<string>();
+    /// <summary>Permission names from the user's roles (e.g. ViewAdminSettings).</summary>
+    public IReadOnlyList<string> Permissions { get; set; } = Array.Empty<string>();
 }

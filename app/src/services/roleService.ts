@@ -28,10 +28,18 @@ export function updateRole(id: string, request: UpdateRoleRequest): Promise<ApiR
 export function deleteRole(id: string): Promise<ApiResponse<unknown>> {
   return apiClient
     .delete<ApiResponse<unknown>>(API_PATHS.ROLES.BY_ID(id))
-    .then((res) => res.data)
+    .then((res) => (res.status === 204 || res.data == null ? { success: true } : res.data))
     .catch((err) => err.response?.data ?? { success: false, error: { message: err.message ?? 'Request failed' } });
 }
 
 export function assignRoleToUser(userId: string, roleId: string): Promise<void> {
-  return apiClient.post(API_PATHS.ROLES.ASSIGN_TO_USER(userId, roleId)).then(() => {});
+  return apiClient
+    .post(API_PATHS.ROLES.ASSIGN_TO_USER(userId, roleId), null, { transformResponse: [(data) => (data === '' || data == null ? null : data)] })
+    .then(() => {});
+}
+
+export function removeRoleFromUser(userId: string, roleId: string): Promise<void> {
+  return apiClient
+    .delete(API_PATHS.ROLES.REMOVE_FROM_USER(userId, roleId), { transformResponse: [] })
+    .then(() => {});
 }

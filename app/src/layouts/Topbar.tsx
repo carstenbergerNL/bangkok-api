@@ -1,13 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { PERMISSIONS } from '../constants/permissions';
 import { useAuth } from '../context/AuthContext';
-
-function useIsAdmin() {
-  const { user } = useAuth();
-  const roles = user?.roles ?? [];
-  return roles.some((r) => r?.localeCompare('Admin', undefined, { sensitivity: 'accent' }) === 0);
-}
 import { useDarkMode } from '../hooks/useDarkMode';
+import { usePermissions } from '../hooks/usePermissions';
 import { getCurrentUserId } from '../services/authService';
 import { getProfileByUserId } from '../services/profileService';
 
@@ -18,7 +14,8 @@ interface TopbarProps {
 
 export function Topbar({ onMenuClick, sidebarCollapsed }: TopbarProps) {
   const { user, logout } = useAuth();
-  const isAdmin = useIsAdmin();
+  const { hasPermission } = usePermissions();
+  const canViewAdmin = hasPermission(PERMISSIONS.ViewAdminSettings);
   const rolesDisplay = (user?.roles ?? []).filter(Boolean).join(', ') || '—';
   const [isDark, toggleDark] = useDarkMode();
   const [open, setOpen] = useState(false);
@@ -154,14 +151,14 @@ export function Topbar({ onMenuClick, sidebarCollapsed }: TopbarProps) {
               >
                 Profile
               </Link>
-              {isAdmin && (
+              {canViewAdmin && (
                 <Link
-                  to="/roles"
+                  to="/admin-settings"
                   className="block px-4 py-2.5 text-sm transition-colors duration-150 hover:bg-[#f3f2f1] dark:hover:bg-[#3b3a39]"
                   style={{ color: 'var(--dropdown-text, #323130)' }}
                   onClick={() => setOpen(false)}
                 >
-                  Roles
+                  Admin Settings
                 </Link>
               )}
               <button

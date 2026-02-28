@@ -6,4 +6,6 @@ export interface LoginResponse {
   displayName?: string;
   applicationId?: string;
   roles: string[];
+  /** Permission names (e.g. ViewAdminSettings). Omitted in older API versions. */
+  permissions?: string[];
 }

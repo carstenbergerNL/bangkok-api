@@ -13,6 +13,8 @@ export interface StoredUser {
   email: string;
   displayName?: string;
   roles: string[];
+  /** Permission names. May be missing for users stored before permissions were added. */
+  permissions?: string[];
   applicationId?: string;
 }
 
@@ -66,6 +68,7 @@ export function setAuthFromLoginResponse(data: LoginResponse, email?: string): v
     email: email ?? '',
     displayName: data.displayName ?? undefined,
     roles: data.roles ?? [],
+    permissions: data.permissions ?? [],
     applicationId: data.applicationId,
   };
   localStorage.setItem(AUTH_STORAGE_KEYS.user, JSON.stringify(user));
