@@ -1,16 +1,14 @@
 {
   "name": "bangkok",
   "private": true,
-  "description": "Bangkok multi-platform: API, app (web), app-native (Expo), shared code",
+  "description": "Bangkok multi-platform: API, app (web), app-native (Expo), mirrored clients",
   "workspaces": [
     "app",
-    "app-native",
-    "shared"
+    "app-native"
   ],
   "scripts": {
-    "build:shared": "npm run build -w shared",
-    "build:app": "npm run build:shared && npm run build -w app",
-    "build:app-native": "npm run build:shared && npm run build -w app-native",
+    "build:app": "npm run build -w app",
+    "build:app-native": "npm run build -w app-native",
     "dev:app": "npm run dev -w app",
     "dev:app-native": "npm run dev -w app-native"
   },

@@ -1,6 +1,5 @@
 /**
- * Auth service – mirrors app (web) API usage. Uses shared types and API_PATHS.
- * Token storage to be wired to SecureStore.
+ * Auth service – mirrors app (web) API usage. Token storage to be wired to SecureStore.
  */
 import { API_PATHS } from '../constants';
 import type { ApiResponse, LoginRequest, LoginResponse } from '../models';

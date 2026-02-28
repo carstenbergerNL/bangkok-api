@@ -63,9 +63,6 @@ nunit-*.xml
 # Node / npm
 node_modules/
 
-# Shared package build
-shared/dist/
-
 # Frontend (Vite/React in app/)
 app/dist/
 

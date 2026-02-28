@@ -1,6 +1,5 @@
 /**
- * API path constants. Must stay in sync with backend controllers.
- * Use these in both app and app-native to avoid drift.
+ * API path constants. Must stay in sync with backend controllers and app-native.
  */
 export const API_PATHS = {
   AUTH: {

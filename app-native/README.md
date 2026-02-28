@@ -1,6 +1,6 @@
 # Bangkok – Native app (Expo)
 
-React Native (Expo) client for Bangkok. It **mirrors the web app** (`app/`) in architecture, API usage, and features, and shares types and constants with it via `@bangkok/shared`.
+React Native (Expo) client for Bangkok. It **mirrors the web app** (`app/`) in architecture, API usage, and features. Each app owns its own code; models and constants are maintained separately and must stay in sync.
 
 ## Prerequisites
 
@@ -14,10 +14,8 @@ React Native (Expo) client for Bangkok. It **mirrors the web app** (`app/`) in a
 1. **From repo root** (recommended):
    ```bash
    npm install
-   npm run build:shared
    cd app-native && npx expo start
    ```
-   This installs workspace deps and builds the shared package so `@bangkok/shared` resolves.
 
 2. **From app-native only**:
    ```bash
@@ -25,7 +23,6 @@ React Native (Expo) client for Bangkok. It **mirrors the web app** (`app/`) in a
    npm install
    npx expo start
    ```
-   Ensure `shared` is built from root first (`npm run build -w shared` or `cd ../shared && npm run build`).
 
 ## Environment
 
@@ -46,34 +43,34 @@ Other env vars can be added to mirror the web app (e.g. default application ID) 
 
 ```
 app-native/src/
-├── api/           # API client (fetch + auth headers); uses shared types & API_PATHS
+├── api/           # API client (fetch + auth headers)
 ├── services/      # authService, userService, profileService (same names as app)
 ├── screens/       # Login, Dashboard, Profile, AdminSettings (counterpart to app pages)
 ├── components/    # Reusable UI; PrivateRoute, AdminRoute, Toast, etc.
 ├── navigation/    # Stack/Tab navigator and route names
 ├── hooks/         # useAuth, useDarkMode, etc.
-├── models/        # Re-export from @bangkok/shared or local-only types only
-├── constants/     # Re-export from @bangkok/shared or app-native–specific only
+├── models/        # Own types – keep identical to app/src/models/
+├── constants/     # Own constants (API_PATHS, VALIDATION) – keep identical to app
 ├── utils/         # Helpers (toast, storage adapters)
 └── context/       # AuthContext, etc.
 ```
 
-- **models/** and **constants/** should prefer `@bangkok/shared`. Add local files only for native-specific types or constants.
+- **models/** and **constants/** are owned by app-native. Keep them identical to `app/src/models/` and `app/src/constants/`.
 - **api/**, **services/**, **screens/** should mirror the web app’s structure and naming so the same features exist in both clients.
 
 ## Sync principles
 
 1. **Same API**  
-   Use the same endpoints and request/response shapes. Import types from `@bangkok/shared` and use `API_PATHS` from shared constants.
+   Use the same endpoints and request/response shapes. Define matching types in `models/` and use `API_PATHS` from `constants/`.
 
 2. **Same features**  
    Every feature in the web app (auth, profile, users, password change, etc.) should have an equivalent in the native app. UI and navigation differ; behavior and data contract do not.
 
 3. **Same validation**  
-   Use `VALIDATION` from `@bangkok/shared` for field lengths and rules so both clients validate the same way.
+   Keep `VALIDATION` in `constants/` identical to `app/src/constants/validation.ts`.
 
-4. **No duplicate types**  
-   Do not redefine DTOs or API response types in app-native. Use `@bangkok/shared`. If you need a native-only type, put it in `models/` and document why it’s not shared.
+4. **Mirror types**  
+   When adding or changing a DTO or API type in `app/src/models/`, add or change the same in `app-native/src/models/`. No shared package; each app owns its copy.
 
 5. **Auth flow**  
    Login, refresh, logout, and token storage (e.g. SecureStore) must implement the same logical flow as the web app; only the storage mechanism is different.
@@ -86,15 +83,11 @@ app-native/src/
   # or
   eas build
   ```
-- Ensure `shared` is built before building the native app so `@bangkok/shared` resolves.
 
 ## Troubleshooting
-
-- **Module not found: @bangkok/shared**  
-  From repo root run `npm run build:shared` and then `npm install`. Ensure you are using the workspace root when running installs.
 
 - **API connection**  
   Check `EXPO_PUBLIC_API_BASE_URL` and that the API allows requests from your device/emulator (CORS, HTTPS, or proxy as needed).
 
 - **Sync with web**  
-  When in doubt, compare `app-native/src/services/` and `app/src/services/` for the same method names and endpoints, and ensure both use `@bangkok/shared` for types and constants.
+  When in doubt, compare `app-native/src/services/` and `app/src/services/` for the same method names and endpoints, and compare `models/` and `constants/` in both apps.

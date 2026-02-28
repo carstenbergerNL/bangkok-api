@@ -1,5 +1,5 @@
 /**
- * Profile service – mirrors app (web). Same endpoints and types from @bangkok/shared.
+ * Profile service – mirrors app (web). Same endpoints and types. Keep in sync.
  */
 import { API_PATHS } from '../constants';
 import type { ApiResponse, Profile, CreateProfileRequest, UpdateProfileRequest } from '../models';

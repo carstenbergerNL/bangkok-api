@@ -11,7 +11,6 @@
     "web": "expo start --web"
   },
   "dependencies": {
-    "@bangkok/shared": "file:../shared",
     "expo": "~55.0.2",
     "expo-status-bar": "~55.0.4",
     "react": "19.2.0",

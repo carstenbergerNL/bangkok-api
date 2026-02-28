@@ -17,7 +17,7 @@ export function setAccessToken(token: string | null): void {
 
 export async function apiRequest<T>(
   path: string,
-  options: RequestInit & { method?: string; body?: unknown } = {}
+  options: Omit<RequestInit, 'body'> & { method?: string; body?: unknown } = {}
 ): Promise<T> {
   const { method = 'GET', body, ...rest } = options;
   const url = path.startsWith('http') ? path : `${getBaseURL()}${path}`;
