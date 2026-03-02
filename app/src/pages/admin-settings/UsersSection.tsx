@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import {
   createUser,
-  deleteUser,
   getUsers,
   hardDeleteUser,
   updateUser,

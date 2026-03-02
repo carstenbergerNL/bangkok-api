@@ -25,12 +25,17 @@ public static class DependencyInjection
         services.AddScoped<IUserRoleRepository, UserRoleRepository>();
         services.AddScoped<IRolePermissionRepository, RolePermissionRepository>();
         services.AddScoped<IProfileRepository, ProfileRepository>();
+        services.AddScoped<IProjectRepository, ProjectRepository>();
+        services.AddScoped<ITaskRepository, TaskRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+        services.AddScoped<IUserPermissionChecker, UserPermissionChecker>();
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<IJwtService, JwtService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IProfileService, ProfileService>();
+        services.AddScoped<IProjectService, ProjectService>();
+        services.AddScoped<ITaskService, TaskService>();
         services.AddScoped<IRoleService, RoleService>();
         services.AddScoped<IPermissionService, PermissionService>();
         services.AddSingleton<IAuditLogger, AuditLogger>();

@@ -35,4 +35,12 @@ export const API_PATHS = {
     BASE: '/api/Permissions',
     BY_ID: (id: string) => `/api/Permissions/${id}`,
   },
+  PROJECTS: {
+    BASE: '/api/Projects',
+    BY_ID: (id: string) => `/api/Projects/${id}`,
+  },
+  TASKS: {
+    BASE: '/api/Tasks',
+    BY_ID: (id: string) => `/api/Tasks/${id}`,
+  },
 } as const;

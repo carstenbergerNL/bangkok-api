@@ -1,0 +1,9 @@
+{
+  "projectId": "00000000-0000-0000-0000-000000000000",
+  "title": "Implement feature X",
+  "description": "Optional task description.",
+  "status": "ToDo",
+  "priority": "Medium",
+  "assignedToUserId": null,
+  "dueDate": null
+}

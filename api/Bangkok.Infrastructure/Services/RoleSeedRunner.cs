@@ -33,6 +33,7 @@ public class RoleSeedRunner
                 if (roleColumnExists == 1)
                     await AssignAdminRoleToLegacyAdminsAsync(connection, adminRole.Id, cancellationToken).ConfigureAwait(false);
                 await EnsureViewAdminSettingsPermissionAsync(connection, adminRole.Id, cancellationToken).ConfigureAwait(false);
+                await EnsureProjectAndTaskPermissionsAsync(connection, adminRole.Id, cancellationToken).ConfigureAwait(false);
                 return;
             }
 
@@ -41,6 +42,15 @@ public class RoleSeedRunner
             var manageUsersId = Guid.NewGuid();
             var manageRolesId = Guid.NewGuid();
             var viewAdminSettingsId = Guid.NewGuid();
+            var projectViewId = Guid.NewGuid();
+            var projectCreateId = Guid.NewGuid();
+            var projectEditId = Guid.NewGuid();
+            var projectDeleteId = Guid.NewGuid();
+            var taskViewId = Guid.NewGuid();
+            var taskCreateId = Guid.NewGuid();
+            var taskEditId = Guid.NewGuid();
+            var taskDeleteId = Guid.NewGuid();
+            var taskAssignId = Guid.NewGuid();
             var now = DateTime.UtcNow;
 
             await connection.ExecuteAsync(new CommandDefinition(@"
@@ -54,19 +64,41 @@ public class RoleSeedRunner
                 INSERT INTO dbo.Permission (Id, Name, Description) VALUES
                 (@ManageUsersId, N'ManageUsers', N'Manage users'),
                 (@ManageRolesId, N'ManageRoles', N'Manage roles'),
-                (@ViewAdminSettingsId, N'ViewAdminSettings', N'View and access Admin Settings')",
-                new { ManageUsersId = manageUsersId, ManageRolesId = manageRolesId, ViewAdminSettingsId = viewAdminSettingsId },
+                (@ViewAdminSettingsId, N'ViewAdminSettings', N'View and access Admin Settings'),
+                (@ProjectViewId, N'Project.View', N'View projects'),
+                (@ProjectCreateId, N'Project.Create', N'Create projects'),
+                (@ProjectEditId, N'Project.Edit', N'Edit projects'),
+                (@ProjectDeleteId, N'Project.Delete', N'Delete projects'),
+                (@TaskViewId, N'Task.View', N'View tasks'),
+                (@TaskCreateId, N'Task.Create', N'Create tasks'),
+                (@TaskEditId, N'Task.Edit', N'Edit tasks'),
+                (@TaskDeleteId, N'Task.Delete', N'Delete tasks'),
+                (@TaskAssignId, N'Task.Assign', N'Assign tasks')",
+                new { ManageUsersId = manageUsersId, ManageRolesId = manageRolesId, ViewAdminSettingsId = viewAdminSettingsId,
+                    ProjectViewId = projectViewId, ProjectCreateId = projectCreateId, ProjectEditId = projectEditId, ProjectDeleteId = projectDeleteId,
+                    TaskViewId = taskViewId, TaskCreateId = taskCreateId, TaskEditId = taskEditId, TaskDeleteId = taskDeleteId, TaskAssignId = taskAssignId },
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
 
             await connection.ExecuteAsync(new CommandDefinition(@"
                 INSERT INTO dbo.RolePermission (Id, RoleId, PermissionId) VALUES
                 (NEWID(), @AdminId, @ManageUsersId),
                 (NEWID(), @AdminId, @ManageRolesId),
-                (NEWID(), @AdminId, @ViewAdminSettingsId)",
-                new { AdminId = adminId, ManageUsersId = manageUsersId, ManageRolesId = manageRolesId, ViewAdminSettingsId = viewAdminSettingsId },
+                (NEWID(), @AdminId, @ViewAdminSettingsId),
+                (NEWID(), @AdminId, @ProjectViewId),
+                (NEWID(), @AdminId, @ProjectCreateId),
+                (NEWID(), @AdminId, @ProjectEditId),
+                (NEWID(), @AdminId, @ProjectDeleteId),
+                (NEWID(), @AdminId, @TaskViewId),
+                (NEWID(), @AdminId, @TaskCreateId),
+                (NEWID(), @AdminId, @TaskEditId),
+                (NEWID(), @AdminId, @TaskDeleteId),
+                (NEWID(), @AdminId, @TaskAssignId)",
+                new { AdminId = adminId, ManageUsersId = manageUsersId, ManageRolesId = manageRolesId, ViewAdminSettingsId = viewAdminSettingsId,
+                    ProjectViewId = projectViewId, ProjectCreateId = projectCreateId, ProjectEditId = projectEditId, ProjectDeleteId = projectDeleteId,
+                    TaskViewId = taskViewId, TaskCreateId = taskCreateId, TaskEditId = taskEditId, TaskDeleteId = taskDeleteId, TaskAssignId = taskAssignId },
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
 
-            _logger.LogInformation("Role management seed completed. Roles: Admin, User. Permissions: ManageUsers, ManageRoles, ViewAdminSettings.");
+            _logger.LogInformation("Role management seed completed. Roles: Admin, User. Permissions: ManageUsers, ManageRoles, ViewAdminSettings, Project.*, Task.*.");
 
             await AssignAdminRoleToLegacyAdminsAsync(connection, adminId, cancellationToken).ConfigureAwait(false);
         }
@@ -95,6 +127,38 @@ public class RoleSeedRunner
                 INSERT INTO dbo.RolePermission (Id, RoleId, PermissionId) VALUES (NEWID(), @RoleId, @PermissionId)",
                 new { RoleId = adminRoleId, PermissionId = viewAdminSettingsId },
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
+        }
+    }
+
+    private static async Task EnsureProjectAndTaskPermissionsAsync(IDbConnection connection, Guid adminRoleId, CancellationToken cancellationToken)
+    {
+        var permissions = new[] { ("Project.View", "View projects"), ("Project.Create", "Create projects"), ("Project.Edit", "Edit projects"), ("Project.Delete", "Delete projects"),
+            ("Task.View", "View tasks"), ("Task.Create", "Create tasks"), ("Task.Edit", "Edit tasks"), ("Task.Delete", "Delete tasks"), ("Task.Assign", "Assign tasks") };
+
+        foreach (var (name, description) in permissions)
+        {
+            var existingId = await connection.ExecuteScalarAsync<Guid?>(new CommandDefinition(
+                "SELECT Id FROM dbo.Permission WHERE Name = @Name", new { Name = name }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+            var permId = existingId ?? Guid.NewGuid();
+            if (!existingId.HasValue)
+            {
+                await connection.ExecuteAsync(new CommandDefinition(@"
+                    INSERT INTO dbo.Permission (Id, Name, Description) VALUES (@Id, @Name, @Description)",
+                    new { Id = permId, Name = name, Description = description },
+                    cancellationToken: cancellationToken)).ConfigureAwait(false);
+            }
+
+            var assigned = await connection.ExecuteScalarAsync<int?>(new CommandDefinition(
+                "SELECT 1 FROM dbo.RolePermission WHERE RoleId = @RoleId AND PermissionId = @PermissionId",
+                new { RoleId = adminRoleId, PermissionId = permId },
+                cancellationToken: cancellationToken)).ConfigureAwait(false);
+            if (assigned != 1)
+            {
+                await connection.ExecuteAsync(new CommandDefinition(@"
+                    INSERT INTO dbo.RolePermission (Id, RoleId, PermissionId) VALUES (NEWID(), @RoleId, @PermissionId)",
+                    new { RoleId = adminRoleId, PermissionId = permId },
+                    cancellationToken: cancellationToken)).ConfigureAwait(false);
+            }
         }
     }
 
