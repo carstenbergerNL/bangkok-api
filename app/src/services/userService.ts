@@ -48,3 +48,11 @@ export function restoreUser(id: string): Promise<ApiResponse<unknown>> {
     .then(() => ({ success: true } as ApiResponse<unknown>))
     .catch((err) => err.response?.data ?? { success: false, error: { message: err.message ?? 'Request failed' } });
 }
+
+/** Permanently delete a user (hard delete). Requires confirm=true. Returns 204 on success. */
+export function hardDeleteUser(id: string): Promise<ApiResponse<unknown>> {
+  return apiClient
+    .delete(`/api/Users/${id}/hard`, { params: { confirm: true } })
+    .then(() => ({ success: true } as ApiResponse<unknown>))
+    .catch((err) => err.response?.data ?? { success: false, error: { message: err.message ?? 'Request failed' } });
+}

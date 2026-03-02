@@ -66,7 +66,7 @@ export function Topbar({ onMenuClick, sidebarCollapsed }: TopbarProps) {
 
   return (
     <header
-      className="h-12 flex-shrink-0 flex items-center justify-between transition-colors duration-200"
+      className="sticky top-0 z-40 h-12 flex-shrink-0 flex items-center justify-between transition-colors duration-200"
       style={{
         backgroundColor: 'var(--topbar-bg, #ffffff)',
         borderBottom: '1px solid var(--topbar-border, #edebe9)',
@@ -91,7 +91,7 @@ export function Topbar({ onMenuClick, sidebarCollapsed }: TopbarProps) {
           className={`text-base font-semibold px-2 truncate transition-colors duration-150 block ${sidebarCollapsed ? 'lg:hidden' : 'lg:block'}`}
           style={{ color: 'var(--topbar-text, #323130)' }}
         >
-          Bangkok
+          Multi Platform Center
         </Link>
       </div>
       <div className="flex items-center gap-1 px-4 lg:px-6 shrink-0">

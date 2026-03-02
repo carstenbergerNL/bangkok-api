@@ -13,7 +13,7 @@ const TABS: { id: AdminSettingsTab; label: string }[] = [
 
 export function AdminSettingsTabs({ activeTab, onTabChange }: AdminSettingsTabsProps) {
   return (
-    <nav className="border-b border-gray-200 dark:border-gray-700" aria-label="Admin settings sections">
+    <nav className="border-b border-gray-200 dark:border-[#2d3d5c]" aria-label="Admin settings sections">
       <div className="flex gap-1">
         {TABS.map((tab) => {
           const isActive = activeTab === tab.id;
@@ -31,7 +31,7 @@ export function AdminSettingsTabs({ activeTab, onTabChange }: AdminSettingsTabsP
                 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500
                 ${isActive
                   ? 'text-blue-600 dark:text-blue-400'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                  : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-100'
                 }
               `}
             >

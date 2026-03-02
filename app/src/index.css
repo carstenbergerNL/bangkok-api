@@ -20,21 +20,21 @@
     background-color: #f3f2f1;
   }
   .dark body {
-    color: #f3f2f1;
-    background-color: #201f1e;
+    color: #e2e8f0;
+    background-color: #152238;
   }
-  /* Fluent dark theme variables for layout and cards */
+  /* Fluent dark theme – blue-tinted (aligned with user table role badges) */
   .dark {
-    --topbar-bg: #292827;
-    --topbar-border: #3b3a39;
-    --topbar-text: #f3f2f1;
-    --sidebar-bg: #252423;
-    --sidebar-border: #3b3a39;
-    --dropdown-bg: #292827;
-    --dropdown-border: #3b3a39;
-    --dropdown-text: #f3f2f1;
-    --card-header-color: #f3f2f1;
-    --card-description-color: #c8c6c4;
+    --topbar-bg: #1e2a4a;
+    --topbar-border: #2d3d5c;
+    --topbar-text: #e2e8f0;
+    --sidebar-bg: #1a2332;
+    --sidebar-border: #2d3d5c;
+    --dropdown-bg: #1e2a4a;
+    --dropdown-border: #2d3d5c;
+    --dropdown-text: #e2e8f0;
+    --card-header-color: #f1f5f9;
+    --card-description-color: #94a3b8;
   }
 }
 
@@ -44,13 +44,13 @@
     background-color: #f3f2f1;
   }
   .dark .app-bg {
-    background-color: #201f1e;
+    background-color: #152238;
   }
   .main-content-bg {
     background-color: #f3f2f1;
   }
   .dark .main-content-bg {
-    background-color: #201f1e;
+    background-color: #152238;
   }
 
   /* Page header - clear hierarchy */
@@ -63,14 +63,14 @@
     letter-spacing: -0.01em;
   }
   .dark .page-header h1 {
-    color: #f3f2f1;
+    color: #f1f5f9;
   }
   .page-header p {
     @apply mt-1 text-sm;
     color: #605e5c;
   }
   .dark .page-header p {
-    color: #c8c6c4;
+    color: #94a3b8;
   }
 
   /* Cards - white surface, subtle border, minimal shadow */
@@ -81,8 +81,8 @@
     box-shadow: 0 1.6px 3.6px 0 rgba(0, 0, 0, 0.132), 0 0.3px 0.9px 0 rgba(0, 0, 0, 0.108);
   }
   .dark .card {
-    background-color: #292827;
-    border-color: #3b3a39;
+    background-color: #1e2a4a;
+    border-color: #2d3d5c;
     box-shadow: 0 1.6px 3.6px 0 rgba(0, 0, 0, 0.3);
   }
   .card-body {
@@ -93,14 +93,14 @@
     color: #323130;
   }
   .dark .card-header {
-    color: #f3f2f1;
+    color: #f1f5f9;
   }
   .card-description {
     @apply text-sm;
     color: #605e5c;
   }
   .dark .card-description {
-    color: #c8c6c4;
+    color: #94a3b8;
   }
 
   /* Buttons - primary Microsoft blue */
@@ -129,12 +129,12 @@
     background-color: #f3f2f1;
   }
   .dark .btn-secondary {
-    background-color: #292827;
-    color: #f3f2f1;
-    border-color: #3b3a39;
+    background-color: #1e2a4a;
+    color: #e2e8f0;
+    border-color: #2d3d5c;
   }
   .dark .btn-secondary:hover:not(:disabled) {
-    background-color: #3b3a39;
+    background-color: #243352;
   }
   .btn-ghost {
     @apply btn px-4 py-2 text-sm;
@@ -144,10 +144,10 @@
     background-color: #f3f2f1;
   }
   .dark .btn-ghost {
-    color: #f3f2f1;
+    color: #e2e8f0;
   }
   .dark .btn-ghost:hover:not(:disabled) {
-    background-color: #3b3a39;
+    background-color: #243352;
   }
   .btn-danger {
     @apply btn px-4 py-2 text-sm text-white;
@@ -165,11 +165,11 @@
     color: #323130;
   }
   .dark .btn-icon {
-    color: #c8c6c4;
+    color: #94a3b8;
   }
   .dark .btn-icon:hover:not(:disabled) {
-    background-color: #3b3a39;
-    color: #f3f2f1;
+    background-color: #243352;
+    color: #e2e8f0;
   }
 
   /* Form inputs - clean, 2px radius, clear focus */
@@ -188,9 +188,9 @@
     --tw-ring-color: rgba(0, 120, 212, 0.3);
   }
   .dark .input {
-    background-color: #292827;
-    border-color: #3b3a39;
-    color: #f3f2f1;
+    background-color: #1e2a4a;
+    border-color: #2d3d5c;
+    color: #e2e8f0;
   }
   .dark .input:focus {
     border-color: #0078d4;
@@ -200,7 +200,7 @@
     color: #323130;
   }
   .dark .input-label {
-    color: #f3f2f1;
+    color: #f1f5f9;
   }
   .form-group {
     @apply mb-4;
@@ -218,15 +218,15 @@
     background-color: #faf9f8;
   }
   .dark .table-grid thead tr {
-    border-bottom-color: #3b3a39;
-    background-color: #252423;
+    border-bottom-color: #2d3d5c;
+    background-color: #1e2a4a;
   }
   .table-grid th {
     @apply px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider;
     color: #605e5c;
   }
   .dark .table-grid th {
-    color: #c8c6c4;
+    color: #94a3b8;
   }
   .table-grid tbody tr {
     border-bottom: 1px solid #edebe9;
@@ -235,37 +235,69 @@
     background-color: #f3f2f1;
   }
   .dark .table-grid tbody tr {
-    border-bottom-color: #3b3a39;
+    border-bottom-color: #2d3d5c;
   }
   .dark .table-grid tbody tr:hover {
-    background-color: #292827;
+    background-color: #243352;
   }
   .table-grid td {
     @apply px-6 py-3;
     color: #323130;
   }
   .dark .table-grid td {
-    color: #f3f2f1;
+    color: #e2e8f0;
   }
   .table-grid td.muted {
     color: #605e5c;
   }
   .dark .table-grid td.muted {
-    color: #c8c6c4;
+    color: #94a3b8;
   }
   .table-actions {
-    @apply flex items-center justify-end gap-2;
+    @apply flex items-center justify-end gap-2 flex-nowrap whitespace-nowrap;
   }
+  /* Table action buttons - compact, bordered, professional */
   .table-link {
-    @apply font-medium hover:underline transition-opacity duration-150;
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium rounded transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-1;
     color: #0078d4;
+    border: 1px solid #0078d4;
+    background-color: transparent;
   }
   .table-link:hover {
-    color: #106ebe;
+    color: #fff;
+    background-color: #0078d4;
+  }
+  .table-link:focus-visible {
+    --tw-ring-color: #0078d4;
+  }
+  .dark .table-link {
+    color: #4da3ff;
+    border-color: #4da3ff;
+  }
+  .dark .table-link:hover {
+    color: #152238;
+    background-color: #4da3ff;
   }
   .table-link-danger {
-    @apply font-medium hover:underline transition-opacity duration-150;
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium rounded transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-1;
     color: #a4262c;
+    border: 1px solid #a4262c;
+    background-color: transparent;
+  }
+  .table-link-danger:hover {
+    color: #fff;
+    background-color: #a4262c;
+  }
+  .table-link-danger:focus-visible {
+    --tw-ring-color: #a4262c;
+  }
+  .dark .table-link-danger {
+    color: #f48771;
+    border-color: #c43134;
+  }
+  .dark .table-link-danger:hover {
+    color: #fff;
+    background-color: #a4262c;
   }
 
   /* Alerts */

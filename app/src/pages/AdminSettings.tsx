@@ -22,7 +22,7 @@ export function AdminSettings() {
         id={`panel-${activeTab}`}
         role="tabpanel"
         aria-labelledby={`tab-${activeTab}`}
-        className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm overflow-hidden transition-opacity duration-200"
+        className="rounded-xl border border-gray-200 dark:border-[#2d3d5c] bg-white dark:bg-[#1e2a4a] shadow-sm overflow-hidden transition-opacity duration-200"
       >
         <div className="p-6">
           {activeTab === 'users' && <UsersSection />}
