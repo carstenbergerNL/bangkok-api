@@ -97,6 +97,13 @@ public class TaskService : ITaskService
         if (project == null)
             return (CreateTaskResult.ProjectNotFound, null, "Project not found.");
 
+        var (canWrite, writeError) = await CanWriteTasksInProjectAsync(project, currentUserId, cancellationToken).ConfigureAwait(false);
+        if (!canWrite)
+        {
+            _logger.LogWarning("User {UserId} attempted to create task in project {ProjectId}: {Reason}", currentUserId, request.ProjectId, writeError);
+            return (CreateTaskResult.Forbidden, null, writeError);
+        }
+
         if (!await CanEditProjectAsync(request.ProjectId, currentUserId, cancellationToken).ConfigureAwait(false))
         {
             _logger.LogWarning("User {UserId} attempted to create task in project {ProjectId} without Member/Owner role.", currentUserId, request.ProjectId);
@@ -146,6 +153,17 @@ public class TaskService : ITaskService
         var task = await _taskRepository.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
         if (task == null)
             return (UpdateTaskResult.NotFound, null);
+
+        var project = await _projectRepository.GetByIdAsync(task.ProjectId, cancellationToken).ConfigureAwait(false);
+        if (project != null)
+        {
+            var (canWrite, writeError) = await CanWriteTasksInProjectAsync(project, currentUserId, cancellationToken).ConfigureAwait(false);
+            if (!canWrite)
+            {
+                _logger.LogWarning("User {UserId} attempted to update task {TaskId}: {Reason}", currentUserId, id, writeError);
+                return (UpdateTaskResult.Forbidden, writeError);
+            }
+        }
 
         if (!await CanEditProjectAsync(task.ProjectId, currentUserId, cancellationToken).ConfigureAwait(false))
         {
@@ -217,6 +235,17 @@ public class TaskService : ITaskService
         if (task == null)
             return DeleteTaskResult.NotFound;
 
+        var project = await _projectRepository.GetByIdAsync(task.ProjectId, cancellationToken).ConfigureAwait(false);
+        if (project != null)
+        {
+            var (canWrite, writeError) = await CanWriteTasksInProjectAsync(project, currentUserId, cancellationToken).ConfigureAwait(false);
+            if (!canWrite)
+            {
+                _logger.LogWarning("User {UserId} attempted to delete task {TaskId}: {Reason}", currentUserId, id, writeError);
+                return DeleteTaskResult.Forbidden;
+            }
+        }
+
         if (!await CanEditProjectAsync(task.ProjectId, currentUserId, cancellationToken).ConfigureAwait(false))
         {
             _logger.LogWarning("User {UserId} attempted to delete task {TaskId} without project Member/Owner role.", currentUserId, id);
@@ -252,6 +281,22 @@ public class TaskService : ITaskService
             return true;
         var m = await _memberRepository.GetByProjectAndUserAsync(projectId, userId, cancellationToken).ConfigureAwait(false);
         return m != null;
+    }
+
+    /// <summary>
+    /// Lifecycle rules: Archived = read-only; Completed = only Admin can write tasks.
+    /// </summary>
+    private async Task<(bool Allowed, string? ErrorMessage)> CanWriteTasksInProjectAsync(Project project, Guid userId, CancellationToken cancellationToken)
+    {
+        if (string.Equals(project.Status, "Archived", StringComparison.OrdinalIgnoreCase))
+            return (false, "Project is archived; tasks are read-only.");
+        if (string.Equals(project.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+        {
+            var isAdmin = await _permissionChecker.HasPermissionAsync(userId, AdminPermission, cancellationToken).ConfigureAwait(false);
+            if (!isAdmin)
+                return (false, "Tasks are locked for completed projects. Only admins can modify tasks.");
+        }
+        return (true, null);
     }
 
     private async Task<bool> CanEditProjectAsync(Guid projectId, Guid userId, CancellationToken cancellationToken)

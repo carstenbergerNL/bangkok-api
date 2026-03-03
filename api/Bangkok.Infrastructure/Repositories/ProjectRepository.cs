@@ -30,17 +30,18 @@ public class ProjectRepository : IProjectRepository
         }
     }
 
-    public async Task<IReadOnlyList<Project>> GetAllAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<Project>> GetAllAsync(string? status = null, CancellationToken cancellationToken = default)
     {
         var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken).ConfigureAwait(false);
         using (connection)
         {
             connection.Open();
-            const string sql = @"
-                SELECT Id, Name, Description, Status, CreatedByUserId, CreatedAt, UpdatedAt
-                FROM dbo.Project
-                ORDER BY CreatedAt DESC";
-            var items = await connection.QueryAsync<Project>(new CommandDefinition(sql, cancellationToken: cancellationToken)).ConfigureAwait(false);
+            var sql = string.IsNullOrWhiteSpace(status)
+                ? "SELECT Id, Name, Description, Status, CreatedByUserId, CreatedAt, UpdatedAt FROM dbo.Project ORDER BY CreatedAt DESC"
+                : "SELECT Id, Name, Description, Status, CreatedByUserId, CreatedAt, UpdatedAt FROM dbo.Project WHERE Status = @Status ORDER BY CreatedAt DESC";
+            var items = string.IsNullOrWhiteSpace(status)
+                ? await connection.QueryAsync<Project>(new CommandDefinition(sql, cancellationToken: cancellationToken)).ConfigureAwait(false)
+                : await connection.QueryAsync<Project>(new CommandDefinition(sql, new { Status = status!.Trim() }, cancellationToken: cancellationToken)).ConfigureAwait(false);
             return items.ToList();
         }
     }

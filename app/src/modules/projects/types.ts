@@ -148,6 +148,8 @@ export interface ProjectDashboard {
   tasksPerMember: { userId: string; userDisplayName: string | null; count: number }[];
 }
 
-export const PROJECT_STATUSES = ['Draft', 'Active', 'Archived'] as const;
+/** Lifecycle statuses for project filtering and display */
+export const PROJECT_STATUSES = ['Active', 'OnHold', 'Completed', 'Archived'] as const;
+export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 export const TASK_STATUSES = ['ToDo', 'InProgress', 'Done'] as const;
 export const TASK_PRIORITIES = ['Low', 'Medium', 'High'] as const;

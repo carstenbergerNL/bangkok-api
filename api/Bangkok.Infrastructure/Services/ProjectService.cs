@@ -52,7 +52,7 @@ public class ProjectService : IProjectService
         return (GetProjectResult.Ok, MapToResponse(project));
     }
 
-    public async Task<IReadOnlyList<ProjectResponse>> GetAllAsync(Guid currentUserId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<ProjectResponse>> GetAllAsync(Guid currentUserId, string? status = null, CancellationToken cancellationToken = default)
     {
         if (!await _permissionChecker.HasPermissionAsync(currentUserId, PermissionView, cancellationToken).ConfigureAwait(false))
         {
@@ -60,7 +60,7 @@ public class ProjectService : IProjectService
             return Array.Empty<ProjectResponse>();
         }
 
-        var allProjects = await _projectRepository.GetAllAsync(cancellationToken).ConfigureAwait(false);
+        var allProjects = await _projectRepository.GetAllAsync(status, cancellationToken).ConfigureAwait(false);
         var isAdmin = await _permissionChecker.HasPermissionAsync(currentUserId, AdminPermission, cancellationToken).ConfigureAwait(false);
         if (isAdmin)
             return allProjects.Select(MapToResponse).ToList();
@@ -86,7 +86,7 @@ public class ProjectService : IProjectService
             Id = Guid.NewGuid(),
             Name = request.Name.Trim(),
             Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
-            Status = string.IsNullOrWhiteSpace(request.Status) ? "Draft" : request.Status.Trim(),
+            Status = string.IsNullOrWhiteSpace(request.Status) ? "Active" : request.Status.Trim(),
             CreatedByUserId = currentUserId,
             CreatedAt = DateTime.UtcNow
         };

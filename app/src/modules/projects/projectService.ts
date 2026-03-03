@@ -3,8 +3,9 @@ import { API_PATHS } from '../../constants/api';
 import type { ApiResponse } from '../../models/ApiResponse';
 import type { Project, CreateProjectRequest, UpdateProjectRequest } from './types';
 
-export function getProjects(): Promise<ApiResponse<Project[]>> {
-  return apiClient.get<ApiResponse<Project[]>>(API_PATHS.PROJECTS.BASE).then((res) => res.data);
+export function getProjects(status?: string): Promise<ApiResponse<Project[]>> {
+  const params = status?.trim() ? { params: { status: status.trim() } } : {};
+  return apiClient.get<ApiResponse<Project[]>>(API_PATHS.PROJECTS.BASE, params).then((res) => res.data);
 }
 
 export function getProject(id: string): Promise<ApiResponse<Project>> {

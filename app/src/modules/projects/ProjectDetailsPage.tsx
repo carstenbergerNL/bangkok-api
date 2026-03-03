@@ -8,6 +8,7 @@ import { getMyProjectRole } from './memberService';
 import { addToast } from '../../utils/toast';
 import { Modal } from '../../components/Modal';
 import type { Project, ProjectMemberRole } from './types';
+import { PROJECT_STATUSES } from './types';
 import { ProjectFormModal } from './ProjectFormModal';
 import { TaskList } from './TaskList';
 import { ProjectMembersTab } from './ProjectMembersTab';
@@ -17,6 +18,8 @@ import { ProjectLabelsSettings } from './ProjectLabelsSettings';
 function getStatusBadgeClass(status: string): string {
   const s = status?.toLowerCase();
   if (s === 'active') return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300';
+  if (s === 'onhold') return 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300';
+  if (s === 'completed') return 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300';
   if (s === 'archived') return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300';
   return 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300';
 }
@@ -34,6 +37,7 @@ export function ProjectDetailsPage() {
   const [deleting, setDeleting] = useState(false);
   const [activeTab, setActiveTab] = useState<'board' | 'members' | 'dashboard' | 'settings'>('dashboard');
   const [myRole, setMyRole] = useState<ProjectMemberRole | null>(null);
+  const [statusChanging, setStatusChanging] = useState(false);
 
   const loadProject = useCallback(() => {
     if (!id) return;
@@ -115,7 +119,28 @@ export function ProjectDetailsPage() {
   const canDelete = hasPermission(PERMISSIONS.ProjectDelete);
   const isAdmin = hasPermission(PERMISSIONS.ViewAdminSettings);
   const canManageMembers = myRole === 'Owner' || isAdmin;
+  const canChangeStatus = canManageMembers;
   const showMembersTab = myRole != null && myRole !== 'Viewer';
+  const isArchived = project?.status?.toLowerCase() === 'archived';
+
+  const handleStatusChange = useCallback(
+    async (newStatus: string) => {
+      if (!project || statusChanging) return;
+      setStatusChanging(true);
+      try {
+        const res = await updateProject(project.id, { status: newStatus });
+        if (res.success) {
+          addToast('success', 'Project status updated.');
+          loadProject();
+        } else {
+          addToast('error', res.error?.message ?? 'Failed to update status.');
+        }
+      } finally {
+        setStatusChanging(false);
+      }
+    },
+    [project, statusChanging, loadProject]
+  );
 
   if (notFound) {
     return (
@@ -145,17 +170,34 @@ export function ProjectDetailsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="card card-body rounded-xl shadow-sm border border-gray-100 dark:border-slate-700/50">
+      <div
+        className={`card card-body rounded-xl shadow-sm border border-gray-100 dark:border-slate-700/50 ${isArchived ? 'opacity-75' : ''}`}
+      >
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-xl font-semibold" style={{ color: 'var(--card-header-color, #323130)' }}>{project.name}</h1>
             {project.description && (
               <p className="mt-1 text-sm" style={{ color: 'var(--card-description-color, #605e5c)' }}>{project.description}</p>
             )}
-            <div className="mt-3">
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(project.status)}`}>
                 {project.status}
               </span>
+              {canChangeStatus && (
+                <select
+                  value={project.status}
+                  onChange={(e) => handleStatusChange(e.target.value)}
+                  disabled={statusChanging}
+                  className="text-sm rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-200 px-2.5 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
+                  aria-label="Change project status"
+                >
+                  {PROJECT_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -234,7 +276,7 @@ export function ProjectDetailsPage() {
         </div>
         <div className="p-4 md:p-6">
           {activeTab === 'board' && project.id && (
-            <TaskList projectId={project.id} userMap={userMap} />
+            <TaskList projectId={project.id} userMap={userMap} isProjectArchived={isArchived} />
           )}
           {activeTab === 'members' && project.id && (
             <ProjectMembersTab

@@ -21,9 +21,11 @@ const COLUMN_LABELS: Record<string, string> = {
 interface TaskListProps {
   projectId: string;
   userMap: Map<string, string>;
+  /** When true, task creation is disabled (archived project). */
+  isProjectArchived?: boolean;
 }
 
-export function TaskList({ projectId, userMap }: TaskListProps) {
+export function TaskList({ projectId, userMap, isProjectArchived = false }: TaskListProps) {
   const { hasPermission } = usePermissions();
   const [searchParams, setSearchParams] = useSearchParams();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -150,7 +152,7 @@ export function TaskList({ projectId, userMap }: TaskListProps) {
     }
   };
 
-  const canCreate = hasPermission(PERMISSIONS.TaskCreate);
+  const canCreate = hasPermission(PERMISSIONS.TaskCreate) && !isProjectArchived;
   const canEdit = hasPermission(PERMISSIONS.TaskEdit);
   const canDelete = hasPermission(PERMISSIONS.TaskDelete);
   const canComment = hasPermission(PERMISSIONS.TaskComment);

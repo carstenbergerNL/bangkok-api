@@ -14,6 +14,7 @@ public class TaskCommentService : ITaskCommentService
 
     private readonly ITaskCommentRepository _commentRepository;
     private readonly ITaskRepository _taskRepository;
+    private readonly IProjectRepository _projectRepository;
     private readonly IProjectMemberRepository _memberRepository;
     private readonly IUserRepository _userRepository;
     private readonly IUserPermissionChecker _permissionChecker;
@@ -22,6 +23,7 @@ public class TaskCommentService : ITaskCommentService
     public TaskCommentService(
         ITaskCommentRepository commentRepository,
         ITaskRepository taskRepository,
+        IProjectRepository projectRepository,
         IProjectMemberRepository memberRepository,
         IUserRepository userRepository,
         IUserPermissionChecker permissionChecker,
@@ -29,6 +31,7 @@ public class TaskCommentService : ITaskCommentService
     {
         _commentRepository = commentRepository;
         _taskRepository = taskRepository;
+        _projectRepository = projectRepository;
         _memberRepository = memberRepository;
         _userRepository = userRepository;
         _permissionChecker = permissionChecker;
@@ -80,6 +83,17 @@ public class TaskCommentService : ITaskCommentService
         if (task == null)
             return (false, null, "Task not found.");
 
+        var project = await _projectRepository.GetByIdAsync(task.ProjectId, cancellationToken).ConfigureAwait(false);
+        if (project != null)
+        {
+            var (canWrite, writeError) = await CanWriteInProjectAsync(project, currentUserId, cancellationToken).ConfigureAwait(false);
+            if (!canWrite)
+            {
+                _logger.LogWarning("User {UserId} attempted to add comment in project {ProjectId}: {Reason}", currentUserId, task.ProjectId, writeError);
+                return (false, null, writeError);
+            }
+        }
+
         if (!await CanEditProjectAsync(task.ProjectId, currentUserId, cancellationToken).ConfigureAwait(false))
             return (false, null, "You must be a project member (Member or Owner) to comment.");
 
@@ -126,8 +140,21 @@ public class TaskCommentService : ITaskCommentService
         if (comment == null)
             return (false, "Comment not found.");
         var task = await _taskRepository.GetByIdAsync(comment.TaskId, cancellationToken).ConfigureAwait(false);
-        if (task != null && !await CanEditProjectAsync(task.ProjectId, currentUserId, cancellationToken).ConfigureAwait(false))
-            return (false, "You must be a project member to edit comments.");
+        if (task != null)
+        {
+            var project = await _projectRepository.GetByIdAsync(task.ProjectId, cancellationToken).ConfigureAwait(false);
+            if (project != null)
+            {
+                var (canWrite, writeError) = await CanWriteInProjectAsync(project, currentUserId, cancellationToken).ConfigureAwait(false);
+                if (!canWrite)
+                {
+                    _logger.LogWarning("User {UserId} attempted to update comment in project {ProjectId}: {Reason}", currentUserId, task.ProjectId, writeError);
+                    return (false, writeError);
+                }
+            }
+            if (!await CanEditProjectAsync(task.ProjectId, currentUserId, cancellationToken).ConfigureAwait(false))
+                return (false, "You must be a project member to edit comments.");
+        }
         if (comment.UserId != currentUserId)
             return (false, "You can only edit your own comment.");
 
@@ -155,8 +182,21 @@ public class TaskCommentService : ITaskCommentService
         if (comment == null)
             return (false, "Comment not found.");
         var task = await _taskRepository.GetByIdAsync(comment.TaskId, cancellationToken).ConfigureAwait(false);
-        if (task != null && !await CanAccessProjectAsync(task.ProjectId, currentUserId, cancellationToken).ConfigureAwait(false))
-            return (false, "You do not have access to this project.");
+        if (task != null)
+        {
+            var project = await _projectRepository.GetByIdAsync(task.ProjectId, cancellationToken).ConfigureAwait(false);
+            if (project != null)
+            {
+                var (canWrite, writeError) = await CanWriteInProjectAsync(project, currentUserId, cancellationToken).ConfigureAwait(false);
+                if (!canWrite)
+                {
+                    _logger.LogWarning("User {UserId} attempted to delete comment in project {ProjectId}: {Reason}", currentUserId, task.ProjectId, writeError);
+                    return (false, writeError);
+                }
+            }
+            if (!await CanAccessProjectAsync(task.ProjectId, currentUserId, cancellationToken).ConfigureAwait(false))
+                return (false, "You do not have access to this project.");
+        }
 
         var canDeleteAny = await _permissionChecker.HasPermissionAsync(currentUserId, PermissionDelete, cancellationToken).ConfigureAwait(false);
         if (comment.UserId != currentUserId && !canDeleteAny)
@@ -164,6 +204,19 @@ public class TaskCommentService : ITaskCommentService
 
         await _commentRepository.DeleteAsync(commentId, cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Comment deleted. CommentId: {CommentId}, DeletedByUserId: {UserId}", commentId, currentUserId);
+        return (true, null);
+    }
+
+    private async Task<(bool Allowed, string? ErrorMessage)> CanWriteInProjectAsync(Project project, Guid userId, CancellationToken cancellationToken)
+    {
+        if (string.Equals(project.Status, "Archived", StringComparison.OrdinalIgnoreCase))
+            return (false, "Project is archived; tasks are read-only.");
+        if (string.Equals(project.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+        {
+            var isAdmin = await _permissionChecker.HasPermissionAsync(userId, AdminPermission, cancellationToken).ConfigureAwait(false);
+            if (!isAdmin)
+                return (false, "Tasks are locked for completed projects. Only admins can modify tasks.");
+        }
         return (true, null);
     }
 
