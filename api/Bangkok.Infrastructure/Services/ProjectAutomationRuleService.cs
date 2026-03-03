@@ -17,6 +17,7 @@ public class ProjectAutomationRuleService : IProjectAutomationRuleService
     private readonly IProjectRepository _projectRepository;
     private readonly IProjectMemberRepository _memberRepository;
     private readonly IUserPermissionChecker _permissionChecker;
+    private readonly ISubscriptionLimitService _subscriptionLimitService;
     private readonly ILogger<ProjectAutomationRuleService> _logger;
 
     public ProjectAutomationRuleService(
@@ -24,12 +25,14 @@ public class ProjectAutomationRuleService : IProjectAutomationRuleService
         IProjectRepository projectRepository,
         IProjectMemberRepository memberRepository,
         IUserPermissionChecker permissionChecker,
+        ISubscriptionLimitService subscriptionLimitService,
         ILogger<ProjectAutomationRuleService> logger)
     {
         _ruleRepository = ruleRepository;
         _projectRepository = projectRepository;
         _memberRepository = memberRepository;
         _permissionChecker = permissionChecker;
+        _subscriptionLimitService = subscriptionLimitService;
         _logger = logger;
     }
 
@@ -76,6 +79,13 @@ public class ProjectAutomationRuleService : IProjectAutomationRuleService
             return (false, null, "ChangeStatus requires TargetValue (e.g. Done, ToDo).");
         if (string.Equals(action, "AddLabel", StringComparison.OrdinalIgnoreCase) && (string.IsNullOrWhiteSpace(request.TargetValue) || !Guid.TryParse(request.TargetValue.Trim(), out _)))
             return (false, null, "AddLabel requires TargetValue (label id).");
+
+        var (canUseAutomation, limitMsg) = await _subscriptionLimitService.CanUseAutomationAsync(cancellationToken).ConfigureAwait(false);
+        if (!canUseAutomation)
+        {
+            _logger.LogWarning("User {UserId} blocked by subscription creating automation rule in project {ProjectId}.", currentUserId, projectId);
+            return (false, null, limitMsg ?? "Automation is not included in your plan.");
+        }
 
         var rule = new ProjectAutomationRule
         {

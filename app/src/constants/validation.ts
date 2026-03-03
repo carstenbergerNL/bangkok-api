@@ -1,5 +1,5 @@
 /**
- * Validation limits. Must match backend DTOs, business rules, and app-native.
+ * Validation limits. Must match backend DTOs and business rules.
  */
 export const VALIDATION = {
   PROFILE: {

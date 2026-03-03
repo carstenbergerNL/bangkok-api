@@ -10,4 +10,6 @@ public class LoginRequest
 
     [Required]
     public string Password { get; set; } = string.Empty;
+    /// <summary>Required when user belongs to multiple tenants.</summary>
+    public Guid? TenantId { get; set; }
 }

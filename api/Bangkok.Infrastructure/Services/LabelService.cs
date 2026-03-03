@@ -72,6 +72,7 @@ public class LabelService : ILabelService
         var label = new Label
         {
             Id = Guid.NewGuid(),
+            TenantId = project.TenantId,
             Name = request.Name.Trim(),
             Color = request.Color.Trim(),
             ProjectId = projectId,

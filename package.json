@@ -1,16 +1,13 @@
 {
   "name": "bangkok",
   "private": true,
-  "description": "Bangkok multi-platform: API, app (web), app-native (Expo), mirrored clients",
+  "description": "Bangkok: API and web app (React + Vite)",
   "workspaces": [
-    "app",
-    "app-native"
+    "app"
   ],
   "scripts": {
     "build:app": "npm run build -w app",
-    "build:app-native": "npm run build -w app-native",
-    "dev:app": "npm run dev -w app",
-    "dev:app-native": "npm run dev -w app-native"
+    "dev:app": "npm run dev -w app"
   },
   "engines": {
     "node": ">=18"

@@ -1,5 +1,5 @@
 /**
- * API path constants. Must stay in sync with backend controllers and app-native.
+ * API path constants. Must stay in sync with backend controllers.
  */
 export const API_PATHS = {
   AUTH: {
@@ -80,5 +80,23 @@ export const API_PATHS = {
     BY_ID: (id: string) => `/api/Notifications/${id}`,
     MARK_READ: (id: string) => `/api/Notifications/${id}/read`,
     MARK_ALL_READ: '/api/Notifications/read-all',
+  },
+  TENANT_MODULES: {
+    BASE: '/api/tenant/modules',
+    MANAGEMENT: '/api/tenant/modules/management',
+    SET_ACTIVE: (moduleKey: string) => `/api/tenant/modules/${moduleKey}/active`,
+  },
+  BILLING: {
+    USAGE: '/api/Billing/usage',
+    PLANS: '/api/Billing/plans',
+    CREATE_CHECKOUT_SESSION: '/api/Billing/create-checkout-session',
+  },
+  PLATFORM_ADMIN: {
+    DASHBOARD_STATS: '/api/PlatformAdmin/dashboard/stats',
+    TENANTS: '/api/PlatformAdmin/tenants',
+    TENANT_USAGE: (id: string) => `/api/PlatformAdmin/tenants/${id}/usage`,
+    TENANT_SUSPEND: (id: string) => `/api/PlatformAdmin/tenants/${id}/suspend`,
+    TENANT_STATUS: (id: string) => `/api/PlatformAdmin/tenants/${id}/status`,
+    TENANT_UPGRADE: (id: string) => `/api/PlatformAdmin/tenants/${id}/upgrade`,
   },
 } as const;

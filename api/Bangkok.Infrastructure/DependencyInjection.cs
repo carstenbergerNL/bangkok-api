@@ -26,6 +26,16 @@ public static class DependencyInjection
         services.AddScoped<IUserRoleRepository, UserRoleRepository>();
         services.AddScoped<IRolePermissionRepository, RolePermissionRepository>();
         services.AddScoped<IProfileRepository, ProfileRepository>();
+        services.AddScoped<ITenantRepository, TenantRepository>();
+        services.AddScoped<ITenantUserRepository, TenantUserRepository>();
+        services.AddScoped<IModuleRepository, ModuleRepository>();
+        services.AddScoped<ITenantModuleRepository, TenantModuleRepository>();
+        services.AddScoped<ITenantModuleService, TenantModuleService>();
+        services.AddScoped<IPlanRepository, PlanRepository>();
+        services.AddScoped<ITenantSubscriptionRepository, TenantSubscriptionRepository>();
+        services.AddScoped<ITenantUsageRepository, TenantUsageRepository>();
+        services.AddScoped<ISubscriptionLimitService, SubscriptionLimitService>();
+        services.AddScoped<IPlatformAdminService, PlatformAdminService>();
         services.AddScoped<IProjectRepository, ProjectRepository>();
         services.AddScoped<IProjectTemplateRepository, ProjectTemplateRepository>();
         services.AddScoped<IProjectTemplateTaskRepository, ProjectTemplateTaskRepository>();

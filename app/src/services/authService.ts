@@ -52,7 +52,18 @@ export function getCurrentUserId(): string | null {
 }
 
 export function login(credentials: LoginRequest): Promise<ApiResponse<LoginResponse>> {
-  return apiClient.post<ApiResponse<LoginResponse>>('/api/Auth/login', credentials).then((res) => res.data);
+  return apiClient
+    .post<ApiResponse<LoginResponse>>('/api/Auth/login', credentials)
+    .then((res) => res.data)
+    .catch((err: { response?: { data?: ApiResponse<LoginResponse> }; message?: string }) => {
+      const data = err.response?.data;
+      if (data && typeof data === 'object' && 'success' in data)
+        return data as ApiResponse<LoginResponse>;
+      return {
+        success: false,
+        error: { message: (data as { error?: { message?: string } })?.error?.message ?? err.message ?? 'Login failed.' },
+      } as ApiResponse<LoginResponse>;
+    });
 }
 
 export function logout(): void {

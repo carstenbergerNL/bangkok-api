@@ -74,6 +74,8 @@ public class AuthController : ControllerBase
             return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<AuthResponse>.Fail(new ErrorResponse { Code = "ACCOUNT_LOCKED", Message = "Account temporarily locked." }, correlationId));
         if (!result.Success)
         {
+            if (!string.IsNullOrEmpty(result.Message))
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<AuthResponse>.Fail(new ErrorResponse { Code = "SUBSCRIPTION_LIMIT", Message = result.Message }, correlationId));
             _ipBlockService.RecordFailedAttempt(clientIp, email);
             _logger.LogWarning("Failed login attempt. IP: {ClientIp}, Email: {Email}, Timestamp: {Timestamp:O}", clientIp, email ?? "(none)", DateTime.UtcNow);
             return Unauthorized(ApiResponse<AuthResponse>.Fail(new ErrorResponse { Code = "INVALID_CREDENTIALS", Message = "Invalid email or password." }, correlationId));

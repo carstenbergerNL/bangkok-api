@@ -19,9 +19,12 @@ public class ProjectService : IProjectService
     private readonly IProjectTemplateTaskRepository _templateTaskRepository;
     private readonly ITaskRepository _taskRepository;
     private readonly IUserPermissionChecker _permissionChecker;
+    private readonly ITenantContext _tenantContext;
+    private readonly ISubscriptionLimitService _subscriptionLimitService;
+    private readonly ITenantUsageRepository _usageRepository;
     private readonly ILogger<ProjectService> _logger;
 
-    public ProjectService(IProjectRepository projectRepository, IProjectMemberRepository memberRepository, IProjectTemplateRepository templateRepository, IProjectTemplateTaskRepository templateTaskRepository, ITaskRepository taskRepository, IUserPermissionChecker permissionChecker, ILogger<ProjectService> logger)
+    public ProjectService(IProjectRepository projectRepository, IProjectMemberRepository memberRepository, IProjectTemplateRepository templateRepository, IProjectTemplateTaskRepository templateTaskRepository, ITaskRepository taskRepository, IUserPermissionChecker permissionChecker, ITenantContext tenantContext, ISubscriptionLimitService subscriptionLimitService, ITenantUsageRepository usageRepository, ILogger<ProjectService> logger)
     {
         _projectRepository = projectRepository;
         _memberRepository = memberRepository;
@@ -29,6 +32,9 @@ public class ProjectService : IProjectService
         _templateTaskRepository = templateTaskRepository;
         _taskRepository = taskRepository;
         _permissionChecker = permissionChecker;
+        _tenantContext = tenantContext;
+        _subscriptionLimitService = subscriptionLimitService;
+        _usageRepository = usageRepository;
         _logger = logger;
     }
 
@@ -44,9 +50,14 @@ public class ProjectService : IProjectService
         if (project == null)
             return (GetProjectResult.NotFound, null);
 
-        var isAdmin = await _permissionChecker.HasPermissionAsync(currentUserId, AdminPermission, cancellationToken).ConfigureAwait(false);
+        var isAdmin = _tenantContext.IsPlatformAdmin || await _permissionChecker.HasPermissionAsync(currentUserId, AdminPermission, cancellationToken).ConfigureAwait(false);
         if (!isAdmin)
         {
+            if (_tenantContext.CurrentTenantId != project.TenantId)
+            {
+                _logger.LogWarning("User {UserId} attempted to get project {ProjectId} from another tenant.", currentUserId, id);
+                return (GetProjectResult.Forbidden, null);
+            }
             var membership = await _memberRepository.GetByProjectAndUserAsync(id, currentUserId, cancellationToken).ConfigureAwait(false);
             if (membership == null)
             {
@@ -66,8 +77,12 @@ public class ProjectService : IProjectService
             return Array.Empty<ProjectResponse>();
         }
 
-        var allProjects = await _projectRepository.GetAllAsync(status, cancellationToken).ConfigureAwait(false);
-        var isAdmin = await _permissionChecker.HasPermissionAsync(currentUserId, AdminPermission, cancellationToken).ConfigureAwait(false);
+        var isAdmin = _tenantContext.IsPlatformAdmin || await _permissionChecker.HasPermissionAsync(currentUserId, AdminPermission, cancellationToken).ConfigureAwait(false);
+        var tenantId = isAdmin ? null : _tenantContext.CurrentTenantId;
+        if (!tenantId.HasValue && !isAdmin)
+            return Array.Empty<ProjectResponse>();
+
+        var allProjects = await _projectRepository.GetAllAsync(tenantId, status, cancellationToken).ConfigureAwait(false);
         if (isAdmin)
             return allProjects.Select(MapToResponse).ToList();
 
@@ -87,9 +102,24 @@ public class ProjectService : IProjectService
         if (request == null || string.IsNullOrWhiteSpace(request.Name))
             return (CreateProjectResult.ValidationError, null, "Name is required.");
 
+        var tenantId = _tenantContext.CurrentTenantId;
+        if (!tenantId.HasValue)
+        {
+            _logger.LogWarning("User {UserId} attempted to create project without a tenant context.", currentUserId);
+            return (CreateProjectResult.Forbidden, null, "Tenant context is required. Please select a tenant or sign in again.");
+        }
+
+        var (canCreate, limitMsg) = await _subscriptionLimitService.CanCreateProjectAsync(cancellationToken).ConfigureAwait(false);
+        if (!canCreate)
+        {
+            _logger.LogWarning("User {UserId} blocked by subscription limit creating project.", currentUserId);
+            return (CreateProjectResult.Forbidden, null, limitMsg ?? "Project limit reached. Upgrade your plan.");
+        }
+
         var project = new Project
         {
             Id = Guid.NewGuid(),
+            TenantId = tenantId.Value,
             Name = request.Name.Trim(),
             Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
             Status = string.IsNullOrWhiteSpace(request.Status) ? "Active" : request.Status.Trim(),
@@ -98,6 +128,7 @@ public class ProjectService : IProjectService
         };
 
         await _projectRepository.CreateAsync(project, cancellationToken).ConfigureAwait(false);
+        await _usageRepository.IncrementProjectsAsync(tenantId.Value, cancellationToken).ConfigureAwait(false);
 
         var ownerMember = new ProjectMember
         {
@@ -126,9 +157,19 @@ public class ProjectService : IProjectService
             return (CreateProjectResult.ValidationError, null, "Template not found.");
         if (request == null || string.IsNullOrWhiteSpace(request.Name))
             return (CreateProjectResult.ValidationError, null, "Name is required.");
+        var tenantId = _tenantContext.CurrentTenantId;
+        if (!tenantId.HasValue)
+            return (CreateProjectResult.Forbidden, null, "Tenant context is required. Please select a tenant or sign in again.");
+        var (canCreate, limitMsg) = await _subscriptionLimitService.CanCreateProjectAsync(cancellationToken).ConfigureAwait(false);
+        if (!canCreate)
+        {
+            _logger.LogWarning("User {UserId} blocked by subscription limit creating project from template.", currentUserId);
+            return (CreateProjectResult.Forbidden, null, limitMsg ?? "Project limit reached. Upgrade your plan.");
+        }
         var project = new Project
         {
             Id = Guid.NewGuid(),
+            TenantId = tenantId.Value,
             Name = request.Name.Trim(),
             Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
             Status = string.IsNullOrWhiteSpace(request.Status) ? "Active" : request.Status.Trim(),
@@ -136,6 +177,7 @@ public class ProjectService : IProjectService
             CreatedAt = DateTime.UtcNow
         };
         await _projectRepository.CreateAsync(project, cancellationToken).ConfigureAwait(false);
+        await _usageRepository.IncrementProjectsAsync(tenantId.Value, cancellationToken).ConfigureAwait(false);
         var ownerMember = new ProjectMember
         {
             Id = Guid.NewGuid(),
@@ -177,7 +219,12 @@ public class ProjectService : IProjectService
         if (project == null)
             return (UpdateProjectResult.NotFound, null);
 
-        var isAdmin = await _permissionChecker.HasPermissionAsync(currentUserId, AdminPermission, cancellationToken).ConfigureAwait(false);
+        var isAdmin = _tenantContext.IsPlatformAdmin || await _permissionChecker.HasPermissionAsync(currentUserId, AdminPermission, cancellationToken).ConfigureAwait(false);
+        if (!isAdmin && _tenantContext.CurrentTenantId != project.TenantId)
+        {
+            _logger.LogWarning("User {UserId} attempted to update project {ProjectId} from another tenant.", currentUserId, id);
+            return (UpdateProjectResult.Forbidden, "You do not have access to this project.");
+        }
         if (!isAdmin)
         {
             var membership = await _memberRepository.GetByProjectAndUserAsync(id, currentUserId, cancellationToken).ConfigureAwait(false);
@@ -214,7 +261,12 @@ public class ProjectService : IProjectService
         if (project == null)
             return DeleteProjectResult.NotFound;
 
-        var isAdmin = await _permissionChecker.HasPermissionAsync(currentUserId, AdminPermission, cancellationToken).ConfigureAwait(false);
+        var isAdmin = _tenantContext.IsPlatformAdmin || await _permissionChecker.HasPermissionAsync(currentUserId, AdminPermission, cancellationToken).ConfigureAwait(false);
+        if (!isAdmin && _tenantContext.CurrentTenantId != project.TenantId)
+        {
+            _logger.LogWarning("User {UserId} attempted to delete project {ProjectId} from another tenant.", currentUserId, id);
+            return DeleteProjectResult.Forbidden;
+        }
         if (!isAdmin)
         {
             var membership = await _memberRepository.GetByProjectAndUserAsync(id, currentUserId, cancellationToken).ConfigureAwait(false);
@@ -231,6 +283,7 @@ public class ProjectService : IProjectService
 
         await _memberRepository.DeleteByProjectIdAsync(id, cancellationToken).ConfigureAwait(false);
         await _projectRepository.DeleteAsync(id, cancellationToken).ConfigureAwait(false);
+        await _usageRepository.DecrementProjectsAsync(project.TenantId, cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Project deleted. ProjectId: {ProjectId}, DeletedByUserId: {UserId}", id, currentUserId);
 
         return DeleteProjectResult.Success;

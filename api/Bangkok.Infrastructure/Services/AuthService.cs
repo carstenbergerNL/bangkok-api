@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using Bangkok.Application.Dto;
 using Bangkok.Application.Dto.Auth;
 using Bangkok.Application.Interfaces;
 using Bangkok.Domain;
@@ -21,6 +22,10 @@ public class AuthService : IAuthService
     private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtService _jwtService;
+    private readonly ITenantRepository _tenantRepository;
+    private readonly ITenantUserRepository _tenantUserRepository;
+    private readonly ITenantUsageRepository _usageRepository;
+    private readonly ISubscriptionLimitService _subscriptionLimitService;
     private readonly Bangkok.Application.Configuration.JwtSettings _jwtSettings;
     private readonly ILogger<AuthService> _logger;
     private readonly IAuditLogger _audit;
@@ -33,6 +38,10 @@ public class AuthService : IAuthService
         IRefreshTokenRepository refreshTokenRepository,
         IPasswordHasher passwordHasher,
         IJwtService jwtService,
+        ITenantRepository tenantRepository,
+        ITenantUserRepository tenantUserRepository,
+        ITenantUsageRepository usageRepository,
+        ISubscriptionLimitService subscriptionLimitService,
         IOptions<Bangkok.Application.Configuration.JwtSettings> jwtSettings,
         ILogger<AuthService> logger,
         IAuditLogger audit)
@@ -44,6 +53,10 @@ public class AuthService : IAuthService
         _refreshTokenRepository = refreshTokenRepository;
         _passwordHasher = passwordHasher;
         _jwtService = jwtService;
+        _tenantRepository = tenantRepository;
+        _tenantUserRepository = tenantUserRepository;
+        _usageRepository = usageRepository;
+        _subscriptionLimitService = subscriptionLimitService;
         _jwtSettings = jwtSettings.Value;
         _logger = logger;
         _audit = audit;
@@ -84,9 +97,30 @@ public class AuthService : IAuthService
         };
         await _refreshTokenRepository.CreateAsync(refreshToken, cancellationToken).ConfigureAwait(false);
 
+        var defaultTenant = await _tenantRepository.GetBySlugAsync("default", cancellationToken).ConfigureAwait(false);
+        var addedToDefaultTenant = false;
+        if (defaultTenant != null)
+        {
+            var (canAdd, _) = await _subscriptionLimitService.CanAddMemberForTenantAsync(defaultTenant.Id, cancellationToken).ConfigureAwait(false);
+            if (canAdd)
+            {
+                await _tenantUserRepository.CreateAsync(new TenantUser
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = defaultTenant.Id,
+                    UserId = user.Id,
+                    Role = "Member",
+                    CreatedAt = DateTime.UtcNow
+                }, cancellationToken).ConfigureAwait(false);
+                await _usageRepository.IncrementUsersAsync(defaultTenant.Id, cancellationToken).ConfigureAwait(false);
+                addedToDefaultTenant = true;
+            }
+        }
+
         var roles = await GetUserRolesAsync(user.Id, cancellationToken).ConfigureAwait(false);
         var permissions = await GetUserPermissionsAsync(user.Id, cancellationToken).ConfigureAwait(false);
-        var accessToken = _jwtService.GenerateAccessToken(user.Id, user.Email, roles);
+        var tenantId = addedToDefaultTenant ? defaultTenant?.Id : null;
+        var accessToken = _jwtService.GenerateAccessToken(user.Id, user.Email, roles, tenantId);
         var expiresAtUtc = DateTime.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpirationMinutes);
 
         return new AuthResponse
@@ -98,7 +132,8 @@ public class AuthService : IAuthService
             ApplicationId = user.Id.ToString(),
             DisplayName = user.DisplayName,
             Roles = roles,
-            Permissions = permissions
+            Permissions = permissions,
+            TenantId = tenantId
         };
     }
 
@@ -141,6 +176,57 @@ public class AuthService : IAuthService
         user.UpdatedAtUtc = DateTime.UtcNow;
         await _userRepository.UpdateAsync(user, cancellationToken).ConfigureAwait(false);
 
+        var tenantUsers = await _tenantUserRepository.GetByUserIdAsync(user.Id, cancellationToken).ConfigureAwait(false);
+        if (tenantUsers.Count == 0)
+        {
+            var defaultTenant = await _tenantRepository.GetBySlugAsync("default", cancellationToken).ConfigureAwait(false);
+            if (defaultTenant != null)
+            {
+                var (canAdd, limitMsg) = await _subscriptionLimitService.CanAddMemberForTenantAsync(defaultTenant.Id, cancellationToken).ConfigureAwait(false);
+                if (!canAdd)
+                {
+                    _logger.LogWarning("Login: cannot add user to default tenant due to member limit. UserId: {UserId}", user.Id);
+                    return LoginResult.Failed(limitMsg ?? "Member limit reached for the default organization. Contact your administrator.");
+                }
+                await _tenantUserRepository.CreateAsync(new TenantUser
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = defaultTenant.Id,
+                    UserId = user.Id,
+                    Role = "Member",
+                    CreatedAt = DateTime.UtcNow
+                }, cancellationToken).ConfigureAwait(false);
+                await _usageRepository.IncrementUsersAsync(defaultTenant.Id, cancellationToken).ConfigureAwait(false);
+                tenantUsers = await _tenantUserRepository.GetByUserIdAsync(user.Id, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        var tenantList = new List<TenantResponse>();
+        foreach (var tu in tenantUsers)
+        {
+            var t = await _tenantRepository.GetByIdAsync(tu.TenantId, cancellationToken).ConfigureAwait(false);
+            if (t != null)
+                tenantList.Add(new TenantResponse { Id = t.Id, Name = t.Name, Slug = t.Slug });
+        }
+
+        Guid? selectedTenantId = null;
+        if (tenantList.Count == 0)
+            selectedTenantId = null;
+        else if (tenantList.Count == 1)
+            selectedTenantId = tenantList[0].Id;
+        else if (request.TenantId.HasValue)
+        {
+            if (tenantUsers.Any(tu => tu.TenantId == request.TenantId.Value))
+                selectedTenantId = request.TenantId.Value;
+            else
+            {
+                _audit.LogLoginFailure(user.Email, clientIp);
+                return LoginResult.Failed();
+            }
+        }
+        else
+            return LoginResult.TenantSelectionRequired(tenantList);
+
         var (refreshTokenValue, refreshExpires) = _jwtService.GenerateRefreshToken();
         var refreshToken = new RefreshToken
         {
@@ -154,7 +240,7 @@ public class AuthService : IAuthService
 
         var roles = await GetUserRolesAsync(user.Id, cancellationToken).ConfigureAwait(false);
         var permissions = await GetUserPermissionsAsync(user.Id, cancellationToken).ConfigureAwait(false);
-        var accessToken = _jwtService.GenerateAccessToken(user.Id, user.Email, roles);
+        var accessToken = _jwtService.GenerateAccessToken(user.Id, user.Email, roles, selectedTenantId);
         var expiresAtUtc = DateTime.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpirationMinutes);
 
         _audit.LogLoginSuccess(user.Id, user.Email, clientIp);
@@ -168,7 +254,8 @@ public class AuthService : IAuthService
             ApplicationId = user.Id.ToString(),
             DisplayName = user.DisplayName,
             Roles = roles,
-            Permissions = permissions
+            Permissions = permissions,
+            TenantId = selectedTenantId
         });
     }
 
@@ -186,6 +273,8 @@ public class AuthService : IAuthService
 
         var roles = await GetUserRolesAsync(user.Id, cancellationToken).ConfigureAwait(false);
         var permissions = await GetUserPermissionsAsync(user.Id, cancellationToken).ConfigureAwait(false);
+        var tenantUsers = await _tenantUserRepository.GetByUserIdAsync(user.Id, cancellationToken).ConfigureAwait(false);
+        var tenantId = tenantUsers.Count > 0 ? tenantUsers[0].TenantId : (Guid?)null;
         var (refreshTokenValue, refreshExpires) = _jwtService.GenerateRefreshToken();
         var newRefreshToken = new RefreshToken
         {
@@ -197,7 +286,7 @@ public class AuthService : IAuthService
         };
         await _refreshTokenRepository.CreateAsync(newRefreshToken, cancellationToken).ConfigureAwait(false);
 
-        var accessToken = _jwtService.GenerateAccessToken(user.Id, user.Email, roles);
+        var accessToken = _jwtService.GenerateAccessToken(user.Id, user.Email, roles, tenantId);
         var expiresAtUtc = DateTime.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpirationMinutes);
 
         return new AuthResponse
@@ -209,7 +298,8 @@ public class AuthService : IAuthService
             ApplicationId = user.Id.ToString(),
             DisplayName = user.DisplayName,
             Roles = roles,
-            Permissions = permissions
+            Permissions = permissions,
+            TenantId = tenantId
         };
     }
 

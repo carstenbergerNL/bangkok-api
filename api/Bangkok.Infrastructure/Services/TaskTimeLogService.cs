@@ -13,7 +13,9 @@ public class TaskTimeLogService : ITaskTimeLogService
 
     private readonly ITaskTimeLogRepository _timeLogRepository;
     private readonly ITaskRepository _taskRepository;
+    private readonly IProjectRepository _projectRepository;
     private readonly IProjectMemberRepository _memberRepository;
+    private readonly ITenantUsageRepository _usageRepository;
     private readonly IUserRepository _userRepository;
     private readonly IUserPermissionChecker _permissionChecker;
     private readonly ILogger<TaskTimeLogService> _logger;
@@ -21,14 +23,18 @@ public class TaskTimeLogService : ITaskTimeLogService
     public TaskTimeLogService(
         ITaskTimeLogRepository timeLogRepository,
         ITaskRepository taskRepository,
+        IProjectRepository projectRepository,
         IProjectMemberRepository memberRepository,
+        ITenantUsageRepository usageRepository,
         IUserRepository userRepository,
         IUserPermissionChecker permissionChecker,
         ILogger<TaskTimeLogService> logger)
     {
         _timeLogRepository = timeLogRepository;
         _taskRepository = taskRepository;
+        _projectRepository = projectRepository;
         _memberRepository = memberRepository;
+        _usageRepository = usageRepository;
         _userRepository = userRepository;
         _permissionChecker = permissionChecker;
         _logger = logger;
@@ -95,6 +101,9 @@ public class TaskTimeLogService : ITaskTimeLogService
         };
 
         await _timeLogRepository.CreateAsync(log, cancellationToken).ConfigureAwait(false);
+        var project = await _projectRepository.GetByIdAsync(task.ProjectId, cancellationToken).ConfigureAwait(false);
+        if (project != null)
+            await _usageRepository.IncrementTimeLogsAsync(project.TenantId, cancellationToken).ConfigureAwait(false);
 
         var user = await _userRepository.GetByIdAsync(currentUserId, cancellationToken).ConfigureAwait(false);
         return (true, new TaskTimeLogResponse
@@ -128,7 +137,10 @@ public class TaskTimeLogService : ITaskTimeLogService
         if (!await CanEditProjectAsync(task.ProjectId, currentUserId, cancellationToken).ConfigureAwait(false))
             return (false, "You do not have permission to delete this time log.");
 
+        var project = await _projectRepository.GetByIdAsync(task.ProjectId, cancellationToken).ConfigureAwait(false);
         await _timeLogRepository.DeleteAsync(timeLogId, cancellationToken).ConfigureAwait(false);
+        if (project != null)
+            await _usageRepository.DecrementTimeLogsAsync(project.TenantId, cancellationToken).ConfigureAwait(false);
         return (true, null);
     }
 

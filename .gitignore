@@ -69,10 +69,6 @@ node_modules/
 # Frontend (Vite/React in app/)
 app/dist/
 
-# Expo / app-native
-app-native/.expo/
-app-native/dist/
-
 # Misc
 ~$*
 *~

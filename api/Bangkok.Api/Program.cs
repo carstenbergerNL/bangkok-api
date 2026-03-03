@@ -32,9 +32,14 @@ builder.Host.UseSerilog((context, services, configuration) =>
 // Options
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection(JwtSettings.SectionName));
 builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(CorsSettings.SectionName));
+builder.Services.Configure<Bangkok.Application.Configuration.StripeSettings>(builder.Configuration.GetSection(Bangkok.Application.Configuration.StripeSettings.SectionName));
 
 // SQL + Application services (Dapper, Repositories, Auth)
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddScoped<Bangkok.Application.Interfaces.IStripeBillingService, Bangkok.Api.Services.StripeBillingService>();
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<Bangkok.Application.Interfaces.ITenantContext, TenantContext>();
 
 // In-memory IP brute force protection (single-instance only)
 builder.Services.AddSingleton<IIpBlockService, IpBlockService>();
@@ -219,6 +224,8 @@ app.UseCors();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<TenantEnforcementMiddleware>();
+app.UseMiddleware<ModuleActivationMiddleware>();
 app.MapControllers();
 
 app.MapHealthChecks("/health", new HealthCheckOptions

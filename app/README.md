@@ -96,7 +96,7 @@ app/
 
 - **Layout**
   - **Topbar:** app title, hamburger (toggle sidebar), dark/light toggle, notifications, user dropdown (logout).
-  - **Sidebar:** Dashboard, Projects, Profile, Settings; **Roles** (permission-based); **Admin Settings** for users with Admin role.
+  - **Sidebar:** Dashboard, Projects, Profile, Settings; **Roles** (permission-based); **Admin Settings** for users with Admin role; **Platform Admin** for users with SuperAdmin role only.
 
 - **Projects**
   - **Project list** – List projects; create, edit, delete. Permission-based: Project.View, Project.Create, Project.Edit, Project.Delete.
@@ -115,14 +115,22 @@ app/
   - **Roles** – List roles; create, edit, delete; assign permissions to roles. Permission-based access.
   - **Permissions** – List permissions; assign to roles.
 
+- **Platform Admin Dashboard** (Super Admin only)
+  - **Stats:** total tenants, active subscriptions, monthly recurring revenue (MRR), trial users, churned users.
+  - **Tenants table:** name, slug, status (Active/Suspended/Cancelled), plan, subscription status, usage (projects, users, storage, time logs). **Actions:** View usage (modal), Suspend, Resume, Upgrade (plan selector).
+
 - **Admin Settings** (admin only)
   - **Users:** list (email, display name, role, active), **Add user** (register), **Edit** (email, display name, role, active; cannot change own “Active”), **Delete** (soft-delete; cannot delete yourself), **Lock** / **Unlock**, assign roles.
   - **Deleted users:** list of soft-deleted users with **Restore** and “Deleted at” time.
   - **Hard delete** (optional): permanently remove a user with confirm.
 
+- **Billing**
+  - **Billing page** (`/billing`) – Current plan, **usage overview** with progress bars (projects, members, storage, time logs), and available plans with Upgrade/Subscribe (monthly or yearly) via Stripe Checkout. Success/cancel redirects to `/billing/success` and `/billing/cancel`.
+
 - **Guards**
   - **PrivateRoute** – Redirects unauthenticated users to `/login`.
   - **AdminRoute** – Redirects non-admin users; used for `/admin-settings`.
+  - **SuperAdminRoute** – Redirects users without SuperAdmin role; used for `/platform-dashboard`.
   - **PermissionRoute** – Checks specific permissions (e.g. Project.View, Task.Create).
 
 ## API usage
@@ -137,6 +145,8 @@ app/
 - **Tasks:** List by project `GET /api/Tasks?projectId=...`; Get `GET /api/Tasks/{id}`; Create `POST /api/Tasks`; Update `PUT /api/Tasks/{id}`; Delete `DELETE /api/Tasks/{id}`; Comments `GET/POST /api/Tasks/{taskId}/comments`; Activities `GET /api/Tasks/{taskId}/activities`; **Time logs** `GET /api/Tasks/{taskId}/timelogs`, `POST /api/Tasks/{taskId}/timelogs`; Delete time log `DELETE /api/Timelogs/{id}`.
 - **Comments:** Update `PUT /api/Comments/{id}`; Delete `DELETE /api/Comments/{id}` (task comments by comment id).
 - **Notifications:** List `GET /api/Notifications`; Unread count `GET /api/Notifications/unread-count`; Mark read `PUT /api/Notifications/{id}/read`; Mark all read `PUT /api/Notifications/read-all`.
+- **Billing:** Usage `GET /api/Billing/usage` (plan, status, projects/members/storage/time logs used and limits); Plans `GET /api/Billing/plans`; Create Checkout Session `POST /api/Billing/create-checkout-session` (planId, billingInterval, successUrl, cancelUrl) for Stripe redirect.
+- **Platform Admin** (Super Admin role only): Dashboard stats `GET /api/PlatformAdmin/dashboard/stats`; Tenants `GET /api/PlatformAdmin/tenants`; Tenant usage `GET /api/PlatformAdmin/tenants/{id}/usage`; Suspend `PUT /api/PlatformAdmin/tenants/{id}/suspend`; Set status `PUT /api/PlatformAdmin/tenants/{id}/status` (body: `{ status: "Active"|"Suspended"|"Cancelled" }`); Upgrade `PUT /api/PlatformAdmin/tenants/{id}/upgrade` (body: `{ planId }`).
 
 ## Build for production
 

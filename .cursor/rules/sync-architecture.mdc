@@ -1,65 +1,40 @@
 ---
-description: Enforce synchronized multi-platform architecture for app (web) and app-native (Expo). Never implement in only one client; keep naming, DTOs, and API usage identical. Each app owns its own code; no shared package.
+description: Frontend (app) structure and API alignment. Keep models, constants, and API usage in sync with the backend. Single web client.
 alwaysApply: true
 ---
 
-# Bangkok – Sync Architecture (app + app-native)
+# Bangkok – App Architecture
 
 ## Principle
 
-**Web and native are two clients of the same system, not two separate projects.** Any feature or structural change in `app/` must be reflected in `app-native/`, and vice versa, unless explicitly documented as platform-only. **Each app owns its own code**; there is no shared package. Models and constants live in each app and must be kept identical.
+The **web app (`app/`)** is the only client. It owns its own models, constants, and services. There is no shared package. Keep types and API paths in `app/` aligned with the backend so the contract does not drift.
 
-## Mandatory rules
+## Rules
 
-1. **Never implement a feature in only one app**
-   - If you add or change a feature in `app/` (web), you must add or change the same feature in `app-native/` (Expo).
-   - If you add or change a feature in `app-native/`, you must add or change the same feature in `app/`.
-   - Exception: document explicitly (e.g. "Web-only admin tool") and note it in the relevant README.
+1. **Models and constants**
+   - All API request/response types and DTOs live in `app/src/models/`.
+   - API paths in `app/src/constants/api.ts` must match backend controllers and routes.
+   - Validation limits in `app/src/constants/validation.ts` should match backend where applicable.
 
-2. **Always mirror structural changes**
-   - New screens/pages in one app → add corresponding screens in the other with the same logical name and route/screen name.
-   - New services or API methods in one app → add the same in the other (same function names and endpoint usage).
-   - Folder structure must stay aligned: `api/`, `services/`, `models/`, `constants/`, `context/`, `hooks/`, etc.
+2. **Services**
+   - Services in `app/src/services/` call the API using `API_PATHS` and types from `models/`.
+   - Same endpoint usage as the backend: same HTTP methods, same request/response shapes.
 
-3. **Keep naming conventions identical**
-   - Model names: `Profile`, `User`, `LoginRequest`, `CreateProfileRequest`, etc. (defined in each app’s `models/`).
-   - Service method names: `getProfileByUserId`, `login`, `changePassword`, etc.
-   - Route/screen names and API path constants must match; keep `API_PATHS` in both `app/src/constants/api.ts` and `app-native/src/constants/api.ts` identical.
+3. **Clean structure**
+   - API client in `api/`; services use the client and local types.
+   - No business rules or API contracts defined inside UI components; use services and types from `models/`.
 
-4. **Keep DTOs identical in both apps**
-   - All API request/response types and DTOs live in **each app’s own** `models/` folder.
-   - When adding or changing a type in `app/src/models/`, add or change the same in `app-native/src/models/`.
-   - No shared package; each app maintains its own copy. They must stay in sync manually.
-
-5. **Keep API usage identical**
-   - Same endpoints, same HTTP methods, same request/response shapes.
-   - Keep `API_PATHS` in both apps identical (`app/src/constants/api.ts` and `app-native/src/constants/api.ts`).
-   - Keep `VALIDATION` in both apps identical (`app/src/constants/validation.ts` and `app-native/src/constants/validation.ts`).
-
-6. **Mirror, do not share**
-   - There is no shared package. Types, constants, and validation are duplicated in each app.
-   - When adding or changing models or constants, update **both** `app/` and `app-native/`.
-
-7. **Maintain clean architecture**
-   - API client in `api/`; services in `services/` that use the client and local types.
-   - No business rules or API contracts defined inside UI components; use services and local types.
-   - Auth flow (login, refresh, logout, token storage) must be identical in behavior; only the storage mechanism (localStorage vs SecureStore) differs.
-
-8. **Never break synchronization**
-   - When changing an API contract or type, update: (1) `app/src/models/` or `app/src/constants/`, (2) `app-native/src/models/` or `app-native/src/constants/`, (3) backend if needed.
-   - When adding a new endpoint or feature, add it to both apps’ models and constants, then implement in both clients.
+4. **When changing the API**
+   - Update backend (controllers, DTOs) as needed.
+   - Update `app/src/models/` and/or `app/src/constants/` so they match the new contract.
+   - Update `app/src/services/` and UI that use the changed endpoints.
 
 ## Where code lives
 
 - **`app/`**: Web client. Own models, constants, services, API client (axios), UI, navigation.
-- **`app-native/`**: Native client. Own models, constants, services, API client (fetch), screens, navigation.
-- **No shared package**: Each app has its own `models/` and `constants/`. Keep them identical.
 
-## Checklist before completing a feature
+## Checklist when adding a feature
 
-- [ ] Types added or updated in **both** `app/src/models/` and `app-native/src/models/` (if applicable).
-- [ ] Constants added or updated in **both** `app/src/constants/` and `app-native/src/constants/` (if applicable).
-- [ ] Web app (`app/`) implements or reflects the change.
-- [ ] Native app (`app-native/`) implements or reflects the change.
-- [ ] Same endpoint usage and same DTOs in both clients.
-- [ ] Models and constants are identical across both apps.
+- [ ] Types added or updated in `app/src/models/` (if applicable).
+- [ ] Constants added or updated in `app/src/constants/` (if applicable).
+- [ ] Web app (`app/`) implements the feature using the same endpoints and DTOs as the backend.

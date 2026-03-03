@@ -34,6 +34,7 @@ public class RoleSeedRunner
                     await AssignAdminRoleToLegacyAdminsAsync(connection, adminRole.Id, cancellationToken).ConfigureAwait(false);
                 await EnsureViewAdminSettingsPermissionAsync(connection, adminRole.Id, cancellationToken).ConfigureAwait(false);
                 await EnsureProjectAndTaskPermissionsAsync(connection, adminRole.Id, cancellationToken).ConfigureAwait(false);
+                await EnsureSuperAdminRoleAsync(connection, cancellationToken).ConfigureAwait(false);
                 return;
             }
 
@@ -109,7 +110,27 @@ public class RoleSeedRunner
             _logger.LogInformation("Role management seed completed. Roles: Admin, User. Permissions: ManageUsers, ManageRoles, ViewAdminSettings, Project.*, Task.*.");
 
             await AssignAdminRoleToLegacyAdminsAsync(connection, adminId, cancellationToken).ConfigureAwait(false);
+            await EnsureSuperAdminRoleAsync(connection, cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    private static async Task EnsureSuperAdminRoleAsync(IDbConnection connection, CancellationToken cancellationToken)
+    {
+        var existing = await connection.ExecuteScalarAsync<Guid?>(new CommandDefinition(
+            "SELECT Id FROM dbo.[Role] WHERE Name = N'SuperAdmin'", cancellationToken: cancellationToken)).ConfigureAwait(false);
+        if (existing.HasValue) return;
+
+        var superAdminId = Guid.NewGuid();
+        var platformAdminPermId = Guid.NewGuid();
+        await connection.ExecuteAsync(new CommandDefinition(@"
+            INSERT INTO dbo.[Role] (Id, Name, Description, CreatedAt) VALUES (@Id, N'SuperAdmin', N'Platform administrator; access to platform dashboard.', GETUTCDATE())",
+            new { Id = superAdminId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        await connection.ExecuteAsync(new CommandDefinition(@"
+            INSERT INTO dbo.[Permission] (Id, Name, Description) VALUES (@Id, N'PlatformAdmin', N'Access platform admin dashboard and tenant management')",
+            new { Id = platformAdminPermId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        await connection.ExecuteAsync(new CommandDefinition(@"
+            INSERT INTO dbo.[RolePermission] (Id, RoleId, PermissionId) VALUES (NEWID(), @RoleId, @PermissionId)",
+            new { RoleId = superAdminId, PermissionId = platformAdminPermId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
     }
 
     private static async Task EnsureViewAdminSettingsPermissionAsync(IDbConnection connection, Guid adminRoleId, CancellationToken cancellationToken)

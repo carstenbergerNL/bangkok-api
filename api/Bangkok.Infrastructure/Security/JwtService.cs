@@ -23,7 +23,7 @@ public class JwtService : IJwtService
         _signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_settings.SigningKey));
     }
 
-    public string GenerateAccessToken(Guid userId, string email, IReadOnlyList<string> roles)
+    public string GenerateAccessToken(Guid userId, string email, IReadOnlyList<string> roles, Guid? tenantId = null)
     {
         var claims = new List<Claim>
         {
@@ -31,6 +31,8 @@ public class JwtService : IJwtService
             new Claim(ClaimTypes.Email, email),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
+        if (tenantId.HasValue)
+            claims.Add(new Claim("tenantId", tenantId.Value.ToString()));
         foreach (var role in roles)
         {
             if (!string.IsNullOrEmpty(role))

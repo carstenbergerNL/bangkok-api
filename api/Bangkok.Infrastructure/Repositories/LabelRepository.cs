@@ -21,7 +21,7 @@ public class LabelRepository : ILabelRepository
         using (connection)
         {
             connection.Open();
-            const string sql = "SELECT Id, Name, Color, ProjectId, CreatedAt FROM dbo.Label WHERE Id = @Id";
+            const string sql = "SELECT Id, TenantId, Name, Color, ProjectId, CreatedAt FROM dbo.Label WHERE Id = @Id";
             return await connection.QuerySingleOrDefaultAsync<Label>(
                 new CommandDefinition(sql, new { Id = id }, cancellationToken: cancellationToken)).ConfigureAwait(false);
         }
@@ -33,7 +33,7 @@ public class LabelRepository : ILabelRepository
         using (connection)
         {
             connection.Open();
-            const string sql = "SELECT Id, Name, Color, ProjectId, CreatedAt FROM dbo.Label WHERE ProjectId = @ProjectId ORDER BY Name";
+            const string sql = "SELECT Id, TenantId, Name, Color, ProjectId, CreatedAt FROM dbo.Label WHERE ProjectId = @ProjectId ORDER BY Name";
             var items = await connection.QueryAsync<Label>(
                 new CommandDefinition(sql, new { ProjectId = projectId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
             return items.ToList();
@@ -46,8 +46,8 @@ public class LabelRepository : ILabelRepository
         using (connection)
         {
             connection.Open();
-            const string sql = "INSERT INTO dbo.Label (Id, Name, Color, ProjectId, CreatedAt) VALUES (@Id, @Name, @Color, @ProjectId, @CreatedAt)";
-            await connection.ExecuteAsync(new CommandDefinition(sql, new { label.Id, label.Name, label.Color, label.ProjectId, label.CreatedAt }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+            const string sql = "INSERT INTO dbo.Label (Id, TenantId, Name, Color, ProjectId, CreatedAt) VALUES (@Id, @TenantId, @Name, @Color, @ProjectId, @CreatedAt)";
+            await connection.ExecuteAsync(new CommandDefinition(sql, new { label.Id, label.TenantId, label.Name, label.Color, label.ProjectId, label.CreatedAt }, cancellationToken: cancellationToken)).ConfigureAwait(false);
             return label.Id;
         }
     }

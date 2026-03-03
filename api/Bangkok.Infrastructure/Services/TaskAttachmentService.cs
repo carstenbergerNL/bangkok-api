@@ -16,8 +16,11 @@ public class TaskAttachmentService : ITaskAttachmentService
 
     private readonly ITaskAttachmentRepository _attachmentRepository;
     private readonly ITaskRepository _taskRepository;
+    private readonly IProjectRepository _projectRepository;
     private readonly IProjectMemberRepository _memberRepository;
     private readonly IUserPermissionChecker _permissionChecker;
+    private readonly ISubscriptionLimitService _subscriptionLimitService;
+    private readonly ITenantUsageRepository _usageRepository;
     private readonly IAttachmentFileStorage _fileStorage;
     private readonly IOptions<AttachmentSettings> _options;
     private readonly ILogger<TaskAttachmentService> _logger;
@@ -25,16 +28,22 @@ public class TaskAttachmentService : ITaskAttachmentService
     public TaskAttachmentService(
         ITaskAttachmentRepository attachmentRepository,
         ITaskRepository taskRepository,
+        IProjectRepository projectRepository,
         IProjectMemberRepository memberRepository,
         IUserPermissionChecker permissionChecker,
+        ISubscriptionLimitService subscriptionLimitService,
+        ITenantUsageRepository usageRepository,
         IAttachmentFileStorage fileStorage,
         IOptions<AttachmentSettings> options,
         ILogger<TaskAttachmentService> logger)
     {
         _attachmentRepository = attachmentRepository;
         _taskRepository = taskRepository;
+        _projectRepository = projectRepository;
         _memberRepository = memberRepository;
         _permissionChecker = permissionChecker;
+        _subscriptionLimitService = subscriptionLimitService;
+        _usageRepository = usageRepository;
         _fileStorage = fileStorage;
         _options = options;
         _logger = logger;
@@ -59,9 +68,16 @@ public class TaskAttachmentService : ITaskAttachmentService
         var task = await _taskRepository.GetByIdAsync(taskId, cancellationToken).ConfigureAwait(false);
         if (task == null)
             return (false, null, "Task not found.");
+        var project = await _projectRepository.GetByIdAsync(task.ProjectId, cancellationToken).ConfigureAwait(false);
+        if (project == null)
+            return (false, null, "Project not found.");
         var settings = _options.Value;
         if (fileSize <= 0 || fileSize > settings.MaxFileSizeBytes)
             return (false, null, $"File size must be between 1 and {settings.MaxFileSizeBytes / (1024 * 1024)} MB.");
+        var fileSizeMb = fileSize / (1024m * 1024m);
+        var (canAddStorage, storageLimitMsg) = await _subscriptionLimitService.CanAddStorageAsync(project.TenantId, fileSizeMb, cancellationToken).ConfigureAwait(false);
+        if (!canAddStorage)
+            return (false, null, storageLimitMsg ?? "Storage limit reached. Upgrade your plan for more storage.");
         if (!IsContentTypeAllowed(contentType, settings))
             return (false, null, "File type is not allowed.");
         var sanitizedContentType = string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType.Trim();
@@ -87,6 +103,7 @@ public class TaskAttachmentService : ITaskAttachmentService
             CreatedAt = DateTime.UtcNow
         };
         await _attachmentRepository.CreateAsync(attachment, cancellationToken).ConfigureAwait(false);
+        await _usageRepository.AddStorageMbAsync(project.TenantId, fileSizeMb, cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Attachment uploaded. TaskId: {TaskId}, AttachmentId: {Id}, FileName: {FileName}", taskId, attachment.Id, attachment.FileName);
         return (true, Map(attachment), null);
     }
@@ -102,8 +119,15 @@ public class TaskAttachmentService : ITaskAttachmentService
         var isUploader = attachment.UploadedByUserId == currentUserId;
         if (!isAdmin && !isUploader)
             return (false, "Only the uploader or an admin can delete this attachment.");
+        var task = await _taskRepository.GetByIdAsync(attachment.TaskId, cancellationToken).ConfigureAwait(false);
+        var project = task != null ? await _projectRepository.GetByIdAsync(task.ProjectId, cancellationToken).ConfigureAwait(false) : null;
         await _fileStorage.DeleteAsync(attachment.FilePath, cancellationToken).ConfigureAwait(false);
         await _attachmentRepository.DeleteAsync(attachmentId, cancellationToken).ConfigureAwait(false);
+        if (project != null)
+        {
+            var fileSizeMb = attachment.FileSize / (1024m * 1024m);
+            await _usageRepository.RemoveStorageMbAsync(project.TenantId, fileSizeMb, cancellationToken).ConfigureAwait(false);
+        }
         _logger.LogInformation("Attachment deleted. Id: {Id}, DeletedBy: {UserId}", attachmentId, currentUserId);
         return (true, null);
     }

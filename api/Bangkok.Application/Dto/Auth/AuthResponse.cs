@@ -13,4 +13,6 @@ public class AuthResponse
     public IReadOnlyList<string> Roles { get; set; } = Array.Empty<string>();
     /// <summary>Permission names from the user's roles (e.g. ViewAdminSettings).</summary>
     public IReadOnlyList<string> Permissions { get; set; } = Array.Empty<string>();
+    /// <summary>Current tenant id (multi-tenancy).</summary>
+    public Guid? TenantId { get; set; }
 }

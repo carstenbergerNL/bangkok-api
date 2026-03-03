@@ -6,6 +6,7 @@ namespace Bangkok.Domain;
 public class Label
 {
     public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Color { get; set; } = string.Empty;
     public Guid ProjectId { get; set; }

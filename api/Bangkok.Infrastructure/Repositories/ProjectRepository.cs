@@ -22,7 +22,7 @@ public class ProjectRepository : IProjectRepository
         {
             connection.Open();
             const string sql = @"
-                SELECT Id, Name, Description, Status, CreatedByUserId, CreatedAt, UpdatedAt
+                SELECT Id, TenantId, Name, Description, Status, CreatedByUserId, CreatedAt, UpdatedAt
                 FROM dbo.Project
                 WHERE Id = @Id";
             return await connection.QuerySingleOrDefaultAsync<Project>(
@@ -30,18 +30,39 @@ public class ProjectRepository : IProjectRepository
         }
     }
 
-    public async Task<IReadOnlyList<Project>> GetAllAsync(string? status = null, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<Project>> GetAllAsync(Guid? tenantId, string? status = null, CancellationToken cancellationToken = default)
     {
         var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken).ConfigureAwait(false);
         using (connection)
         {
             connection.Open();
-            var sql = string.IsNullOrWhiteSpace(status)
-                ? "SELECT Id, Name, Description, Status, CreatedByUserId, CreatedAt, UpdatedAt FROM dbo.Project ORDER BY CreatedAt DESC"
-                : "SELECT Id, Name, Description, Status, CreatedByUserId, CreatedAt, UpdatedAt FROM dbo.Project WHERE Status = @Status ORDER BY CreatedAt DESC";
-            var items = string.IsNullOrWhiteSpace(status)
-                ? await connection.QueryAsync<Project>(new CommandDefinition(sql, cancellationToken: cancellationToken)).ConfigureAwait(false)
-                : await connection.QueryAsync<Project>(new CommandDefinition(sql, new { Status = status!.Trim() }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+            var hasTenant = tenantId.HasValue;
+            var hasStatus = !string.IsNullOrWhiteSpace(status);
+            string sql;
+            object? param;
+            if (hasTenant && hasStatus)
+            {
+                sql = "SELECT Id, TenantId, Name, Description, Status, CreatedByUserId, CreatedAt, UpdatedAt FROM dbo.Project WHERE TenantId = @TenantId AND Status = @Status ORDER BY CreatedAt DESC";
+                param = new { TenantId = tenantId!.Value, Status = status!.Trim() };
+            }
+            else if (hasTenant)
+            {
+                sql = "SELECT Id, TenantId, Name, Description, Status, CreatedByUserId, CreatedAt, UpdatedAt FROM dbo.Project WHERE TenantId = @TenantId ORDER BY CreatedAt DESC";
+                param = new { TenantId = tenantId!.Value };
+            }
+            else if (hasStatus)
+            {
+                sql = "SELECT Id, TenantId, Name, Description, Status, CreatedByUserId, CreatedAt, UpdatedAt FROM dbo.Project WHERE Status = @Status ORDER BY CreatedAt DESC";
+                param = new { Status = status!.Trim() };
+            }
+            else
+            {
+                sql = "SELECT Id, TenantId, Name, Description, Status, CreatedByUserId, CreatedAt, UpdatedAt FROM dbo.Project ORDER BY CreatedAt DESC";
+                param = null;
+            }
+            var items = param != null
+                ? await connection.QueryAsync<Project>(new CommandDefinition(sql, param, cancellationToken: cancellationToken)).ConfigureAwait(false)
+                : await connection.QueryAsync<Project>(new CommandDefinition(sql, cancellationToken: cancellationToken)).ConfigureAwait(false);
             return items.ToList();
         }
     }
@@ -53,11 +74,12 @@ public class ProjectRepository : IProjectRepository
         {
             connection.Open();
             const string sql = @"
-                INSERT INTO dbo.Project (Id, Name, Description, Status, CreatedByUserId, CreatedAt)
-                VALUES (@Id, @Name, @Description, @Status, @CreatedByUserId, @CreatedAt)";
+                INSERT INTO dbo.Project (Id, TenantId, Name, Description, Status, CreatedByUserId, CreatedAt)
+                VALUES (@Id, @TenantId, @Name, @Description, @Status, @CreatedByUserId, @CreatedAt)";
             await connection.ExecuteAsync(new CommandDefinition(sql, new
             {
                 project.Id,
+                project.TenantId,
                 project.Name,
                 project.Description,
                 project.Status,
