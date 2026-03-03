@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { usePermissions } from '../../hooks/usePermissions';
 import { PERMISSIONS } from '../../constants/permissions';
 import { addToast } from '../../utils/toast';
-import { getProjects, createProject, updateProject } from './projectService';
-import type { Project } from './types';
+import { getProjects, createProject, updateProject, getProjectTemplates, createProjectFromTemplate } from './projectService';
+import type { Project, ProjectTemplate } from './types';
 import { PROJECT_STATUSES } from './types';
 import { ProjectFormModal } from './ProjectFormModal';
 
@@ -34,6 +34,7 @@ export function ProjectListPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
 
   const loadProjects = useCallback(() => {
     setLoading(true);
@@ -59,6 +60,16 @@ export function ProjectListPage() {
     loadProjects();
   }, [loadProjects]);
 
+  const canCreate = hasPermission(PERMISSIONS.ProjectCreate);
+  useEffect(() => {
+    if (canCreate) {
+      getProjectTemplates().then((res) => {
+        const data = res.data ?? (res as unknown as { Data?: ProjectTemplate[] }).Data;
+        setTemplates(Array.isArray(data) ? data : []);
+      });
+    }
+  }, [canCreate]);
+
   const handleCreate = () => {
     setEditingProject(null);
     setModalOpen(true);
@@ -78,7 +89,6 @@ export function ProjectListPage() {
     setEditingProject(null);
   };
 
-  const canCreate = hasPermission(PERMISSIONS.ProjectCreate);
   const canEdit = hasPermission(PERMISSIONS.ProjectEdit);
 
   if (loading) {
@@ -221,6 +231,11 @@ export function ProjectListPage() {
         project={editingProject}
         save={async (id, data) => updateProject(id, data)}
         create={createProject}
+        templates={templates}
+        createFromTemplate={canCreate ? async (templateId, data) => {
+          const res = await createProjectFromTemplate(templateId, data);
+          return { success: !!res.success, error: res.error };
+        } : undefined}
       />
     </div>
   );

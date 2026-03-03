@@ -23,7 +23,8 @@ public class TaskRepository : ITaskRepository
         {
             connection.Open();
             const string sql = @"
-                SELECT Id, ProjectId, Title, Description, Status, Priority, AssignedToUserId, DueDate, CreatedByUserId, CreatedAt, UpdatedAt, EstimatedHours
+                SELECT Id, ProjectId, Title, Description, Status, Priority, AssignedToUserId, DueDate, CreatedByUserId, CreatedAt, UpdatedAt, EstimatedHours,
+                    ISNULL(IsRecurring, 0) AS IsRecurring, RecurrencePattern, RecurrenceInterval, RecurrenceEndDate, RecurrenceSourceTaskId
                 FROM dbo.Task
                 WHERE Id = @Id";
             return await connection.QuerySingleOrDefaultAsync<ProjectTask>(
@@ -83,7 +84,8 @@ public class TaskRepository : ITaskRepository
 
             var whereClause = string.Join(" AND ", conditions);
             var sql = $@"
-                SELECT t.Id, t.ProjectId, t.Title, t.Description, t.Status, t.Priority, t.AssignedToUserId, t.DueDate, t.CreatedByUserId, t.CreatedAt, t.UpdatedAt, t.EstimatedHours
+                SELECT t.Id, t.ProjectId, t.Title, t.Description, t.Status, t.Priority, t.AssignedToUserId, t.DueDate, t.CreatedByUserId, t.CreatedAt, t.UpdatedAt, t.EstimatedHours,
+                    ISNULL(t.IsRecurring, 0) AS IsRecurring, t.RecurrencePattern, t.RecurrenceInterval, t.RecurrenceEndDate, t.RecurrenceSourceTaskId
                 FROM dbo.Task t
                 WHERE {whereClause}
                 ORDER BY t.CreatedAt DESC";
@@ -100,8 +102,8 @@ public class TaskRepository : ITaskRepository
         {
             connection.Open();
             const string sql = @"
-                INSERT INTO dbo.Task (Id, ProjectId, Title, Description, Status, Priority, AssignedToUserId, DueDate, CreatedByUserId, CreatedAt, EstimatedHours)
-                VALUES (@Id, @ProjectId, @Title, @Description, @Status, @Priority, @AssignedToUserId, @DueDate, @CreatedByUserId, @CreatedAt, @EstimatedHours)";
+                INSERT INTO dbo.Task (Id, ProjectId, Title, Description, Status, Priority, AssignedToUserId, DueDate, CreatedByUserId, CreatedAt, EstimatedHours, IsRecurring, RecurrencePattern, RecurrenceInterval, RecurrenceEndDate, RecurrenceSourceTaskId)
+                VALUES (@Id, @ProjectId, @Title, @Description, @Status, @Priority, @AssignedToUserId, @DueDate, @CreatedByUserId, @CreatedAt, @EstimatedHours, @IsRecurring, @RecurrencePattern, @RecurrenceInterval, @RecurrenceEndDate, @RecurrenceSourceTaskId)";
             await connection.ExecuteAsync(new CommandDefinition(sql, new
             {
                 task.Id,
@@ -114,7 +116,12 @@ public class TaskRepository : ITaskRepository
                 task.DueDate,
                 task.CreatedByUserId,
                 task.CreatedAt,
-                task.EstimatedHours
+                task.EstimatedHours,
+                task.IsRecurring,
+                task.RecurrencePattern,
+                task.RecurrenceInterval,
+                task.RecurrenceEndDate,
+                task.RecurrenceSourceTaskId
             }, cancellationToken: cancellationToken)).ConfigureAwait(false);
             return task.Id;
         }
@@ -129,7 +136,8 @@ public class TaskRepository : ITaskRepository
             const string sql = @"
                 UPDATE dbo.Task
                 SET Title = @Title, Description = @Description, Status = @Status, Priority = @Priority,
-                    AssignedToUserId = @AssignedToUserId, DueDate = @DueDate, UpdatedAt = @UpdatedAt, EstimatedHours = @EstimatedHours
+                    AssignedToUserId = @AssignedToUserId, DueDate = @DueDate, UpdatedAt = @UpdatedAt, EstimatedHours = @EstimatedHours,
+                    IsRecurring = @IsRecurring, RecurrencePattern = @RecurrencePattern, RecurrenceInterval = @RecurrenceInterval, RecurrenceEndDate = @RecurrenceEndDate, RecurrenceSourceTaskId = @RecurrenceSourceTaskId
                 WHERE Id = @Id";
             await connection.ExecuteAsync(new CommandDefinition(sql, new
             {
@@ -141,7 +149,12 @@ public class TaskRepository : ITaskRepository
                 task.AssignedToUserId,
                 task.DueDate,
                 task.UpdatedAt,
-                task.EstimatedHours
+                task.EstimatedHours,
+                task.IsRecurring,
+                task.RecurrencePattern,
+                task.RecurrenceInterval,
+                task.RecurrenceEndDate,
+                task.RecurrenceSourceTaskId
             }, cancellationToken: cancellationToken)).ConfigureAwait(false);
         }
     }
@@ -152,8 +165,15 @@ public class TaskRepository : ITaskRepository
         using (connection)
         {
             connection.Open();
-            const string sql = "DELETE FROM dbo.Task WHERE Id = @Id";
-            await connection.ExecuteAsync(new CommandDefinition(sql, new { Id = id }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+            using (var transaction = connection.BeginTransaction())
+            {
+                await connection.ExecuteAsync(new CommandDefinition("DELETE FROM dbo.TaskTimeLog WHERE TaskId = @Id", new { Id = id }, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
+                await connection.ExecuteAsync(new CommandDefinition("DELETE FROM dbo.TaskLabel WHERE TaskId = @Id", new { Id = id }, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
+                await connection.ExecuteAsync(new CommandDefinition("DELETE FROM dbo.TaskActivity WHERE TaskId = @Id", new { Id = id }, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
+                await connection.ExecuteAsync(new CommandDefinition("DELETE FROM dbo.TaskComment WHERE TaskId = @Id", new { Id = id }, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
+                await connection.ExecuteAsync(new CommandDefinition("DELETE FROM dbo.Task WHERE Id = @Id", new { Id = id }, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
+                transaction.Commit();
+            }
         }
     }
 }

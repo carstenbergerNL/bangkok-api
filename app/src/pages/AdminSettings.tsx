@@ -3,6 +3,7 @@ import { AdminSettingsTabs, type AdminSettingsTab } from '../components/AdminSet
 import { UsersSection } from './admin-settings/UsersSection';
 import { RolesSection } from './admin-settings/RolesSection';
 import { PermissionsSection } from './admin-settings/PermissionsSection';
+import { TemplatesSection } from './admin-settings/TemplatesSection';
 
 export function AdminSettings() {
   const [activeTab, setActiveTab] = useState<AdminSettingsTab>('users');
@@ -12,7 +13,7 @@ export function AdminSettings() {
       <div className="page-header">
         <h1>Admin Settings</h1>
         <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-          Manage users, roles, and permissions.
+          Manage users, roles, permissions, and project templates.
         </p>
       </div>
 
@@ -28,6 +29,7 @@ export function AdminSettings() {
           {activeTab === 'users' && <UsersSection />}
           {activeTab === 'roles' && <RolesSection />}
           {activeTab === 'permissions' && <PermissionsSection />}
+          {activeTab === 'templates' && <TemplatesSection />}
         </div>
       </div>
     </div>

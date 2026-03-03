@@ -21,14 +21,16 @@ public class TasksController : ControllerBase
     private readonly ITaskCommentService _commentService;
     private readonly ITaskActivityService _activityService;
     private readonly ITaskTimeLogService _timeLogService;
+    private readonly ITaskAttachmentService _attachmentService;
     private readonly ILogger<TasksController> _logger;
 
-    public TasksController(ITaskService taskService, ITaskCommentService commentService, ITaskActivityService activityService, ITaskTimeLogService timeLogService, ILogger<TasksController> logger)
+    public TasksController(ITaskService taskService, ITaskCommentService commentService, ITaskActivityService activityService, ITaskTimeLogService timeLogService, ITaskAttachmentService attachmentService, ILogger<TasksController> logger)
     {
         _taskService = taskService;
         _commentService = commentService;
         _activityService = activityService;
         _timeLogService = timeLogService;
+        _attachmentService = attachmentService;
         _logger = logger;
     }
 
@@ -232,7 +234,7 @@ public class TasksController : ControllerBase
         return Ok(ApiResponse<IReadOnlyList<TaskActivityResponse>>.Ok(list, correlationId));
     }
 
-    [HttpGet("{taskId:guid}/timelogs")]
+    [HttpGet("~/api/Tasks/{taskId:guid}/timelogs")]
     [SwaggerOperation(Summary = "List task time logs", Description = "Returns time logs for the task. Requires Task.View. 403 if permission missing.")]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<TaskTimeLogResponse>>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -248,7 +250,7 @@ public class TasksController : ControllerBase
         return Ok(ApiResponse<IReadOnlyList<TaskTimeLogResponse>>.Ok(list, correlationId));
     }
 
-    [HttpPost("{taskId:guid}/timelogs")]
+    [HttpPost("~/api/Tasks/{taskId:guid}/timelogs")]
     [SwaggerOperation(Summary = "Log time on task", Description = "Adds a time log entry. Requires Task.Edit. 403 if permission missing.")]
     [ProducesResponseType(typeof(ApiResponse<TaskTimeLogResponse>), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -261,7 +263,11 @@ public class TasksController : ControllerBase
         if (currentUserId == null)
             return Unauthorized(ApiResponse<TaskTimeLogResponse>.Fail(new ErrorResponse { Code = "UNAUTHORIZED", Message = "Authentication required." }, correlationId));
 
-        var (success, data, error) = await _timeLogService.CreateAsync(taskId, request ?? new CreateTaskTimeLogRequest(), currentUserId.Value, cancellationToken).ConfigureAwait(false);
+        var body = request ?? new CreateTaskTimeLogRequest();
+        if (body.Hours < 0.01m || body.Hours > 999.99m)
+            return BadRequest(ApiResponse<TaskTimeLogResponse>.Fail(new ErrorResponse { Code = "VALIDATION", Message = "Hours must be between 0.01 and 999.99." }, correlationId));
+
+        var (success, data, error) = await _timeLogService.CreateAsync(taskId, body, currentUserId.Value, cancellationToken).ConfigureAwait(false);
         if (!success)
         {
             if (error?.Contains("not found") == true)
@@ -271,6 +277,58 @@ public class TasksController : ControllerBase
             return BadRequest(ApiResponse<TaskTimeLogResponse>.Fail(new ErrorResponse { Code = "VALIDATION", Message = error ?? "Invalid request." }, correlationId));
         }
         return StatusCode(StatusCodes.Status201Created, ApiResponse<TaskTimeLogResponse>.Ok(data!, correlationId));
+    }
+
+    [HttpGet("~/api/Tasks/{taskId:guid}/attachments")]
+    [SwaggerOperation(Summary = "List task attachments", Description = "Returns file metadata for the task. Requires Task.View. 403 if permission missing.")]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<TaskAttachmentResponse>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<TaskAttachmentResponse>>>> GetAttachments([FromRoute] Guid taskId, CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
+        var currentUserId = GetCurrentUserId();
+        if (currentUserId == null)
+            return Unauthorized(ApiResponse<IReadOnlyList<TaskAttachmentResponse>>.Fail(new ErrorResponse { Code = "UNAUTHORIZED", Message = "Authentication required." }, correlationId));
+
+        var list = await _attachmentService.GetByTaskIdAsync(taskId, currentUserId.Value, cancellationToken).ConfigureAwait(false);
+        return Ok(ApiResponse<IReadOnlyList<TaskAttachmentResponse>>.Ok(list, correlationId));
+    }
+
+    [HttpPost("~/api/Tasks/{taskId:guid}/attachments")]
+    [SwaggerOperation(Summary = "Upload attachment", Description = "Multipart form with file. Requires Task.Edit. Max size and allowed types from config. Returns 201 with attachment metadata.")]
+    [ProducesResponseType(typeof(ApiResponse<TaskAttachmentResponse>), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [RequestSizeLimit(10_485_760)]
+    public async Task<ActionResult<ApiResponse<TaskAttachmentResponse>>> UploadAttachment([FromRoute] Guid taskId, IFormFile? file, CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
+        var currentUserId = GetCurrentUserId();
+        if (currentUserId == null)
+            return Unauthorized(ApiResponse<TaskAttachmentResponse>.Fail(new ErrorResponse { Code = "UNAUTHORIZED", Message = "Authentication required." }, correlationId));
+
+        if (file == null || file.Length == 0)
+            return BadRequest(ApiResponse<TaskAttachmentResponse>.Fail(new ErrorResponse { Code = "VALIDATION", Message = "No file or empty file." }, correlationId));
+        var fileName = file.FileName;
+        var contentType = file.ContentType ?? "application/octet-stream";
+        var fileSize = (int)Math.Min(file.Length, int.MaxValue);
+        if (fileSize <= 0)
+            return BadRequest(ApiResponse<TaskAttachmentResponse>.Fail(new ErrorResponse { Code = "VALIDATION", Message = "Invalid file size." }, correlationId));
+
+        await using var stream = file.OpenReadStream();
+        var (success, data, error) = await _attachmentService.UploadAsync(taskId, fileName, stream, contentType, fileSize, currentUserId.Value, cancellationToken).ConfigureAwait(false);
+        if (!success)
+        {
+            if (error?.Contains("not found") == true)
+                return NotFound(ApiResponse<TaskAttachmentResponse>.Fail(new ErrorResponse { Code = "TASK_NOT_FOUND", Message = error }, correlationId));
+            if (error?.Contains("permission") == true)
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<TaskAttachmentResponse>.Fail(new ErrorResponse { Code = "FORBIDDEN", Message = error }, correlationId));
+            return BadRequest(ApiResponse<TaskAttachmentResponse>.Fail(new ErrorResponse { Code = "VALIDATION", Message = error ?? "Upload failed." }, correlationId));
+        }
+        return StatusCode(StatusCodes.Status201Created, ApiResponse<TaskAttachmentResponse>.Ok(data!, correlationId));
     }
 
     private Guid? GetCurrentUserId()

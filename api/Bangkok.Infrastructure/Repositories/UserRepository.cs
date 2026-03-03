@@ -29,6 +29,20 @@ public class UserRepository : IUserRepository
         }
     }
 
+    public async Task<IReadOnlyDictionary<Guid, string>> GetDisplayNamesByIdsAsync(IReadOnlyList<Guid> ids, CancellationToken cancellationToken = default)
+    {
+        if (ids == null || ids.Count == 0) return new Dictionary<Guid, string>();
+        var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken).ConfigureAwait(false);
+        using (connection)
+        {
+            connection.Open();
+            const string sql = "SELECT Id, DisplayName, Email FROM dbo.[User] WHERE Id IN @Ids";
+            var rows = await connection.QueryAsync<(Guid Id, string? DisplayName, string Email)>(
+                new CommandDefinition(sql, new { Ids = ids }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+            return rows.ToDictionary(r => r.Id, r => string.IsNullOrWhiteSpace(r.DisplayName) ? r.Email : r.DisplayName);
+        }
+    }
+
     public async Task<User?> GetByIdIncludeDeletedAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken).ConfigureAwait(false);
@@ -74,21 +88,32 @@ public class UserRepository : IUserRepository
 
     public async Task<IReadOnlyList<User>> SearchForMentionAsync(string query, int limit, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(query) || limit <= 0)
-            return Array.Empty<User>();
+        if (limit <= 0) return Array.Empty<User>();
         var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken).ConfigureAwait(false);
         using (connection)
         {
             connection.Open();
+            var top = Math.Min(limit, 20);
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                const string sqlDefault = @"
+                    SELECT TOP (@Limit) Id, Email, DisplayName, PasswordHash, PasswordSalt, IsActive, CreatedAtUtc, UpdatedAtUtc, RecoverString, RecoverStringExpiry, IsDeleted, DeletedAt, FailedLoginAttempts, LockoutEnd
+                    FROM dbo.[User]
+                    WHERE IsDeleted = 0
+                    ORDER BY DisplayName";
+                var list = await connection.QueryAsync<User>(
+                    new CommandDefinition(sqlDefault, new { Limit = top }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+                return list.ToList();
+            }
             var pattern = "%" + query.Trim().Replace("%", "[%]").Replace("_", "[_]") + "%";
             const string sql = @"
                 SELECT TOP (@Limit) Id, Email, DisplayName, PasswordHash, PasswordSalt, IsActive, CreatedAtUtc, UpdatedAtUtc, RecoverString, RecoverStringExpiry, IsDeleted, DeletedAt, FailedLoginAttempts, LockoutEnd
                 FROM dbo.[User]
                 WHERE IsDeleted = 0 AND (DisplayName LIKE @Pattern OR Email LIKE @Pattern)
                 ORDER BY DisplayName";
-            var list = await connection.QueryAsync<User>(
-                new CommandDefinition(sql, new { Pattern = pattern, Limit = Math.Min(limit, 20) }, cancellationToken: cancellationToken)).ConfigureAwait(false);
-            return list.ToList();
+            var listFiltered = await connection.QueryAsync<User>(
+                new CommandDefinition(sql, new { Pattern = pattern, Limit = top }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+            return listFiltered.ToList();
         }
     }
 

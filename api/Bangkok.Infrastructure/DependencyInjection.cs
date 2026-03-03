@@ -17,6 +17,7 @@ public static class DependencyInjection
         {
             options.DefaultConnection = configuration.GetConnectionString("DefaultConnection") ?? string.Empty;
         });
+        services.Configure<AttachmentSettings>(configuration.GetSection(AttachmentSettings.SectionName));
         services.AddSingleton<ISqlConnectionFactory, SqlConnectionFactory>();
 
         services.AddScoped<IUserRepository, UserRepository>();
@@ -26,14 +27,19 @@ public static class DependencyInjection
         services.AddScoped<IRolePermissionRepository, RolePermissionRepository>();
         services.AddScoped<IProfileRepository, ProfileRepository>();
         services.AddScoped<IProjectRepository, ProjectRepository>();
+        services.AddScoped<IProjectTemplateRepository, ProjectTemplateRepository>();
+        services.AddScoped<IProjectTemplateTaskRepository, ProjectTemplateTaskRepository>();
         services.AddScoped<IProjectDashboardRepository, ProjectDashboardRepository>();
         services.AddScoped<IProjectMemberRepository, ProjectMemberRepository>();
         services.AddScoped<ITaskRepository, TaskRepository>();
         services.AddScoped<ILabelRepository, LabelRepository>();
+        services.AddScoped<IProjectCustomFieldRepository, ProjectCustomFieldRepository>();
+        services.AddScoped<ITaskCustomFieldValueRepository, TaskCustomFieldValueRepository>();
         services.AddScoped<ITaskLabelRepository, TaskLabelRepository>();
         services.AddScoped<ITaskCommentRepository, TaskCommentRepository>();
         services.AddScoped<ITaskActivityRepository, TaskActivityRepository>();
         services.AddScoped<ITaskTimeLogRepository, TaskTimeLogRepository>();
+        services.AddScoped<ITaskAttachmentRepository, TaskAttachmentRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IUserPermissionChecker, UserPermissionChecker>();
@@ -43,13 +49,18 @@ public static class DependencyInjection
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IProfileService, ProfileService>();
         services.AddScoped<IProjectService, ProjectService>();
+        services.AddScoped<IProjectTemplateService, ProjectTemplateService>();
         services.AddScoped<IProjectDashboardService, ProjectDashboardService>();
         services.AddScoped<IProjectMemberService, ProjectMemberService>();
         services.AddScoped<ILabelService, LabelService>();
+        services.AddScoped<IProjectCustomFieldService, ProjectCustomFieldService>();
+        services.AddScoped<IProjectExportService, ProjectExportService>();
         services.AddScoped<ITaskService, TaskService>();
         services.AddScoped<ITaskCommentService, TaskCommentService>();
         services.AddScoped<ITaskActivityService, TaskActivityService>();
         services.AddScoped<ITaskTimeLogService, TaskTimeLogService>();
+        services.AddScoped<IAttachmentFileStorage, LocalAttachmentFileStorage>();
+        services.AddScoped<ITaskAttachmentService, TaskAttachmentService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IRoleService, RoleService>();
         services.AddScoped<IPermissionService, PermissionService>();

@@ -1,0 +1,30 @@
+---
+description: Restart the Bangkok API after backend changes so changes take effect
+alwaysApply: true
+---
+
+# Restart API When Backend Changes
+
+**Rule: whenever you change API (backend) code, restart the API so the changes take effect.**
+
+## When to restart
+
+Restart the API after changing any of:
+
+- **api/** – Controllers, middleware, Program.cs, appsettings
+- **Bangkok.Application/** – DTOs, interfaces, models (if consumed by the API project)
+- **Bangkok.Infrastructure/** – Repositories, services, DI
+- **Bangkok.Domain/** – Domain entities
+
+## What to do
+
+After making such changes in the same session:
+
+1. **Restart the API** – Stop any running `dotnet run` for `api/Bangkok.Api`, then start it again (e.g. from `api/Bangkok.Api`: `dotnet run`).
+2. Optionally **rebuild first** – From repo root or `api/`: `dotnet build`, then start the API.
+
+Do this in the same change set when you’ve edited backend code; don’t leave the API running with stale code.
+
+## Reminder
+
+If you’ve just edited files under `api/` or the Bangkok.* projects, remind the user to restart the API (or run the restart for them) so they test against the updated behavior.

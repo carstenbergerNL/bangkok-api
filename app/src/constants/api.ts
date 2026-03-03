@@ -38,12 +38,16 @@ export const API_PATHS = {
   PROJECTS: {
     BASE: '/api/Projects',
     BY_ID: (id: string) => `/api/Projects/${id}`,
+    FROM_TEMPLATE: (templateId: string) => `/api/Projects/from-template/${templateId}`,
     MEMBERS: (projectId: string) => `/api/Projects/${projectId}/members`,
     MEMBERS_ME: (projectId: string) => `/api/Projects/${projectId}/members/me`,
     MEMBER_BY_ID: (projectId: string, memberId: string) => `/api/Projects/${projectId}/members/${memberId}`,
     LABELS: (projectId: string) => `/api/Projects/${projectId}/labels`,
     LABEL_BY_ID: (projectId: string, labelId: string) => `/api/Projects/${projectId}/labels/${labelId}`,
+    CUSTOM_FIELDS: (projectId: string) => `/api/Projects/${projectId}/custom-fields`,
+    CUSTOM_FIELD_BY_ID: (projectId: string, fieldId: string) => `/api/Projects/${projectId}/custom-fields/${fieldId}`,
     DASHBOARD: (projectId: string) => `/api/Projects/${projectId}/dashboard`,
+    EXPORT: (projectId: string) => `/api/Projects/${projectId}/export`,
   },
   TASKS: {
     BASE: '/api/Tasks',
@@ -51,6 +55,15 @@ export const API_PATHS = {
     COMMENTS: (taskId: string) => `/api/Tasks/${taskId}/comments`,
     ACTIVITIES: (taskId: string) => `/api/Tasks/${taskId}/activities`,
     TIMELOGS: (taskId: string) => `/api/Tasks/${taskId}/timelogs`,
+    ATTACHMENTS: (taskId: string) => `/api/Tasks/${taskId}/attachments`,
+  },
+  ATTACHMENTS: {
+    BY_ID: (id: string) => `/api/Attachments/${id}`,
+    DOWNLOAD: (id: string) => `/api/Attachments/${id}/download`,
+  },
+  PROJECT_TEMPLATES: {
+    BASE: '/api/project-templates',
+    BY_ID: (id: string) => `/api/project-templates/${id}`,
   },
   TIMELOGS: {
     BY_ID: (id: string) => `/api/Timelogs/${id}`,

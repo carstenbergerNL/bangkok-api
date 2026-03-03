@@ -20,18 +20,26 @@ public class TaskService : ITaskService
     private readonly IProjectMemberRepository _memberRepository;
     private readonly ITaskActivityRepository _activityRepository;
     private readonly ITaskLabelRepository _taskLabelRepository;
+    private readonly ITaskCustomFieldValueRepository _taskCustomFieldValueRepository;
+    private readonly IProjectCustomFieldRepository _projectCustomFieldRepository;
+    private readonly ITaskAttachmentRepository _attachmentRepository;
+    private readonly IAttachmentFileStorage _attachmentFileStorage;
     private readonly ILabelRepository _labelRepository;
     private readonly IUserPermissionChecker _permissionChecker;
     private readonly INotificationService _notificationService;
     private readonly ILogger<TaskService> _logger;
 
-    public TaskService(ITaskRepository taskRepository, IProjectRepository projectRepository, IProjectMemberRepository memberRepository, ITaskActivityRepository activityRepository, ITaskLabelRepository taskLabelRepository, ILabelRepository labelRepository, IUserPermissionChecker permissionChecker, INotificationService notificationService, ILogger<TaskService> logger)
+    public TaskService(ITaskRepository taskRepository, IProjectRepository projectRepository, IProjectMemberRepository memberRepository, ITaskActivityRepository activityRepository, ITaskLabelRepository taskLabelRepository, ITaskCustomFieldValueRepository taskCustomFieldValueRepository, IProjectCustomFieldRepository projectCustomFieldRepository, ITaskAttachmentRepository attachmentRepository, IAttachmentFileStorage attachmentFileStorage, ILabelRepository labelRepository, IUserPermissionChecker permissionChecker, INotificationService notificationService, ILogger<TaskService> logger)
     {
         _taskRepository = taskRepository;
         _projectRepository = projectRepository;
         _memberRepository = memberRepository;
         _activityRepository = activityRepository;
         _taskLabelRepository = taskLabelRepository;
+        _taskCustomFieldValueRepository = taskCustomFieldValueRepository;
+        _projectCustomFieldRepository = projectCustomFieldRepository;
+        _attachmentRepository = attachmentRepository;
+        _attachmentFileStorage = attachmentFileStorage;
         _labelRepository = labelRepository;
         _permissionChecker = permissionChecker;
         _notificationService = notificationService;
@@ -57,7 +65,9 @@ public class TaskService : ITaskService
         }
 
         var labels = await GetLabelsForTaskAsync(task.Id, task.ProjectId, cancellationToken).ConfigureAwait(false);
-        return (GetTaskResult.Ok, MapToResponse(task, labels));
+        var customValues = await _taskCustomFieldValueRepository.GetByTaskIdAsync(task.Id, cancellationToken).ConfigureAwait(false);
+        var customValueResponses = customValues.Select(v => new TaskCustomFieldValueResponse { FieldId = v.FieldId, Value = v.Value }).ToList();
+        return (GetTaskResult.Ok, MapToResponse(task, labels, customValueResponses));
     }
 
     public async Task<IReadOnlyList<TaskResponse>> GetByProjectIdAsync(Guid projectId, Guid currentUserId, TaskFilterRequest? filter = null, CancellationToken cancellationToken = default)
@@ -112,6 +122,7 @@ public class TaskService : ITaskService
             return (CreateTaskResult.Forbidden, null, "You must be a project member (Member or Owner) to create tasks.");
         }
 
+        var isRecurring = request.IsRecurring && !string.IsNullOrWhiteSpace(request.RecurrencePattern) && request.RecurrenceInterval.HasValue && request.RecurrenceInterval.Value >= 1;
         var task = new ProjectTask
         {
             Id = Guid.NewGuid(),
@@ -124,7 +135,12 @@ public class TaskService : ITaskService
             DueDate = request.DueDate?.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(request.DueDate.Value, DateTimeKind.Utc) : request.DueDate,
             CreatedByUserId = currentUserId,
             CreatedAt = DateTime.UtcNow,
-            EstimatedHours = request.EstimatedHours
+            EstimatedHours = request.EstimatedHours,
+            IsRecurring = isRecurring,
+            RecurrencePattern = isRecurring ? request.RecurrencePattern!.Trim() : null,
+            RecurrenceInterval = isRecurring ? request.RecurrenceInterval : null,
+            RecurrenceEndDate = isRecurring && request.RecurrenceEndDate.HasValue ? (request.RecurrenceEndDate.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(request.RecurrenceEndDate.Value, DateTimeKind.Utc) : request.RecurrenceEndDate.Value) : null,
+            RecurrenceSourceTaskId = null
         };
 
         await _taskRepository.CreateAsync(task, cancellationToken).ConfigureAwait(false);
@@ -144,7 +160,8 @@ public class TaskService : ITaskService
         _logger.LogInformation("Task created. TaskId: {TaskId}, ProjectId: {ProjectId}, Title: {Title}, CreatedByUserId: {CreatedByUserId}", task.Id, task.ProjectId, task.Title, currentUserId);
 
         var labels = await GetLabelsForTaskAsync(task.Id, task.ProjectId, cancellationToken).ConfigureAwait(false);
-        return (CreateTaskResult.Success, MapToResponse(task, labels), null);
+        var customValueResponses = await SaveTaskCustomFieldValuesAsync(task.Id, task.ProjectId, request.CustomFieldValues, cancellationToken).ConfigureAwait(false);
+        return (CreateTaskResult.Success, MapToResponse(task, labels, customValueResponses), null);
     }
 
     public async Task<(UpdateTaskResult Result, string? ErrorMessage)> UpdateAsync(Guid id, UpdateTaskRequest request, Guid currentUserId, CancellationToken cancellationToken = default)
@@ -204,9 +221,30 @@ public class TaskService : ITaskService
             task.DueDate = request.DueDate.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(request.DueDate.Value, DateTimeKind.Utc) : request.DueDate.Value;
         if (request.EstimatedHours.HasValue)
             task.EstimatedHours = request.EstimatedHours.Value;
+        if (request.IsRecurring.HasValue)
+        {
+            var enableRecurring = request.IsRecurring.Value && !string.IsNullOrWhiteSpace(request.RecurrencePattern) && request.RecurrenceInterval.HasValue && request.RecurrenceInterval.Value >= 1;
+            task.IsRecurring = enableRecurring;
+            task.RecurrencePattern = enableRecurring ? (request.RecurrencePattern ?? task.RecurrencePattern)?.Trim() : null;
+            task.RecurrenceInterval = enableRecurring ? request.RecurrenceInterval : null;
+            task.RecurrenceEndDate = enableRecurring && request.RecurrenceEndDate.HasValue ? (request.RecurrenceEndDate.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(request.RecurrenceEndDate.Value, DateTimeKind.Utc) : request.RecurrenceEndDate.Value) : (enableRecurring ? task.RecurrenceEndDate : null);
+            if (!enableRecurring) task.RecurrenceSourceTaskId = null;
+        }
+        else if (request.RecurrencePattern != null || request.RecurrenceInterval.HasValue)
+        {
+            var enableRecurring = task.IsRecurring && !string.IsNullOrWhiteSpace(request.RecurrencePattern ?? task.RecurrencePattern) && (request.RecurrenceInterval ?? task.RecurrenceInterval).GetValueOrDefault(1) >= 1;
+            task.RecurrencePattern = enableRecurring ? (request.RecurrencePattern ?? task.RecurrencePattern)?.Trim() : null;
+            task.RecurrenceInterval = enableRecurring ? (request.RecurrenceInterval ?? task.RecurrenceInterval) : null;
+            task.RecurrenceEndDate = request.RecurrenceEndDate.HasValue ? (request.RecurrenceEndDate.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(request.RecurrenceEndDate.Value, DateTimeKind.Utc) : request.RecurrenceEndDate.Value) : task.RecurrenceEndDate;
+        }
         task.UpdatedAt = DateTime.UtcNow;
 
+        var statusChangedToDone = request.Status != null && string.Equals(request.Status.Trim(), "Done", StringComparison.OrdinalIgnoreCase) && !string.Equals(oldStatus, "Done", StringComparison.OrdinalIgnoreCase);
+
         await _taskRepository.UpdateAsync(task, cancellationToken).ConfigureAwait(false);
+
+        if (statusChangedToDone && task.IsRecurring)
+            await CreateNextRecurrenceInstanceAsync(task, currentUserId, cancellationToken).ConfigureAwait(false);
 
         if (request.LabelIds != null)
         {
@@ -215,6 +253,9 @@ public class TaskService : ITaskService
             var toSet = request.LabelIds.Where(x => x != Guid.Empty && validIds.Contains(x)).Distinct().ToList();
             await _taskLabelRepository.SetForTaskAsync(task.Id, toSet, cancellationToken).ConfigureAwait(false);
         }
+
+        if (request.CustomFieldValues != null)
+            await SaveTaskCustomFieldValuesAsync(task.Id, task.ProjectId, request.CustomFieldValues, cancellationToken).ConfigureAwait(false);
 
         if (request.Status != null && request.Status.Trim() != oldStatus)
             await LogActivityAsync(task.Id, currentUserId, "StatusChanged", oldStatus, task.Status, cancellationToken).ConfigureAwait(false);
@@ -271,6 +312,18 @@ public class TaskService : ITaskService
             return DeleteTaskResult.Forbidden;
         }
 
+        var attachments = await _attachmentRepository.GetByTaskIdAsync(id, cancellationToken).ConfigureAwait(false);
+        foreach (var att in attachments)
+        {
+            try
+            {
+                await _attachmentFileStorage.DeleteAsync(att.FilePath, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to delete attachment file {Path} for task {TaskId}", att.FilePath, id);
+            }
+        }
         await LogActivityAsync(id, currentUserId, "TaskDeleted", task.Title, null, cancellationToken).ConfigureAwait(false);
         await _taskRepository.DeleteAsync(id, cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Task deleted. TaskId: {TaskId}, DeletedByUserId: {UserId}", id, currentUserId);
@@ -350,7 +403,85 @@ public class TaskService : ITaskService
         return result;
     }
 
-    private static TaskResponse MapToResponse(ProjectTask t, IReadOnlyList<LabelResponse> labels) => new()
+    /// <summary>
+    /// When a recurring task is marked Done, create the next instance with DueDate set to the next occurrence.
+    /// Safe: only runs when task is recurring and has valid pattern/interval; respects RecurrenceEndDate.
+    /// </summary>
+    private async Task CreateNextRecurrenceInstanceAsync(ProjectTask completedTask, Guid currentUserId, CancellationToken cancellationToken)
+    {
+        if (!completedTask.IsRecurring || string.IsNullOrWhiteSpace(completedTask.RecurrencePattern) || !completedTask.RecurrenceInterval.HasValue || completedTask.RecurrenceInterval.Value < 1)
+            return;
+        var baseDate = completedTask.DueDate ?? completedTask.CreatedAt;
+        var nextDue = ComputeNextRecurrenceDate(baseDate, completedTask.RecurrencePattern.Trim(), completedTask.RecurrenceInterval.Value);
+        if (!nextDue.HasValue)
+            return;
+        if (completedTask.RecurrenceEndDate.HasValue && nextDue.Value > completedTask.RecurrenceEndDate.Value)
+            return;
+        var sourceId = completedTask.RecurrenceSourceTaskId ?? completedTask.Id;
+        var nextTask = new ProjectTask
+        {
+            Id = Guid.NewGuid(),
+            ProjectId = completedTask.ProjectId,
+            Title = completedTask.Title,
+            Description = completedTask.Description,
+            Status = "ToDo",
+            Priority = completedTask.Priority,
+            AssignedToUserId = completedTask.AssignedToUserId,
+            DueDate = nextDue.Value,
+            CreatedByUserId = currentUserId,
+            CreatedAt = DateTime.UtcNow,
+            EstimatedHours = completedTask.EstimatedHours,
+            IsRecurring = true,
+            RecurrencePattern = completedTask.RecurrencePattern,
+            RecurrenceInterval = completedTask.RecurrenceInterval,
+            RecurrenceEndDate = completedTask.RecurrenceEndDate,
+            RecurrenceSourceTaskId = sourceId
+        };
+        await _taskRepository.CreateAsync(nextTask, cancellationToken).ConfigureAwait(false);
+        var labelIds = await _taskLabelRepository.GetLabelIdsByTaskIdAsync(completedTask.Id, cancellationToken).ConfigureAwait(false);
+        if (labelIds.Count > 0)
+            await _taskLabelRepository.SetForTaskAsync(nextTask.Id, labelIds, cancellationToken).ConfigureAwait(false);
+        var customVals = await _taskCustomFieldValueRepository.GetByTaskIdAsync(completedTask.Id, cancellationToken).ConfigureAwait(false);
+        if (customVals.Count > 0)
+        {
+            var toCopy = customVals.Select(v => (v.FieldId, v.Value)).ToList();
+            await _taskCustomFieldValueRepository.SetForTaskAsync(nextTask.Id, toCopy, cancellationToken).ConfigureAwait(false);
+        }
+        await LogActivityAsync(nextTask.Id, currentUserId, "RecurrenceCreated", null, $"Next occurrence (from task {completedTask.Id})", cancellationToken).ConfigureAwait(false);
+        _logger.LogInformation("Recurring task next instance created. SourceTaskId: {SourceId}, NewTaskId: {NewId}, DueDate: {Due}", completedTask.Id, nextTask.Id, nextDue);
+    }
+
+    private static DateTime? ComputeNextRecurrenceDate(DateTime from, string pattern, int interval)
+    {
+        if (interval < 1) return null;
+        var d = from.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(from, DateTimeKind.Utc) : from;
+        return pattern.ToLowerInvariant() switch
+        {
+            "daily" => d.AddDays(interval),
+            "weekly" => d.AddDays(7 * interval),
+            "monthly" => d.AddMonths(interval),
+            _ => null
+        };
+    }
+
+    private async Task<IReadOnlyList<TaskCustomFieldValueResponse>> SaveTaskCustomFieldValuesAsync(Guid taskId, Guid projectId, IReadOnlyList<TaskCustomFieldValueItem>? values, CancellationToken cancellationToken)
+    {
+        if (values == null || values.Count == 0)
+        {
+            await _taskCustomFieldValueRepository.SetForTaskAsync(taskId, Array.Empty<(Guid, string?)>(), cancellationToken).ConfigureAwait(false);
+            return Array.Empty<TaskCustomFieldValueResponse>();
+        }
+        var projectFields = await _projectCustomFieldRepository.GetByProjectIdAsync(projectId, cancellationToken).ConfigureAwait(false);
+        var validFieldIds = projectFields.Select(f => f.Id).ToHashSet();
+        var toSave = values
+            .Where(x => x.FieldId != Guid.Empty && validFieldIds.Contains(x.FieldId))
+            .Select(x => (x.FieldId, x.Value))
+            .ToList();
+        await _taskCustomFieldValueRepository.SetForTaskAsync(taskId, toSave, cancellationToken).ConfigureAwait(false);
+        return toSave.Select(x => new TaskCustomFieldValueResponse { FieldId = x.FieldId, Value = x.Value }).ToList();
+    }
+
+    private static TaskResponse MapToResponse(ProjectTask t, IReadOnlyList<LabelResponse> labels, IReadOnlyList<TaskCustomFieldValueResponse>? customFieldValues = null) => new()
     {
         Id = t.Id,
         ProjectId = t.ProjectId,
@@ -364,6 +495,12 @@ public class TaskService : ITaskService
         CreatedAt = t.CreatedAt,
         UpdatedAt = t.UpdatedAt,
         EstimatedHours = t.EstimatedHours,
-        Labels = labels ?? Array.Empty<LabelResponse>()
+        IsRecurring = t.IsRecurring,
+        RecurrencePattern = t.RecurrencePattern,
+        RecurrenceInterval = t.RecurrenceInterval,
+        RecurrenceEndDate = t.RecurrenceEndDate,
+        RecurrenceSourceTaskId = t.RecurrenceSourceTaskId,
+        Labels = labels ?? Array.Empty<LabelResponse>(),
+        CustomFieldValues = customFieldValues ?? Array.Empty<TaskCustomFieldValueResponse>()
     };
 }

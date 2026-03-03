@@ -3,21 +3,22 @@ interface FormSidebarProps {
   onClose: () => void;
   title: string;
   children: React.ReactNode;
-  /** Width: 'default' (w-64) or 'wide' (w-96) for forms with more fields */
+  /** Kept for API compatibility; all right sidebars use the same width. */
   width?: 'default' | 'wide';
 }
 
 const borderColor = 'var(--sidebar-border, #edebe9)';
 const headerColor = 'var(--card-header-color, #323130)';
 
-export function FormSidebar({ open, onClose, title, children, width = 'default' }: FormSidebarProps) {
+/** Same width as task drawer: 28rem, max 90vw on small screens */
+const RIGHT_SIDEBAR_WIDTH = 'w-[28rem] max-w-[90vw]';
+
+export function FormSidebar({ open, onClose, title, children }: FormSidebarProps) {
   if (!open) return null;
 
   return (
     <aside
-      className={`fixed top-12 right-0 z-40 h-[calc(100vh-3rem)] flex flex-col shrink-0 border-l transition-[width] duration-200 ${
-        width === 'wide' ? 'w-96' : 'w-64'
-      }`}
+      className={`fixed top-12 right-0 z-40 h-[calc(100vh-3rem)] flex flex-col shrink-0 border-l transition-[width] duration-200 ${RIGHT_SIDEBAR_WIDTH}`}
       style={{
         backgroundColor: 'var(--sidebar-bg, #faf9f8)',
         borderLeft: `1px solid ${borderColor}`,

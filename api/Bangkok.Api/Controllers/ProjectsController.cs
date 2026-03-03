@@ -20,14 +20,18 @@ public class ProjectsController : ControllerBase
     private readonly IProjectService _projectService;
     private readonly IProjectMemberService _memberService;
     private readonly ILabelService _labelService;
+    private readonly IProjectCustomFieldService _customFieldService;
+    private readonly IProjectExportService _exportService;
     private readonly IProjectDashboardService _dashboardService;
     private readonly ILogger<ProjectsController> _logger;
 
-    public ProjectsController(IProjectService projectService, IProjectMemberService memberService, ILabelService labelService, IProjectDashboardService dashboardService, ILogger<ProjectsController> logger)
+    public ProjectsController(IProjectService projectService, IProjectMemberService memberService, ILabelService labelService, IProjectCustomFieldService customFieldService, IProjectExportService exportService, IProjectDashboardService dashboardService, ILogger<ProjectsController> logger)
     {
         _projectService = projectService;
         _memberService = memberService;
         _labelService = labelService;
+        _customFieldService = customFieldService;
+        _exportService = exportService;
         _dashboardService = dashboardService;
         _logger = logger;
     }
@@ -88,6 +92,30 @@ public class ProjectsController : ControllerBase
             return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<ProjectResponse>.Fail(new ErrorResponse { Code = "FORBIDDEN", Message = errorMessage ?? "You do not have permission to create projects." }, correlationId));
         if (result == CreateProjectResult.ValidationError)
             return BadRequest(ApiResponse<ProjectResponse>.Fail(new ErrorResponse { Code = "VALIDATION", Message = errorMessage ?? "Invalid request." }, correlationId));
+        if (data == null)
+            return BadRequest(ApiResponse<ProjectResponse>.Fail(new ErrorResponse { Code = "ERROR", Message = "Create failed." }, correlationId));
+
+        return CreatedAtAction(nameof(GetById), new { id = data.Id }, ApiResponse<ProjectResponse>.Ok(data, correlationId));
+    }
+
+    [HttpPost("from-template/{templateId:guid}")]
+    [SwaggerOperation(Summary = "Create project from template", Description = "Creates a new project with name/description/status from request body, then copies all template tasks into the project. Requires Project.Create.")]
+    [ProducesResponseType(typeof(ApiResponse<ProjectResponse>), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<ApiResponse<ProjectResponse>>> CreateFromTemplate([FromRoute] Guid templateId, [FromBody] CreateProjectRequest request, CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
+        var currentUserId = GetCurrentUserId();
+        if (currentUserId == null)
+            return Unauthorized(ApiResponse<ProjectResponse>.Fail(new ErrorResponse { Code = "UNAUTHORIZED", Message = "Authentication required." }, correlationId));
+
+        var (result, data, errorMessage) = await _projectService.CreateFromTemplateAsync(templateId, request, currentUserId.Value, cancellationToken).ConfigureAwait(false);
+        if (result == CreateProjectResult.Forbidden)
+            return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<ProjectResponse>.Fail(new ErrorResponse { Code = "FORBIDDEN", Message = errorMessage ?? "You do not have permission to create projects." }, correlationId));
+        if (result == CreateProjectResult.ValidationError)
+            return BadRequest(ApiResponse<ProjectResponse>.Fail(new ErrorResponse { Code = "VALIDATION", Message = errorMessage ?? "Invalid request or template not found." }, correlationId));
         if (data == null)
             return BadRequest(ApiResponse<ProjectResponse>.Fail(new ErrorResponse { Code = "ERROR", Message = "Create failed." }, correlationId));
 
@@ -362,6 +390,131 @@ public class ProjectsController : ControllerBase
             if (error?.Contains("permission") == true || error?.Contains("required") == true)
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.Fail(new ErrorResponse { Code = "FORBIDDEN", Message = error }, correlationId));
             return BadRequest(ApiResponse<object>.Fail(new ErrorResponse { Code = "VALIDATION", Message = error }, correlationId));
+        }
+        return NoContent();
+    }
+
+    [HttpGet("{projectId:guid}/export")]
+    [SwaggerOperation(Summary = "Export project to CSV", Description = "Returns a CSV file with tasks (Title, Status, Priority, Assignee, Due Date, Labels, Logged Hours). Requires project access.")]
+    [Produces("text/csv")]
+    [ProducesResponseType(typeof(FileResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Export([FromRoute] Guid projectId, CancellationToken cancellationToken)
+    {
+        var currentUserId = GetCurrentUserId();
+        if (currentUserId == null)
+            return Unauthorized();
+
+        var (csvBytes, error) = await _exportService.ExportToCsvAsync(projectId, currentUserId.Value, cancellationToken).ConfigureAwait(false);
+        if (csvBytes == null)
+        {
+            if (error?.Contains("not found") == true)
+                return NotFound();
+            return StatusCode(StatusCodes.Status403Forbidden);
+        }
+
+        var fileName = $"project-{projectId:N}.csv";
+        return File(csvBytes, "text/csv", fileName);
+    }
+
+    [HttpGet("{projectId:guid}/custom-fields")]
+    [SwaggerOperation(Summary = "List project custom fields", Description = "Returns custom field definitions for the project. Requires project access.")]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ProjectCustomFieldResponse>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<ProjectCustomFieldResponse>>>> GetCustomFields([FromRoute] Guid projectId, CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
+        var currentUserId = GetCurrentUserId();
+        if (currentUserId == null)
+            return Unauthorized(ApiResponse<IReadOnlyList<ProjectCustomFieldResponse>>.Fail(new ErrorResponse { Code = "UNAUTHORIZED", Message = "Authentication required." }, correlationId));
+
+        var (success, data, error) = await _customFieldService.GetByProjectIdAsync(projectId, currentUserId.Value, cancellationToken).ConfigureAwait(false);
+        if (!success)
+        {
+            if (error?.Contains("not found") == true)
+                return NotFound(ApiResponse<IReadOnlyList<ProjectCustomFieldResponse>>.Fail(new ErrorResponse { Code = "PROJECT_NOT_FOUND", Message = error }, correlationId));
+            return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<IReadOnlyList<ProjectCustomFieldResponse>>.Fail(new ErrorResponse { Code = "FORBIDDEN", Message = error }, correlationId));
+        }
+        return Ok(ApiResponse<IReadOnlyList<ProjectCustomFieldResponse>>.Ok(data ?? Array.Empty<ProjectCustomFieldResponse>(), correlationId));
+    }
+
+    [HttpPost("{projectId:guid}/custom-fields")]
+    [SwaggerOperation(Summary = "Create custom field", Description = "Creates a custom field for the project. Requires Project.Edit and project member.")]
+    [ProducesResponseType(typeof(ApiResponse<ProjectCustomFieldResponse>), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ApiResponse<ProjectCustomFieldResponse>>> CreateCustomField([FromRoute] Guid projectId, [FromBody] CreateProjectCustomFieldRequest request, CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
+        var currentUserId = GetCurrentUserId();
+        if (currentUserId == null)
+            return Unauthorized(ApiResponse<ProjectCustomFieldResponse>.Fail(new ErrorResponse { Code = "UNAUTHORIZED", Message = "Authentication required." }, correlationId));
+
+        var (success, data, error) = await _customFieldService.CreateAsync(projectId, request ?? new CreateProjectCustomFieldRequest(), currentUserId.Value, cancellationToken).ConfigureAwait(false);
+        if (!success)
+        {
+            if (error?.Contains("not found") == true)
+                return NotFound(ApiResponse<ProjectCustomFieldResponse>.Fail(new ErrorResponse { Code = "PROJECT_NOT_FOUND", Message = error }, correlationId));
+            if (error?.Contains("permission") == true || error?.Contains("required") == true)
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<ProjectCustomFieldResponse>.Fail(new ErrorResponse { Code = "FORBIDDEN", Message = error }, correlationId));
+            return BadRequest(ApiResponse<ProjectCustomFieldResponse>.Fail(new ErrorResponse { Code = "VALIDATION", Message = error ?? "Invalid request." }, correlationId));
+        }
+        return StatusCode(StatusCodes.Status201Created, ApiResponse<ProjectCustomFieldResponse>.Ok(data!, correlationId));
+    }
+
+    [HttpPut("{projectId:guid}/custom-fields/{id:guid}")]
+    [SwaggerOperation(Summary = "Update custom field", Description = "Updates a custom field. Requires Project.Edit and project member.")]
+    [ProducesResponseType(typeof(ApiResponse<ProjectCustomFieldResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ApiResponse<ProjectCustomFieldResponse>>> UpdateCustomField([FromRoute] Guid projectId, [FromRoute] Guid id, [FromBody] UpdateProjectCustomFieldRequest request, CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
+        var currentUserId = GetCurrentUserId();
+        if (currentUserId == null)
+            return Unauthorized(ApiResponse<ProjectCustomFieldResponse>.Fail(new ErrorResponse { Code = "UNAUTHORIZED", Message = "Authentication required." }, correlationId));
+
+        var (success, data, error) = await _customFieldService.UpdateAsync(projectId, id, request ?? new UpdateProjectCustomFieldRequest(), currentUserId.Value, cancellationToken).ConfigureAwait(false);
+        if (!success)
+        {
+            if (error?.Contains("not found") == true)
+                return NotFound(ApiResponse<ProjectCustomFieldResponse>.Fail(new ErrorResponse { Code = "NOT_FOUND", Message = error }, correlationId));
+            if (error?.Contains("permission") == true || error?.Contains("required") == true)
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<ProjectCustomFieldResponse>.Fail(new ErrorResponse { Code = "FORBIDDEN", Message = error }, correlationId));
+            return BadRequest(ApiResponse<ProjectCustomFieldResponse>.Fail(new ErrorResponse { Code = "VALIDATION", Message = error ?? "Invalid request." }, correlationId));
+        }
+        return Ok(ApiResponse<ProjectCustomFieldResponse>.Ok(data!, correlationId));
+    }
+
+    [HttpDelete("{projectId:guid}/custom-fields/{id:guid}")]
+    [SwaggerOperation(Summary = "Delete custom field", Description = "Deletes a custom field and all its task values. Requires Project.Edit and project member.")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteCustomField([FromRoute] Guid projectId, [FromRoute] Guid id, CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
+        var currentUserId = GetCurrentUserId();
+        if (currentUserId == null)
+            return Unauthorized();
+
+        var (success, error) = await _customFieldService.DeleteAsync(projectId, id, currentUserId.Value, cancellationToken).ConfigureAwait(false);
+        if (!success)
+        {
+            if (error?.Contains("not found") == true)
+                return NotFound(ApiResponse<object>.Fail(new ErrorResponse { Code = "NOT_FOUND", Message = error }, correlationId));
+            if (error?.Contains("permission") == true || error?.Contains("required") == true)
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.Fail(new ErrorResponse { Code = "FORBIDDEN", Message = error }, correlationId));
+            return NotFound(ApiResponse<object>.Fail(new ErrorResponse { Code = "NOT_FOUND", Message = error }, correlationId));
         }
         return NoContent();
     }

@@ -226,7 +226,7 @@ export function TaskList({ projectId, userMap, isProjectArchived = false }: Task
 
       {drawerOpen && selectedTask && (
         <aside
-          className="fixed top-12 right-0 z-40 h-[calc(100vh-3rem)] w-64 flex flex-col shrink-0 border-l transition-[width] duration-200"
+          className="fixed top-12 right-0 z-40 h-[calc(100vh-3rem)] w-[28rem] max-w-[90vw] flex flex-col shrink-0 border-l transition-[width] duration-200"
           style={{
             backgroundColor: 'var(--sidebar-bg, #faf9f8)',
             borderColor: 'var(--sidebar-border, #edebe9)',

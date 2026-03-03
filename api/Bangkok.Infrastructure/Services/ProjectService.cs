@@ -15,13 +15,19 @@ public class ProjectService : IProjectService
 
     private readonly IProjectRepository _projectRepository;
     private readonly IProjectMemberRepository _memberRepository;
+    private readonly IProjectTemplateRepository _templateRepository;
+    private readonly IProjectTemplateTaskRepository _templateTaskRepository;
+    private readonly ITaskRepository _taskRepository;
     private readonly IUserPermissionChecker _permissionChecker;
     private readonly ILogger<ProjectService> _logger;
 
-    public ProjectService(IProjectRepository projectRepository, IProjectMemberRepository memberRepository, IUserPermissionChecker permissionChecker, ILogger<ProjectService> logger)
+    public ProjectService(IProjectRepository projectRepository, IProjectMemberRepository memberRepository, IProjectTemplateRepository templateRepository, IProjectTemplateTaskRepository templateTaskRepository, ITaskRepository taskRepository, IUserPermissionChecker permissionChecker, ILogger<ProjectService> logger)
     {
         _projectRepository = projectRepository;
         _memberRepository = memberRepository;
+        _templateRepository = templateRepository;
+        _templateTaskRepository = templateTaskRepository;
+        _taskRepository = taskRepository;
         _permissionChecker = permissionChecker;
         _logger = logger;
     }
@@ -105,6 +111,57 @@ public class ProjectService : IProjectService
 
         _logger.LogInformation("Project created. ProjectId: {ProjectId}, Name: {Name}, CreatedByUserId: {CreatedByUserId}", project.Id, project.Name, currentUserId);
 
+        return (CreateProjectResult.Success, MapToResponse(project), null);
+    }
+
+    public async Task<(CreateProjectResult Result, ProjectResponse? Data, string? ErrorMessage)> CreateFromTemplateAsync(Guid templateId, CreateProjectRequest request, Guid currentUserId, CancellationToken cancellationToken = default)
+    {
+        if (!await _permissionChecker.HasPermissionAsync(currentUserId, PermissionCreate, cancellationToken).ConfigureAwait(false))
+        {
+            _logger.LogWarning("User {UserId} attempted to create project from template without Project.Create", currentUserId);
+            return (CreateProjectResult.Forbidden, null, "You do not have permission to create projects.");
+        }
+        var template = await _templateRepository.GetByIdAsync(templateId, cancellationToken).ConfigureAwait(false);
+        if (template == null)
+            return (CreateProjectResult.ValidationError, null, "Template not found.");
+        if (request == null || string.IsNullOrWhiteSpace(request.Name))
+            return (CreateProjectResult.ValidationError, null, "Name is required.");
+        var project = new Project
+        {
+            Id = Guid.NewGuid(),
+            Name = request.Name.Trim(),
+            Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
+            Status = string.IsNullOrWhiteSpace(request.Status) ? "Active" : request.Status.Trim(),
+            CreatedByUserId = currentUserId,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _projectRepository.CreateAsync(project, cancellationToken).ConfigureAwait(false);
+        var ownerMember = new ProjectMember
+        {
+            Id = Guid.NewGuid(),
+            ProjectId = project.Id,
+            UserId = currentUserId,
+            Role = "Owner",
+            CreatedAt = DateTime.UtcNow
+        };
+        await _memberRepository.AddAsync(ownerMember, cancellationToken).ConfigureAwait(false);
+        var templateTasks = await _templateTaskRepository.GetByTemplateIdAsync(templateId, cancellationToken).ConfigureAwait(false);
+        foreach (var tt in templateTasks)
+        {
+            var task = new ProjectTask
+            {
+                Id = Guid.NewGuid(),
+                ProjectId = project.Id,
+                Title = tt.Title,
+                Description = tt.Description,
+                Status = string.IsNullOrWhiteSpace(tt.DefaultStatus) ? "ToDo" : tt.DefaultStatus,
+                Priority = string.IsNullOrWhiteSpace(tt.DefaultPriority) ? "Medium" : tt.DefaultPriority,
+                CreatedByUserId = currentUserId,
+                CreatedAt = DateTime.UtcNow
+            };
+            await _taskRepository.CreateAsync(task, cancellationToken).ConfigureAwait(false);
+        }
+        _logger.LogInformation("Project created from template. ProjectId: {ProjectId}, TemplateId: {TemplateId}, Tasks: {Count}", project.Id, templateId, templateTasks.Count);
         return (CreateProjectResult.Success, MapToResponse(project), null);
     }
 

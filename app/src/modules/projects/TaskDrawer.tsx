@@ -5,10 +5,11 @@ import { getCurrentUserId } from '../../services/authService';
 import { getCommentsByTaskId, createComment, updateComment, deleteComment } from './commentService';
 import { getActivitiesByTaskId } from './activityService';
 import { getLabels } from './labelService';
-import { getTimeLogs, createTimeLog, deleteTimeLog, updateTask } from './taskService';
+import { getCustomFields } from './customFieldService';
+import { getTimeLogs, createTimeLog, deleteTimeLog, updateTask, getAttachments, uploadAttachment, deleteAttachment, downloadAttachment } from './taskService';
 import type { User } from '../../models/User';
 import { TASK_STATUSES, TASK_PRIORITIES } from './types';
-import type { Task, UpdateTaskRequest, TaskComment, TaskActivity, TaskTimeLog, Label } from './types';
+import type { Task, UpdateTaskRequest, TaskComment, TaskActivity, TaskTimeLog, TaskAttachment, Label, ProjectCustomField } from './types';
 
 function CommentContentWithMentions({ content }: { content: string }) {
   if (!content) return null;
@@ -37,6 +38,69 @@ function formatRelativeTime(iso: string): string {
   if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
   if (s < 604800) return `${Math.floor(s / 86400)} d ago`;
   return d.toLocaleDateString();
+}
+
+function formatValidationErrors(res: { errors?: Record<string, string[]> } | undefined): string | undefined {
+  const errors = res?.errors;
+  if (!errors || typeof errors !== 'object') return undefined;
+  const first = Object.values(errors).flat().find(Boolean);
+  return first ?? undefined;
+}
+
+function isTimelogShape(obj: unknown): obj is TaskTimeLog {
+  const o = obj as Record<string, unknown>;
+  return o != null && typeof o === 'object' && (typeof o.id === 'string' || typeof o.Id === 'string') && (typeof o.hours === 'number' || typeof o.Hours === 'number');
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function AttachmentIcon({ contentType }: { contentType: string }) {
+  const ct = (contentType || '').toLowerCase();
+  const iconClass = 'w-8 h-8 shrink-0 rounded flex items-center justify-center';
+  if (ct.startsWith('image/')) {
+    return (
+      <div className={`${iconClass} bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300`}>
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+      </div>
+    );
+  }
+  if (ct.includes('pdf')) {
+    return (
+      <div className={`${iconClass} bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300`}>
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+      </div>
+    );
+  }
+  if (ct.includes('sheet') || ct.includes('excel')) {
+    return (
+      <div className={`${iconClass} bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300`}>
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+      </div>
+    );
+  }
+  if (ct.includes('word') || ct.includes('document')) {
+    return (
+      <div className={`${iconClass} bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300`}>
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+      </div>
+    );
+  }
+  if (ct.startsWith('text/')) {
+    return (
+      <div className={`${iconClass} bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300`}>
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+      </div>
+    );
+  }
+  return (
+    <div className={`${iconClass} bg-gray-100 text-gray-600 dark:bg-slate-600 dark:text-slate-300`}>
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+    </div>
+  );
 }
 
 interface TaskDrawerProps {
@@ -76,6 +140,8 @@ export function TaskDrawer({
   const [estimatedHours, setEstimatedHours] = useState<string>('');
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
   const [projectLabels, setProjectLabels] = useState<Label[]>([]);
+  const [customFields, setCustomFields] = useState<ProjectCustomField[]>([]);
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
   const [users, setUsers] = useState<User[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -102,6 +168,12 @@ export function TaskDrawer({
   const [logHours, setLogHours] = useState('');
   const [logDescription, setLogDescription] = useState('');
   const [postingTimeLog, setPostingTimeLog] = useState(false);
+
+  const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
+  const [attachmentsLoading, setAttachmentsLoading] = useState(false);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const currentUserId = getCurrentUserId();
 
@@ -141,6 +213,13 @@ export function TaskDrawer({
     });
   }, []);
 
+  const loadCustomFields = useCallback((projectId: string) => {
+    getCustomFields(projectId).then((res) => {
+      const data = res.data ?? (res as unknown as { Data?: ProjectCustomField[] }).Data;
+      setCustomFields(Array.isArray(data) ? data : []);
+    });
+  }, []);
+
   const loadTimeLogs = useCallback((taskId: string) => {
     setTimeLogsLoading(true);
     getTimeLogs(taskId)
@@ -151,10 +230,21 @@ export function TaskDrawer({
       .finally(() => setTimeLogsLoading(false));
   }, []);
 
+  const loadAttachments = useCallback((taskId: string) => {
+    setAttachmentsLoading(true);
+    getAttachments(taskId)
+      .then((res) => {
+        const data = res.data ?? (res as unknown as { Data?: TaskAttachment[] }).Data;
+        setAttachments(Array.isArray(data) ? data : []);
+      })
+      .finally(() => setAttachmentsLoading(false));
+  }, []);
+
   useEffect(() => {
     if (open && task) {
       loadUsers();
       loadProjectLabels(task.projectId);
+      loadCustomFields(task.projectId);
       setTitle(task.title ?? '');
       setDescription(task.description ?? '');
       setStatus(task.status ?? 'ToDo');
@@ -163,12 +253,18 @@ export function TaskDrawer({
       setDueDate(task.dueDate ? task.dueDate.slice(0, 10) : '');
       setEstimatedHours(task.estimatedHours != null ? String(task.estimatedHours) : '');
       setSelectedLabelIds(task.labels?.map((l) => l.id) ?? []);
+      const cfMap: Record<string, string> = {};
+      (task.customFieldValues ?? []).forEach((v) => {
+        cfMap[v.fieldId] = v.value ?? '';
+      });
+      setCustomFieldValues(cfMap);
       setActiveTab('details');
       setNewCommentText('');
       setEditingCommentId(null);
       setLogHours('');
       setLogDescription('');
       loadTimeLogs(task.id);
+      loadAttachments(task.id);
       if (activeTab === 'comments') loadComments(task.id);
       if (activeTab === 'activity') loadActivities(task.id);
     }
@@ -182,17 +278,17 @@ export function TaskDrawer({
   }, [open, task?.id, activeTab, loadComments, loadActivities]);
 
   useEffect(() => {
-    if (!mentionQuery.trim()) {
-      setMentionOptions([]);
-      return;
-    }
     setMentionLoading(true);
     const t = setTimeout(() => {
-      searchUsersForMention(mentionQuery, 15).then((res) => {
-        const data = res.data ?? (res as { Data?: MentionUser[] }).Data;
-        setMentionOptions(Array.isArray(data) ? data : []);
-      }).finally(() => setMentionLoading(false));
-    }, 200);
+      searchUsersForMention(mentionQuery, 15)
+        .then((res) => {
+          const raw = res?.data ?? (res as { Data?: MentionUser[] } | undefined)?.Data;
+          const list = Array.isArray(raw) ? raw : [];
+          setMentionOptions(list);
+        })
+        .catch(() => setMentionOptions([]))
+        .finally(() => setMentionLoading(false));
+    }, mentionQuery.trim() ? 200 : 0);
     return () => clearTimeout(t);
   }, [mentionQuery]);
 
@@ -255,6 +351,10 @@ export function TaskDrawer({
             return Number.isNaN(n) ? null : n;
           })(),
         labelIds: selectedLabelIds,
+        customFieldValues: customFields.map((f) => ({
+          fieldId: f.id,
+          value: (customFieldValues[f.id] ?? '').trim() || null,
+        })),
       });
       if (res.success) {
         addToast('success', 'Task updated.');
@@ -337,16 +437,57 @@ export function TaskDrawer({
     }
     setPostingTimeLog(true);
     try {
-      const res = await createTimeLog(task.id, { hours: hoursNum, description: logDescription.trim() || null });
-      const data = res.data ?? (res as unknown as { Data?: TaskTimeLog }).Data;
-      if (res.success && data) {
-        setTimeLogs((prev) => [data, ...prev]);
+      const result = await createTimeLog(task.id, { hours: hoursNum, description: logDescription.trim() || null });
+      const res = result.data;
+      const isHttpSuccess = result.ok && result.status >= 200 && result.status < 300;
+
+      if (isHttpSuccess) {
+        const payload = (res as { data?: TaskTimeLog }).data ?? (res as { Data?: TaskTimeLog }).Data ?? (isTimelogShape(res) ? (res as TaskTimeLog) : undefined);
+        const raw = payload ?? (res as unknown as { data?: unknown }).data;
+        const log: TaskTimeLog | null = raw
+          ? {
+              id: (raw as { id?: string }).id ?? (raw as { Id?: string }).Id ?? '',
+              taskId: (raw as { taskId?: string }).taskId ?? (raw as { TaskId?: string }).TaskId ?? task.id,
+              userId: (raw as { userId?: string }).userId ?? (raw as { UserId?: string }).UserId ?? '',
+              userDisplayName: (raw as { userDisplayName?: string }).userDisplayName ?? (raw as { UserDisplayName?: string }).UserDisplayName ?? null,
+              hours: Number((raw as { hours?: number }).hours ?? (raw as { Hours?: number }).Hours ?? 0),
+              description: (raw as { description?: string }).description ?? (raw as { Description?: string }).Description ?? null,
+              createdAt: (raw as { createdAt?: string }).createdAt ?? (raw as { CreatedAt?: string }).CreatedAt ?? new Date().toISOString(),
+            }
+          : null;
+        if (log?.id) {
+          setTimeLogs((prev) => [log, ...prev]);
+        } else {
+          loadTimeLogs(task.id);
+        }
         setLogHours('');
         setLogDescription('');
         addToast('success', 'Time logged.');
-      } else {
-        addToast('error', res.error?.message ?? 'Failed to log time.');
+        return;
       }
+
+      const err = (res as { error?: { message?: string } }).error ?? (res as { Error?: { Message?: string } }).Error;
+      const errorMessage =
+        err?.message ??
+        (err as { Message?: string })?.Message ??
+        (res as { message?: string }).message ??
+        (res as { Message?: string })?.Message ??
+        formatValidationErrors(res as { errors?: Record<string, string[]> }) ??
+        (res as { title?: string }).title;
+      if (!errorMessage) {
+        console.error('Create timelog failed. Status:', result.status, 'Response:', res);
+      }
+      addToast('error', errorMessage ?? (result.status != null ? `Failed to log time (HTTP ${result.status}). Check console.` : 'Failed to log time (network error?). Check console.'));
+    } catch (e) {
+      console.error('Create timelog exception:', e);
+      const errData = (e as { response?: { data?: unknown } })?.response?.data as Record<string, unknown> | undefined;
+      const msg =
+        (errData?.error as { message?: string })?.message ??
+        (errData?.message as string) ??
+        formatValidationErrors(errData as { errors?: Record<string, string[]> }) ??
+        (e as { message?: string }).message ??
+        'Failed to log time.';
+      addToast('error', msg);
     } finally {
       setPostingTimeLog(false);
     }
@@ -361,6 +502,54 @@ export function TaskDrawer({
     } else {
       addToast('error', res.error?.message ?? 'Failed to remove time log.');
     }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !task || !canEdit) return;
+    setUploadingAttachment(true);
+    try {
+      const res = await uploadAttachment(task.id, file);
+      const data = res.data ?? (res as unknown as { Data?: TaskAttachment }).Data;
+      if (res.success && data) {
+        setAttachments((prev) => [data, ...prev]);
+        addToast('success', 'File uploaded.');
+      } else {
+        addToast('error', res.error?.message ?? 'Upload failed.');
+      }
+    } finally {
+      setUploadingAttachment(false);
+    }
+  };
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file || !task || !canEdit) return;
+    setUploadingAttachment(true);
+    uploadAttachment(task.id, file).then((res) => {
+      const data = res.data ?? (res as unknown as { Data?: TaskAttachment }).Data;
+      if (res.success && data) {
+        setAttachments((prev) => [data, ...prev]);
+        addToast('success', 'File uploaded.');
+      } else {
+        addToast('error', res.error?.message ?? 'Upload failed.');
+      }
+    }).finally(() => setUploadingAttachment(false));
+  };
+  const handleDeleteAttachment = async (att: TaskAttachment) => {
+    if (!canEdit) return;
+    const res = await deleteAttachment(att.id);
+    if (res.success) {
+      setAttachments((prev) => prev.filter((a) => a.id !== att.id));
+      addToast('success', 'Attachment removed.');
+    } else {
+      addToast('error', res.error?.message ?? 'Failed to remove attachment.');
+    }
+  };
+  const handleDownloadAttachment = (att: TaskAttachment) => {
+    downloadAttachment(att.id, att.fileName).catch(() => addToast('error', 'Download failed.'));
   };
 
   if (!open) return null;
@@ -539,6 +728,94 @@ export function TaskDrawer({
                   </div>
                 </div>
               )}
+              {customFields.length > 0 && (
+                <div className="space-y-3 pt-1 border-t border-gray-100 dark:border-slate-700/50">
+                  <span className="block text-sm font-medium" style={{ color: headerColor }}>
+                    Custom fields
+                  </span>
+                  <div className="space-y-3">
+                    {customFields.map((field) => {
+                      const value = customFieldValues[field.id] ?? '';
+                      const inputClass = 'w-full px-3 py-2 rounded-lg border bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-600 focus:ring-2 focus:ring-blue-500 disabled:opacity-70 disabled:cursor-not-allowed text-sm';
+                      const labelClass = 'block text-sm font-medium mb-1';
+                      const ft = (field.fieldType || 'Text').toLowerCase();
+                      if (ft === 'number') {
+                        return (
+                          <div key={field.id}>
+                            <label htmlFor={`drawer-cf-${field.id}`} className={labelClass} style={{ color: headerColor }}>
+                              {field.name}
+                            </label>
+                            <input
+                              id={`drawer-cf-${field.id}`}
+                              type="number"
+                              value={value}
+                              onChange={(e) => setCustomFieldValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
+                              disabled={!canEdit}
+                              className={inputClass}
+                              placeholder="Optional"
+                            />
+                          </div>
+                        );
+                      }
+                      if (ft === 'date') {
+                        return (
+                          <div key={field.id}>
+                            <label htmlFor={`drawer-cf-${field.id}`} className={labelClass} style={{ color: headerColor }}>
+                              {field.name}
+                            </label>
+                            <input
+                              id={`drawer-cf-${field.id}`}
+                              type="date"
+                              value={value}
+                              onChange={(e) => setCustomFieldValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
+                              disabled={!canEdit}
+                              className={inputClass}
+                            />
+                          </div>
+                        );
+                      }
+                      if (ft === 'dropdown' && field.options) {
+                        const opts = field.options.split(',').map((o) => o.trim()).filter(Boolean);
+                        return (
+                          <div key={field.id}>
+                            <label htmlFor={`drawer-cf-${field.id}`} className={labelClass} style={{ color: headerColor }}>
+                              {field.name}
+                            </label>
+                            <select
+                              id={`drawer-cf-${field.id}`}
+                              value={value}
+                              onChange={(e) => setCustomFieldValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
+                              disabled={!canEdit}
+                              className={inputClass}
+                            >
+                              <option value="">—</option>
+                              {opts.map((opt) => (
+                                <option key={opt} value={opt}>{opt}</option>
+                              ))}
+                            </select>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div key={field.id}>
+                          <label htmlFor={`drawer-cf-${field.id}`} className={labelClass} style={{ color: headerColor }}>
+                            {field.name}
+                          </label>
+                          <input
+                            id={`drawer-cf-${field.id}`}
+                            type="text"
+                            value={value}
+                            onChange={(e) => setCustomFieldValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
+                            disabled={!canEdit}
+                            className={inputClass}
+                            placeholder="Optional"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               <div>
                 <label htmlFor="drawer-due" className="block text-sm font-medium mb-1" style={{ color: headerColor }}>
                   Due date
@@ -567,6 +844,110 @@ export function TaskDrawer({
                   disabled={!canEdit}
                   className="w-full px-3 py-2 rounded-lg border bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-600 focus:ring-2 focus:ring-blue-500 disabled:opacity-70 disabled:cursor-not-allowed"
                 />
+              </div>
+              {task?.isRecurring && (
+                <div className="flex items-center gap-2 text-sm" style={{ color: descColor }}>
+                  <svg className="w-4 h-4 text-indigo-500 dark:text-indigo-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span>
+                    Recurring: every {task.recurrenceInterval ?? 1} {task.recurrencePattern?.toLowerCase() ?? 'week'}
+                    {task.recurrenceEndDate ? ` until ${task.recurrenceEndDate.slice(0, 10)}` : ''}. Edit in task form to change.
+                  </span>
+                </div>
+              )}
+              <div className="border-t border-gray-200 dark:border-slate-600 pt-4 mt-2">
+                <h4 className="text-sm font-semibold mb-3" style={{ color: headerColor }}>
+                  Attachments
+                </h4>
+                {canEdit && (
+                  <>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      className="hidden"
+                      accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
+                      onChange={handleFileSelect}
+                    />
+                    <div
+                      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                      onDragLeave={() => setDragOver(false)}
+                      onDrop={handleDrop}
+                      className={`mb-3 rounded-lg border-2 border-dashed px-4 py-3 text-center text-sm transition-colors ${dragOver ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400' : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500'}`}
+                      style={{ color: descColor }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploadingAttachment}
+                        className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        {uploadingAttachment ? (
+                          'Uploading…'
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                            </svg>
+                            Upload file
+                          </>
+                        )}
+                      </button>
+                      <span className="ml-2">or drag and drop</span>
+                    </div>
+                  </>
+                )}
+                {attachmentsLoading ? (
+                  <div className="animate-pulse space-y-2">
+                    <div className="h-12 rounded bg-gray-200 dark:bg-slate-600" />
+                    <div className="h-12 rounded bg-gray-200 dark:bg-slate-600" />
+                  </div>
+                ) : attachments.length === 0 ? (
+                  <p className="text-sm py-2" style={{ color: descColor }}>No attachments yet.</p>
+                ) : (
+                  <ul className="space-y-2 max-h-48 overflow-y-auto">
+                    {attachments.map((att) => (
+                      <li
+                        key={att.id}
+                        className="flex items-center gap-3 py-2 px-3 rounded-lg bg-gray-50 dark:bg-slate-800/60 border border-gray-100 dark:border-slate-700"
+                      >
+                        <AttachmentIcon contentType={att.contentType} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate" style={{ color: headerColor }} title={att.fileName}>
+                            {att.fileName}
+                          </p>
+                          <p className="text-xs" style={{ color: descColor }}>
+                            {formatFileSize(att.fileSize)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadAttachment(att)}
+                            className="p-1.5 rounded text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-900/20"
+                            title="Download"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                          </button>
+                          {canEdit && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteAttachment(att)}
+                              className="p-1.5 rounded text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-900/20"
+                              title="Remove"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
               <div className="border-t border-gray-200 dark:border-slate-600 pt-4 mt-2">
                 <h4 className="text-sm font-semibold mb-3" style={{ color: headerColor }}>

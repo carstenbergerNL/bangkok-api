@@ -10,7 +10,7 @@ using Swashbuckle.AspNetCore.Annotations;
 namespace Bangkok.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/Notifications")]
 [Produces("application/json")]
 [Authorize]
 [EnableRateLimiting("GlobalPolicy")]

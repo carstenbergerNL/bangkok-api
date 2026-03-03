@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { usePermissions } from '../../hooks/usePermissions';
 import { PERMISSIONS } from '../../constants/permissions';
 import { getUsers } from '../../services/userService';
-import { getProject, updateProject, deleteProject } from './projectService';
+import { getProject, updateProject, deleteProject, exportProjectToCsv } from './projectService';
 import { getMyProjectRole } from './memberService';
 import { addToast } from '../../utils/toast';
 import { Modal } from '../../components/Modal';
@@ -14,6 +14,7 @@ import { TaskList } from './TaskList';
 import { ProjectMembersTab } from './ProjectMembersTab';
 import { ProjectDashboardTab } from './ProjectDashboardTab';
 import { ProjectLabelsSettings } from './ProjectLabelsSettings';
+import { ProjectCustomFieldsSettings } from './ProjectCustomFieldsSettings';
 
 function getStatusBadgeClass(status: string): string {
   const s = status?.toLowerCase();
@@ -36,8 +37,10 @@ export function ProjectDetailsPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [activeTab, setActiveTab] = useState<'board' | 'members' | 'dashboard' | 'settings'>('dashboard');
+  const [settingsSubTab, setSettingsSubTab] = useState<'badges' | 'custom-fields'>('badges');
   const [myRole, setMyRole] = useState<ProjectMemberRole | null>(null);
   const [statusChanging, setStatusChanging] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const loadProject = useCallback(() => {
     if (!id) return;
@@ -201,6 +204,27 @@ export function ProjectDetailsPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {project.id && (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!project.id || exporting) return;
+                  setExporting(true);
+                  try {
+                    await exportProjectToCsv(project.id);
+                    addToast('success', 'Export downloaded.');
+                  } catch {
+                    addToast('error', 'Export failed.');
+                  } finally {
+                    setExporting(false);
+                  }
+                }}
+                disabled={exporting}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {exporting ? 'Exporting…' : 'Export'}
+              </button>
+            )}
             {canEdit && (
               <button
                 type="button"
@@ -289,7 +313,34 @@ export function ProjectDetailsPage() {
             <ProjectDashboardTab projectId={project.id} />
           )}
           {activeTab === 'settings' && project.id && (
-            <ProjectLabelsSettings projectId={project.id} />
+            <div>
+              <div className="flex border-b border-gray-200 dark:border-slate-600 mb-4">
+                <button
+                  type="button"
+                  onClick={() => setSettingsSubTab('badges')}
+                  className={`px-4 py-2 text-sm font-medium transition-colors ${
+                    settingsSubTab === 'badges'
+                      ? 'border-b-2 text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
+                      : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200'
+                  }`}
+                >
+                  Badges
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSettingsSubTab('custom-fields')}
+                  className={`px-4 py-2 text-sm font-medium transition-colors ${
+                    settingsSubTab === 'custom-fields'
+                      ? 'border-b-2 text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
+                      : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200'
+                  }`}
+                >
+                  Custom Fields
+                </button>
+              </div>
+              {settingsSubTab === 'badges' && <ProjectLabelsSettings projectId={project.id} />}
+              {settingsSubTab === 'custom-fields' && <ProjectCustomFieldsSettings projectId={project.id} />}
+            </div>
           )}
         </div>
       </div>

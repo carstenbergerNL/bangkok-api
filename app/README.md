@@ -100,7 +100,7 @@ app/
 
 - **Projects**
   - **Project list** – List projects; create, edit, delete. Permission-based: Project.View, Project.Create, Project.Edit, Project.Delete.
-  - **Project details** – Tabs: **Board** (Kanban), **Tasks**, **Dashboard**, **Members**, **Labels**. Dashboard shows total/completed/overdue tasks, total estimated hours, total logged hours, over-budget indicator.
+  - **Project details** – Tabs: **Board** (Kanban), **Tasks**, **Dashboard**, **Members**, **Labels**. Dashboard shows total/completed/overdue tasks, total estimated hours, total logged hours, over-budget indicator. **Export** button in the header downloads project tasks as CSV (title, status, priority, assignee, due date, labels, logged hours); shows loading state and triggers file download.
 
 - **Tasks**
   - **Kanban** – Columns by status (ToDo, In Progress, Done); drag-and-drop; create task, open task drawer.
@@ -133,7 +133,7 @@ app/
 - **Profile:** Get `GET /api/Profile/{userId}`; Create/Update `POST /api/Profile`, `PUT /api/Profile/{userId}`.
 - **Roles:** List `GET /api/Roles`; CRUD; role permissions GET/POST/DELETE.
 - **Permissions:** List `GET /api/Permissions`; CRUD.
-- **Projects:** List `GET /api/Projects`; Get `GET /api/Projects/{id}`; Create `POST /api/Projects`; Update `PUT /api/Projects/{id}`; Delete `DELETE /api/Projects/{id}`; Dashboard `GET /api/Projects/{id}/dashboard`; Members GET/POST/PUT/DELETE; Labels GET/POST/DELETE.
+- **Projects:** List `GET /api/Projects`; Get `GET /api/Projects/{id}`; Create `POST /api/Projects`; Update `PUT /api/Projects/{id}`; Delete `DELETE /api/Projects/{id}`; Dashboard `GET /api/Projects/{id}/dashboard`; **Export** `GET /api/Projects/{id}/export` (returns CSV: task title, status, priority, assignee, due date, labels, logged hours); Members GET/POST/PUT/DELETE; Labels GET/POST/DELETE.
 - **Tasks:** List by project `GET /api/Tasks?projectId=...`; Get `GET /api/Tasks/{id}`; Create `POST /api/Tasks`; Update `PUT /api/Tasks/{id}`; Delete `DELETE /api/Tasks/{id}`; Comments `GET/POST /api/Tasks/{taskId}/comments`; Activities `GET /api/Tasks/{taskId}/activities`; **Time logs** `GET /api/Tasks/{taskId}/timelogs`, `POST /api/Tasks/{taskId}/timelogs`; Delete time log `DELETE /api/Timelogs/{id}`.
 - **Comments:** Update `PUT /api/Comments/{id}`; Delete `DELETE /api/Comments/{id}` (task comments by comment id).
 - **Notifications:** List `GET /api/Notifications`; Unread count `GET /api/Notifications/unread-count`; Mark read `PUT /api/Notifications/{id}/read`; Mark all read `PUT /api/Notifications/read-all`.

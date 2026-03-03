@@ -62,7 +62,7 @@ public class UsersController : ControllerBase
         return NoContent();
     }
 
-    [HttpGet("mention-search")]
+    [HttpGet("~/api/Users/mention-search")]
     [SwaggerOperation(Summary = "Search users for @mention", Description = "Lightweight search by display name or email for @mention autocomplete. Returns id, displayName, email.")]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<MentionUserResponse>>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -77,9 +77,6 @@ public class UsersController : ControllerBase
             return Unauthorized(ApiResponse<IReadOnlyList<MentionUserResponse>>.Fail(new ErrorResponse { Code = "UNAUTHORIZED", Message = "Authentication required." }, correlationId));
 
         var query = (q ?? "").Trim();
-        if (query.Length == 0)
-            return Ok(ApiResponse<IReadOnlyList<MentionUserResponse>>.Ok(Array.Empty<MentionUserResponse>(), correlationId));
-
         var list = await _userService.SearchForMentionAsync(query, Math.Clamp(limit, 1, 20), cancellationToken).ConfigureAwait(false);
         return Ok(ApiResponse<IReadOnlyList<MentionUserResponse>>.Ok(list, correlationId));
     }

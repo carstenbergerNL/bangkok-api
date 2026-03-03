@@ -55,6 +55,20 @@ public class TaskTimeLogRepository : ITaskTimeLogRepository
         }
     }
 
+    public async Task<IReadOnlyDictionary<Guid, decimal>> GetTotalLoggedHoursByTaskIdsAsync(IReadOnlyList<Guid> taskIds, CancellationToken cancellationToken = default)
+    {
+        if (taskIds.Count == 0) return new Dictionary<Guid, decimal>();
+        var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken).ConfigureAwait(false);
+        using (connection)
+        {
+            connection.Open();
+            const string sql = "SELECT TaskId, ISNULL(SUM(Hours), 0) AS Total FROM dbo.TaskTimeLog WHERE TaskId IN @TaskIds GROUP BY TaskId";
+            var rows = await connection.QueryAsync<(Guid TaskId, decimal Total)>(
+                new CommandDefinition(sql, new { TaskIds = taskIds }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+            return rows.ToDictionary(r => r.TaskId, r => r.Total);
+        }
+    }
+
     public async Task<Guid> CreateAsync(TaskTimeLog log, CancellationToken cancellationToken = default)
     {
         var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken).ConfigureAwait(false);

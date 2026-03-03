@@ -17,4 +17,9 @@ public class ProjectTask
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public decimal? EstimatedHours { get; set; }
+    public bool IsRecurring { get; set; }
+    public string? RecurrencePattern { get; set; }
+    public int? RecurrenceInterval { get; set; }
+    public DateTime? RecurrenceEndDate { get; set; }
+    public Guid? RecurrenceSourceTaskId { get; set; }
 }

@@ -18,6 +18,28 @@ export interface Label {
   createdAt: string;
 }
 
+/** Project custom field – matches backend ProjectCustomFieldResponse */
+export interface ProjectCustomField {
+  id: string;
+  projectId: string;
+  name: string;
+  fieldType: string;
+  options?: string | null;
+  createdAt: string;
+}
+
+export interface CreateProjectCustomFieldRequest {
+  name: string;
+  fieldType: string;
+  options?: string | null;
+}
+
+export interface UpdateProjectCustomFieldRequest {
+  name: string;
+  fieldType: string;
+  options?: string | null;
+}
+
 /** Task – matches backend TaskResponse */
 export interface Task {
   id: string;
@@ -32,7 +54,36 @@ export interface Task {
   createdAt: string;
   updatedAt?: string | null;
   estimatedHours?: number | null;
+  isRecurring?: boolean;
+  recurrencePattern?: string | null;
+  recurrenceInterval?: number | null;
+  recurrenceEndDate?: string | null;
+  recurrenceSourceTaskId?: string | null;
   labels?: Label[];
+  customFieldValues?: TaskCustomFieldValue[];
+}
+
+/** Task custom field value – matches backend TaskCustomFieldValueResponse */
+export interface TaskCustomFieldValue {
+  fieldId: string;
+  value?: string | null;
+}
+
+/** Item for create/update task custom field values */
+export interface TaskCustomFieldValueItem {
+  fieldId: string;
+  value?: string | null;
+}
+
+/** Task attachment – matches backend TaskAttachmentResponse */
+export interface TaskAttachment {
+  id: string;
+  taskId: string;
+  fileName: string;
+  fileSize: number;
+  contentType: string;
+  uploadedByUserId: string;
+  createdAt: string;
 }
 
 /** Task time log – matches backend TaskTimeLogResponse */
@@ -58,6 +109,44 @@ export interface UpdateProjectRequest {
   status?: string | null;
 }
 
+/** Project template – matches backend ProjectTemplateResponse */
+export interface ProjectTemplate {
+  id: string;
+  name: string;
+  description?: string | null;
+  createdAt: string;
+  tasks: ProjectTemplateTask[];
+}
+
+export interface ProjectTemplateTask {
+  id: string;
+  templateId: string;
+  title: string;
+  description?: string | null;
+  defaultStatus?: string | null;
+  defaultPriority?: string | null;
+}
+
+export interface CreateProjectTemplateRequest {
+  name: string;
+  description?: string | null;
+  tasks?: CreateProjectTemplateTaskRequest[];
+}
+
+/** Same shape as CreateProjectTemplateRequest; used for PUT. */
+export interface UpdateProjectTemplateRequest {
+  name: string;
+  description?: string | null;
+  tasks?: CreateProjectTemplateTaskRequest[];
+}
+
+export interface CreateProjectTemplateTaskRequest {
+  title: string;
+  description?: string | null;
+  defaultStatus?: string | null;
+  defaultPriority?: string | null;
+}
+
 export interface CreateTaskRequest {
   projectId: string;
   title: string;
@@ -67,7 +156,12 @@ export interface CreateTaskRequest {
   assignedToUserId?: string | null;
   dueDate?: string | null;
   estimatedHours?: number | null;
+  isRecurring?: boolean;
+  recurrencePattern?: string | null;
+  recurrenceInterval?: number | null;
+  recurrenceEndDate?: string | null;
   labelIds?: string[];
+  customFieldValues?: TaskCustomFieldValueItem[];
 }
 
 export interface UpdateTaskRequest {
@@ -78,7 +172,12 @@ export interface UpdateTaskRequest {
   assignedToUserId?: string | null;
   dueDate?: string | null;
   estimatedHours?: number | null;
+  isRecurring?: boolean;
+  recurrencePattern?: string | null;
+  recurrenceInterval?: number | null;
+  recurrenceEndDate?: string | null;
   labelIds?: string[];
+  customFieldValues?: TaskCustomFieldValueItem[];
 }
 
 export interface CreateTaskTimeLogRequest {
@@ -172,3 +271,7 @@ export const PROJECT_STATUSES = ['Active', 'OnHold', 'Completed', 'Archived'] as
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 export const TASK_STATUSES = ['ToDo', 'InProgress', 'Done'] as const;
 export const TASK_PRIORITIES = ['Low', 'Medium', 'High'] as const;
+
+/** Recurrence pattern for recurring tasks – must match backend */
+export const RECURRENCE_PATTERNS = ['Daily', 'Weekly', 'Monthly'] as const;
+export type RecurrencePattern = (typeof RECURRENCE_PATTERNS)[number];

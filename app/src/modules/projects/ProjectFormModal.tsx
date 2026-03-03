@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { FormSidebar } from '../../components/FormSidebar';
 import { addToast } from '../../utils/toast';
 import { PROJECT_STATUSES } from './types';
-import type { Project, CreateProjectRequest, UpdateProjectRequest } from './types';
+import type { Project, CreateProjectRequest, UpdateProjectRequest, ProjectTemplate } from './types';
 
 interface ProjectFormModalProps {
   open: boolean;
@@ -11,21 +11,27 @@ interface ProjectFormModalProps {
   project: Project | null;
   save: (id: string, data: UpdateProjectRequest) => Promise<{ success: boolean; error?: { message?: string } }>;
   create: (data: CreateProjectRequest) => Promise<{ success: boolean; error?: { message?: string } }>;
+  /** When provided, show "Create from template" option and use this to create from selected template. */
+  templates?: ProjectTemplate[];
+  createFromTemplate?: (templateId: string, data: CreateProjectRequest) => Promise<{ success: boolean; error?: { message?: string } }>;
 }
 
-export function ProjectFormModal({ open, onClose, onSaved, project, save, create }: ProjectFormModalProps) {
+export function ProjectFormModal({ open, onClose, onSaved, project, save, create, templates = [], createFromTemplate }: ProjectFormModalProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<string>('Active');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [saving, setSaving] = useState(false);
 
   const isEdit = !!project;
+  const showTemplateOption = !isEdit && templates.length > 0 && createFromTemplate;
 
   useEffect(() => {
     if (open) {
       setName(project?.name ?? '');
       setDescription(project?.description ?? '');
       setStatus(project?.status ?? 'Active');
+      setSelectedTemplateId('');
     }
   }, [open, project]);
 
@@ -35,9 +41,15 @@ export function ProjectFormModal({ open, onClose, onSaved, project, save, create
     if (!trimmed) return;
     setSaving(true);
     try {
-      const res = isEdit
-        ? await save(project!.id, { name: trimmed, description: description.trim() || null, status })
-        : await create({ name: trimmed, description: description.trim() || null, status });
+      const payload = { name: trimmed, description: description.trim() || null, status };
+      let res: { success: boolean; error?: { message?: string } };
+      if (isEdit) {
+        res = await save(project!.id, payload);
+      } else if (showTemplateOption && selectedTemplateId) {
+        res = await createFromTemplate!(selectedTemplateId, payload);
+      } else {
+        res = await create(payload);
+      }
       if (res.success) {
         addToast('success', isEdit ? 'Project updated.' : 'Project created.');
         onSaved();
@@ -53,6 +65,26 @@ export function ProjectFormModal({ open, onClose, onSaved, project, save, create
   return (
     <FormSidebar open={open} onClose={onClose} title={isEdit ? 'Edit project' : 'Create project'}>
       <form onSubmit={handleSubmit} className="space-y-4">
+        {showTemplateOption && (
+          <div>
+            <label htmlFor="project-template" className="block text-sm font-medium mb-1" style={{ color: 'var(--card-header-color, #323130)' }}>
+              Create from template
+            </label>
+            <select
+              id="project-template"
+              value={selectedTemplateId}
+              onChange={(e) => setSelectedTemplateId(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">Blank project</option>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}{t.tasks?.length ? ` (${t.tasks.length} tasks)` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div>
           <label htmlFor="project-name" className="block text-sm font-medium mb-1" style={{ color: 'var(--card-header-color, #323130)' }}>
             Name <span className="text-red-500">*</span>

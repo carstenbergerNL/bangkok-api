@@ -18,18 +18,28 @@ export interface MentionUser {
 }
 
 export function getUsers(pageNumber = 1, pageSize = 10, includeDeleted = false): Promise<ApiResponse<PagedResult<User>>> {
+  const empty = {
+    success: false as const,
+    data: { items: [] as User[], totalCount: 0, pageNumber: 1, pageSize: 10 },
+  } satisfies ApiResponse<PagedResult<User>>;
   return apiClient
     .get<ApiResponse<PagedResult<User>>>('/api/Users', { params: { pageNumber, pageSize, includeDeleted } })
-    .then((res) => res.data);
+    .then((res) => res.data)
+    .catch((err) => (err.response?.status === 403 ? empty : Promise.reject(err)));
 }
 
-/** Lightweight search for @mention autocomplete. */
+/** Lightweight search for @mention autocomplete. Empty q returns first N users so typing @ shows a list. */
 export function searchUsersForMention(q: string, limit = 15): Promise<ApiResponse<MentionUser[]>> {
-  const query = (q || '').trim();
-  if (!query) return Promise.resolve({ success: true, data: [] } as ApiResponse<MentionUser[]>);
   return apiClient
-    .get<ApiResponse<MentionUser[]>>('/api/Users/mention-search', { params: { q: query, limit } })
-    .then((res) => res.data);
+    .get<ApiResponse<MentionUser[]>>('/api/Users/mention-search', { params: { q: (q || '').trim(), limit } })
+    .then((res) => res.data)
+    .catch((err) => {
+      const status = err.response?.status;
+      if (status === 403 || status === 404 || status == null) {
+        return { success: true as const, data: [] } as ApiResponse<MentionUser[]>;
+      }
+      return Promise.reject(err);
+    });
 }
 
 export function getUserById(id: string): Promise<ApiResponse<User>> {

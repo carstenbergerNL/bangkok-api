@@ -35,6 +35,9 @@ api/Bangkok.Api/appsettings.json
 api/Bangkok.Api/appsettings.*.json
 !api/Bangkok.Api/appsettings.Example.json
 
+# Uploaded files (runtime)
+api/Bangkok.Api/uploads/
+
 # Visual Studio
 .vs/
 *.user
