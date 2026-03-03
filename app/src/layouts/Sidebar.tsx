@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { PERMISSIONS } from '../constants/permissions';
 import { usePermissions } from '../hooks/usePermissions';
 import { useActiveModules } from '../hooks/useActiveModules';
