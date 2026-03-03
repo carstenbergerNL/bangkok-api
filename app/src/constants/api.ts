@@ -55,4 +55,11 @@ export const API_PATHS = {
     BASE: '/api/Comments',
     BY_ID: (id: string) => `/api/Comments/${id}`,
   },
+  NOTIFICATIONS: {
+    BASE: '/api/Notifications',
+    UNREAD_COUNT: '/api/Notifications/unread-count',
+    BY_ID: (id: string) => `/api/Notifications/${id}`,
+    MARK_READ: (id: string) => `/api/Notifications/${id}/read`,
+    MARK_ALL_READ: '/api/Notifications/read-all',
+  },
 } as const;

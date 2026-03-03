@@ -13,6 +13,7 @@ public interface IUserService
     Task<HardDeleteUserResult> HardDeleteUserAsync(Guid id, Guid currentUserId, bool confirm, CancellationToken cancellationToken = default, string? clientIp = null);
     Task<LockUserResult> LockUserAsync(Guid id, Guid currentUserId, DateTime? lockoutEnd, CancellationToken cancellationToken = default);
     Task<UnlockUserResult> UnlockUserAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<MentionUserResponse>> SearchForMentionAsync(string query, int limit = 15, CancellationToken cancellationToken = default);
 }
 
 public enum UpdateUserResult

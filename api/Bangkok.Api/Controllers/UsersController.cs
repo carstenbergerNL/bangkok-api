@@ -62,6 +62,28 @@ public class UsersController : ControllerBase
         return NoContent();
     }
 
+    [HttpGet("mention-search")]
+    [SwaggerOperation(Summary = "Search users for @mention", Description = "Lightweight search by display name or email for @mention autocomplete. Returns id, displayName, email.")]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<MentionUserResponse>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<MentionUserResponse>>>> MentionSearch(
+        [FromQuery] string? q,
+        [FromQuery] int limit = 15,
+        CancellationToken cancellationToken = default)
+    {
+        var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
+        var (currentUserId, _) = GetCurrentUserIdentity();
+        if (currentUserId == null)
+            return Unauthorized(ApiResponse<IReadOnlyList<MentionUserResponse>>.Fail(new ErrorResponse { Code = "UNAUTHORIZED", Message = "Authentication required." }, correlationId));
+
+        var query = (q ?? "").Trim();
+        if (query.Length == 0)
+            return Ok(ApiResponse<IReadOnlyList<MentionUserResponse>>.Ok(Array.Empty<MentionUserResponse>(), correlationId));
+
+        var list = await _userService.SearchForMentionAsync(query, Math.Clamp(limit, 1, 20), cancellationToken).ConfigureAwait(false);
+        return Ok(ApiResponse<IReadOnlyList<MentionUserResponse>>.Ok(list, correlationId));
+    }
+
     [HttpGet("{id:guid}")]
     [SwaggerOperation(Summary = "Get user by ID", Description = "Returns a single user by ID (safe fields only). Caller must be the user or Admin.")]
     [ProducesResponseType(typeof(ApiResponse<UserResponse>), StatusCodes.Status200OK)]

@@ -57,6 +57,41 @@ public class UserRepository : IUserRepository
         }
     }
 
+    public async Task<User?> GetByDisplayNameAsync(string displayName, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(displayName)) return null;
+        var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken).ConfigureAwait(false);
+        using (connection)
+        {
+            connection.Open();
+            const string sql = @"
+            SELECT Id, Email, DisplayName, PasswordHash, PasswordSalt, IsActive, CreatedAtUtc, UpdatedAtUtc, RecoverString, RecoverStringExpiry, IsDeleted, DeletedAt, FailedLoginAttempts, LockoutEnd
+            FROM dbo.[User]
+            WHERE DisplayName = @DisplayName AND IsDeleted = 0";
+            return await connection.QuerySingleOrDefaultAsync<User>(new CommandDefinition(sql, new { DisplayName = displayName.Trim() }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        }
+    }
+
+    public async Task<IReadOnlyList<User>> SearchForMentionAsync(string query, int limit, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(query) || limit <= 0)
+            return Array.Empty<User>();
+        var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken).ConfigureAwait(false);
+        using (connection)
+        {
+            connection.Open();
+            var pattern = "%" + query.Trim().Replace("%", "[%]").Replace("_", "[_]") + "%";
+            const string sql = @"
+                SELECT TOP (@Limit) Id, Email, DisplayName, PasswordHash, PasswordSalt, IsActive, CreatedAtUtc, UpdatedAtUtc, RecoverString, RecoverStringExpiry, IsDeleted, DeletedAt, FailedLoginAttempts, LockoutEnd
+                FROM dbo.[User]
+                WHERE IsDeleted = 0 AND (DisplayName LIKE @Pattern OR Email LIKE @Pattern)
+                ORDER BY DisplayName";
+            var list = await connection.QueryAsync<User>(
+                new CommandDefinition(sql, new { Pattern = pattern, Limit = Math.Min(limit, 20) }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+            return list.ToList();
+        }
+    }
+
     public async Task<User?> GetByRecoverStringAsync(string recoverString, CancellationToken cancellationToken = default)
     {
         var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken).ConfigureAwait(false);

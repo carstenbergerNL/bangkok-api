@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { addToast } from '../../utils/toast';
-import { getUsers } from '../../services/userService';
+import { getUsers, searchUsersForMention, type MentionUser } from '../../services/userService';
 import { getCurrentUserId } from '../../services/authService';
 import { getCommentsByTaskId, createComment, updateComment, deleteComment } from './commentService';
 import { getActivitiesByTaskId } from './activityService';
@@ -8,6 +8,24 @@ import { getLabels } from './labelService';
 import type { User } from '../../models/User';
 import { TASK_STATUSES, TASK_PRIORITIES } from './types';
 import type { Task, UpdateTaskRequest, TaskComment, TaskActivity, Label } from './types';
+
+function CommentContentWithMentions({ content }: { content: string }) {
+  if (!content) return null;
+  const parts = content.split(/(@\S+)/g);
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.startsWith('@') ? (
+          <span key={i} className="text-blue-600 dark:text-blue-400 font-medium">
+            {part}
+          </span>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  );
+}
 
 function formatRelativeTime(iso: string): string {
   const d = new Date(iso);
@@ -65,6 +83,14 @@ export function TaskDrawer({
   const [postingComment, setPostingComment] = useState(false);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editCommentText, setEditCommentText] = useState('');
+
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [mentionOptions, setMentionOptions] = useState<MentionUser[]>([]);
+  const [mentionStartIndex, setMentionStartIndex] = useState(0);
+  const [mentionLoading, setMentionLoading] = useState(false);
+  const commentTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const commentCursorRef = useRef(0);
 
   const [activities, setActivities] = useState<TaskActivity[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
@@ -132,6 +158,59 @@ export function TaskDrawer({
       if (activeTab === 'activity') loadActivities(task.id);
     }
   }, [open, task?.id, activeTab, loadComments, loadActivities]);
+
+  useEffect(() => {
+    if (!mentionQuery.trim()) {
+      setMentionOptions([]);
+      return;
+    }
+    setMentionLoading(true);
+    const t = setTimeout(() => {
+      searchUsersForMention(mentionQuery, 15).then((res) => {
+        const data = res.data ?? (res as { Data?: MentionUser[] }).Data;
+        setMentionOptions(Array.isArray(data) ? data : []);
+      }).finally(() => setMentionLoading(false));
+    }, 200);
+    return () => clearTimeout(t);
+  }, [mentionQuery]);
+
+  const handleCommentInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    const cursor = e.target.selectionStart ?? 0;
+    commentCursorRef.current = cursor;
+    setNewCommentText(value);
+    const textBeforeCursor = value.slice(0, cursor);
+    const lastAt = textBeforeCursor.lastIndexOf('@');
+    if (lastAt !== -1) {
+      const fromAt = textBeforeCursor.slice(lastAt + 1);
+      if (!/\s/.test(fromAt)) {
+        setMentionStartIndex(lastAt);
+        setMentionQuery(fromAt);
+        setMentionOpen(true);
+        return;
+      }
+    }
+    setMentionOpen(false);
+  }, []);
+
+  const handleSelectMention = useCallback((user: MentionUser) => {
+    const d = (user.displayName || '').trim();
+    const mention = d && !d.includes(' ') ? d : user.email;
+    const start = mentionStartIndex;
+    const end = commentCursorRef.current;
+    const before = newCommentText.slice(0, start);
+    const after = newCommentText.slice(end);
+    const insert = `@${mention} `;
+    setNewCommentText(before + insert + after);
+    setMentionOpen(false);
+    setMentionOptions([]);
+    setMentionQuery('');
+    setTimeout(() => {
+      commentTextareaRef.current?.focus();
+      const pos = start + insert.length;
+      commentTextareaRef.current?.setSelectionRange(pos, pos);
+    }, 0);
+  }, [newCommentText, mentionStartIndex]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -432,14 +511,39 @@ export function TaskDrawer({
           ) : activeTab === 'comments' ? (
             <div className="flex flex-col h-full min-h-0">
               {canComment && (
-                <div className="shrink-0 mb-4">
+                <div className="shrink-0 mb-4 relative">
                   <textarea
+                    ref={commentTextareaRef}
                     value={newCommentText}
-                    onChange={(e) => setNewCommentText(e.target.value)}
-                    placeholder="Add a comment…"
+                    onChange={handleCommentInputChange}
+                    onBlur={() => setTimeout(() => setMentionOpen(false), 150)}
+                    placeholder="Add a comment… Use @ to mention someone."
                     className="w-full px-3 py-2 rounded-lg border bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-600 focus:ring-2 focus:ring-blue-500 resize-none"
                     rows={2}
                   />
+                  {mentionOpen && (
+                    <div
+                      className="absolute left-0 right-0 top-full mt-0.5 z-10 py-1 rounded-lg border border-gray-200 dark:border-slate-600 shadow-lg bg-white dark:bg-slate-800 max-h-48 overflow-y-auto"
+                    >
+                      {mentionLoading ? (
+                        <div className="px-3 py-2 text-sm text-gray-500 dark:text-slate-400">Searching…</div>
+                      ) : mentionOptions.length === 0 ? (
+                        <div className="px-3 py-2 text-sm text-gray-500 dark:text-slate-400">No users found.</div>
+                      ) : (
+                        mentionOptions.map((u) => (
+                          <button
+                            key={u.id}
+                            type="button"
+                            onClick={() => handleSelectMention(u)}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors flex flex-col"
+                          >
+                            <span style={{ color: headerColor }}>{u.displayName || u.email}</span>
+                            {u.displayName && <span className="text-xs text-gray-500 dark:text-slate-400">{u.email}</span>}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={handleAddComment}
@@ -532,7 +636,7 @@ export function TaskDrawer({
                           </div>
                         ) : (
                           <p className="text-sm mt-0.5 whitespace-pre-wrap break-words" style={{ color: descColor }}>
-                            {c.content}
+                            <CommentContentWithMentions content={c.content} />
                           </p>
                         )}
                       </div>

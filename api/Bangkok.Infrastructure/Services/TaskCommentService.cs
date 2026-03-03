@@ -17,6 +17,7 @@ public class TaskCommentService : ITaskCommentService
     private readonly IProjectRepository _projectRepository;
     private readonly IProjectMemberRepository _memberRepository;
     private readonly IUserRepository _userRepository;
+    private readonly INotificationService _notificationService;
     private readonly IUserPermissionChecker _permissionChecker;
     private readonly ILogger<TaskCommentService> _logger;
 
@@ -26,6 +27,7 @@ public class TaskCommentService : ITaskCommentService
         IProjectRepository projectRepository,
         IProjectMemberRepository memberRepository,
         IUserRepository userRepository,
+        INotificationService notificationService,
         IUserPermissionChecker permissionChecker,
         ILogger<TaskCommentService> logger)
     {
@@ -34,6 +36,7 @@ public class TaskCommentService : ITaskCommentService
         _projectRepository = projectRepository;
         _memberRepository = memberRepository;
         _userRepository = userRepository;
+        _notificationService = notificationService;
         _permissionChecker = permissionChecker;
         _logger = logger;
     }
@@ -114,6 +117,8 @@ public class TaskCommentService : ITaskCommentService
 
         await _commentRepository.CreateAsync(comment, cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Comment created. CommentId: {CommentId}, TaskId: {TaskId}, UserId: {UserId}", comment.Id, taskId, currentUserId);
+
+        await NotifyMentionsAsync(content!, taskId, task.Title, currentUserId, cancellationToken).ConfigureAwait(false);
 
         var user = await _userRepository.GetByIdAsync(currentUserId, cancellationToken).ConfigureAwait(false);
         return (true, new TaskCommentResponse
@@ -234,5 +239,27 @@ public class TaskCommentService : ITaskCommentService
             return true;
         var m = await _memberRepository.GetByProjectAndUserAsync(projectId, userId, cancellationToken).ConfigureAwait(false);
         return m != null && (m.Role == "Member" || m.Role == "Owner");
+    }
+
+    private async Task NotifyMentionsAsync(string content, Guid taskId, string taskTitle, Guid commentAuthorId, CancellationToken cancellationToken)
+    {
+        var tokens = System.Text.RegularExpressions.Regex.Matches(content, @"@(\S+)")
+            .Select(m => m.Groups[1].Value.Trim())
+            .Where(s => s.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (tokens.Count == 0) return;
+
+        var notified = new HashSet<Guid>();
+        foreach (var token in tokens)
+        {
+            User? user = token.Contains('@', StringComparison.Ordinal)
+                ? await _userRepository.GetByEmailAsync(token, cancellationToken).ConfigureAwait(false)
+                : await _userRepository.GetByDisplayNameAsync(token, cancellationToken).ConfigureAwait(false);
+            if (user == null || user.Id == commentAuthorId || notified.Contains(user.Id))
+                continue;
+            notified.Add(user.Id);
+            await _notificationService.CreateAsync(user.Id, NotificationService.TypeMention, "You were mentioned", $"You were mentioned in a comment on task: {taskTitle}", taskId, cancellationToken).ConfigureAwait(false);
+        }
     }
 }

@@ -7,6 +7,8 @@ public interface IUserRepository
     Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<User?> GetByIdIncludeDeletedAsync(Guid id, CancellationToken cancellationToken = default);
     Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default);
+    Task<User?> GetByDisplayNameAsync(string displayName, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<User>> SearchForMentionAsync(string query, int limit, CancellationToken cancellationToken = default);
     Task<User?> GetByRecoverStringAsync(string recoverString, CancellationToken cancellationToken = default);
     Task<Guid> CreateAsync(User user, CancellationToken cancellationToken = default);
     Task UpdateAsync(User user, CancellationToken cancellationToken = default);

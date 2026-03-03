@@ -22,9 +22,10 @@ public class TaskService : ITaskService
     private readonly ITaskLabelRepository _taskLabelRepository;
     private readonly ILabelRepository _labelRepository;
     private readonly IUserPermissionChecker _permissionChecker;
+    private readonly INotificationService _notificationService;
     private readonly ILogger<TaskService> _logger;
 
-    public TaskService(ITaskRepository taskRepository, IProjectRepository projectRepository, IProjectMemberRepository memberRepository, ITaskActivityRepository activityRepository, ITaskLabelRepository taskLabelRepository, ILabelRepository labelRepository, IUserPermissionChecker permissionChecker, ILogger<TaskService> logger)
+    public TaskService(ITaskRepository taskRepository, IProjectRepository projectRepository, IProjectMemberRepository memberRepository, ITaskActivityRepository activityRepository, ITaskLabelRepository taskLabelRepository, ILabelRepository labelRepository, IUserPermissionChecker permissionChecker, INotificationService notificationService, ILogger<TaskService> logger)
     {
         _taskRepository = taskRepository;
         _projectRepository = projectRepository;
@@ -33,6 +34,7 @@ public class TaskService : ITaskService
         _taskLabelRepository = taskLabelRepository;
         _labelRepository = labelRepository;
         _permissionChecker = permissionChecker;
+        _notificationService = notificationService;
         _logger = logger;
     }
 
@@ -136,6 +138,8 @@ public class TaskService : ITaskService
         }
 
         await LogActivityAsync(task.Id, currentUserId, "TaskCreated", null, task.Title, cancellationToken).ConfigureAwait(false);
+        if (task.AssignedToUserId.HasValue && task.AssignedToUserId.Value != currentUserId && task.AssignedToUserId.Value != Guid.Empty)
+            await _notificationService.CreateAsync(task.AssignedToUserId.Value, NotificationService.TypeTaskAssigned, "Task assigned", $"You were assigned to: {task.Title}", task.Id, cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Task created. TaskId: {TaskId}, ProjectId: {ProjectId}, Title: {Title}, CreatedByUserId: {CreatedByUserId}", task.Id, task.ProjectId, task.Title, currentUserId);
 
         var labels = await GetLabelsForTaskAsync(task.Id, task.ProjectId, cancellationToken).ConfigureAwait(false);
@@ -174,6 +178,7 @@ public class TaskService : ITaskService
         var oldStatus = task.Status;
         var oldPriority = task.Priority;
         var oldAssignedTo = task.AssignedToUserId;
+        var oldDueDate = task.DueDate;
 
         if (request.AssignedToUserId.HasValue && request.AssignedToUserId.Value != Guid.Empty)
         {
@@ -214,6 +219,17 @@ public class TaskService : ITaskService
             await LogActivityAsync(task.Id, currentUserId, "PriorityChanged", oldPriority, task.Priority, cancellationToken).ConfigureAwait(false);
         if (request.AssignedToUserId != null && request.AssignedToUserId != oldAssignedTo)
             await LogActivityAsync(task.Id, currentUserId, "AssignedToChanged", oldAssignedTo?.ToString(), task.AssignedToUserId?.ToString(), cancellationToken).ConfigureAwait(false);
+
+        var assigneeId = task.AssignedToUserId;
+        if (assigneeId.HasValue && assigneeId.Value != currentUserId)
+        {
+            if (request.AssignedToUserId != null && request.AssignedToUserId != oldAssignedTo && assigneeId.Value != Guid.Empty)
+                await _notificationService.CreateAsync(assigneeId.Value, NotificationService.TypeTaskAssigned, "Task assigned", $"You were assigned to: {task.Title}", task.Id, cancellationToken).ConfigureAwait(false);
+            if (request.DueDate.HasValue && oldDueDate != task.DueDate)
+                await _notificationService.CreateAsync(assigneeId.Value, NotificationService.TypeTaskDueDateChanged, "Due date changed", $"Due date was updated for: {task.Title}", task.Id, cancellationToken).ConfigureAwait(false);
+            if (request.Status != null && request.Status.Trim() != oldStatus)
+                await _notificationService.CreateAsync(assigneeId.Value, NotificationService.TypeTaskStatusChanged, "Status changed", $"Status changed to {task.Status} for: {task.Title}", task.Id, cancellationToken).ConfigureAwait(false);
+        }
 
         if (request.AssignedToUserId.HasValue && request.AssignedToUserId.Value != Guid.Empty)
             _logger.LogInformation("Task assigned. TaskId: {TaskId}, AssignedToUserId: {AssignedToUserId}, UpdatedByUserId: {UserId}", id, request.AssignedToUserId, currentUserId);

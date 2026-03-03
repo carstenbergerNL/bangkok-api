@@ -14,6 +14,7 @@ public class ProjectMemberService : IProjectMemberService
     private readonly IProjectRepository _projectRepository;
     private readonly IUserRepository _userRepository;
     private readonly IUserPermissionChecker _permissionChecker;
+    private readonly INotificationService _notificationService;
     private readonly ILogger<ProjectMemberService> _logger;
 
     public ProjectMemberService(
@@ -21,12 +22,14 @@ public class ProjectMemberService : IProjectMemberService
         IProjectRepository projectRepository,
         IUserRepository userRepository,
         IUserPermissionChecker permissionChecker,
+        INotificationService notificationService,
         ILogger<ProjectMemberService> logger)
     {
         _memberRepository = memberRepository;
         _projectRepository = projectRepository;
         _userRepository = userRepository;
         _permissionChecker = permissionChecker;
+        _notificationService = notificationService;
         _logger = logger;
     }
 
@@ -111,6 +114,7 @@ public class ProjectMemberService : IProjectMemberService
             CreatedAt = DateTime.UtcNow
         };
         await _memberRepository.AddAsync(member, cancellationToken).ConfigureAwait(false);
+        await _notificationService.CreateAsync(request.UserId, NotificationService.TypeMemberAddedToProject, "Added to project", $"You were added to project \"{project.Name}\" as {role}.", projectId, cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Project member added. ProjectId: {ProjectId}, UserId: {UserId}, Role: {Role}, AddedByUserId: {CurrentUserId}", projectId, request.UserId, role, currentUserId);
 
         var response = new ProjectMemberResponse

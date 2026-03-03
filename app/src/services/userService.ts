@@ -11,9 +11,24 @@ export interface UpdateUserRequest {
   isActive?: boolean;
 }
 
+export interface MentionUser {
+  id: string;
+  displayName?: string | null;
+  email: string;
+}
+
 export function getUsers(pageNumber = 1, pageSize = 10, includeDeleted = false): Promise<ApiResponse<PagedResult<User>>> {
   return apiClient
     .get<ApiResponse<PagedResult<User>>>('/api/Users', { params: { pageNumber, pageSize, includeDeleted } })
+    .then((res) => res.data);
+}
+
+/** Lightweight search for @mention autocomplete. */
+export function searchUsersForMention(q: string, limit = 15): Promise<ApiResponse<MentionUser[]>> {
+  const query = (q || '').trim();
+  if (!query) return Promise.resolve({ success: true, data: [] } as ApiResponse<MentionUser[]>);
+  return apiClient
+    .get<ApiResponse<MentionUser[]>>('/api/Users/mention-search', { params: { q: query, limit } })
     .then((res) => res.data);
 }
 

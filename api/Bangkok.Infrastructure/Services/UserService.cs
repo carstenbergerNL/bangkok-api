@@ -248,6 +248,17 @@ public class UserService : IUserService
         return UnlockUserResult.Success;
     }
 
+    public async Task<IReadOnlyList<MentionUserResponse>> SearchForMentionAsync(string query, int limit = 15, CancellationToken cancellationToken = default)
+    {
+        var users = await _userRepository.SearchForMentionAsync(query ?? string.Empty, limit, cancellationToken).ConfigureAwait(false);
+        return users.Select(u => new MentionUserResponse
+        {
+            Id = u.Id,
+            DisplayName = u.DisplayName,
+            Email = u.Email ?? string.Empty
+        }).ToList();
+    }
+
     private async Task<UserResponse> MapToResponseAsync(User user, CancellationToken cancellationToken)
     {
         var roles = await _userRoleRepository.GetRolesByUserIdAsync(user.Id, cancellationToken).ConfigureAwait(false);

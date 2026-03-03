@@ -33,6 +33,7 @@ public static class DependencyInjection
         services.AddScoped<ITaskLabelRepository, TaskLabelRepository>();
         services.AddScoped<ITaskCommentRepository, TaskCommentRepository>();
         services.AddScoped<ITaskActivityRepository, TaskActivityRepository>();
+        services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IUserPermissionChecker, UserPermissionChecker>();
         services.AddScoped<IPasswordHasher, PasswordHasher>();
@@ -47,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<ITaskService, TaskService>();
         services.AddScoped<ITaskCommentService, TaskCommentService>();
         services.AddScoped<ITaskActivityService, TaskActivityService>();
+        services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IRoleService, RoleService>();
         services.AddScoped<IPermissionService, PermissionService>();
         services.AddSingleton<IAuditLogger, AuditLogger>();
