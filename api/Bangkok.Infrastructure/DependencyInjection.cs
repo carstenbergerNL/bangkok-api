@@ -26,7 +26,11 @@ public static class DependencyInjection
         services.AddScoped<IRolePermissionRepository, RolePermissionRepository>();
         services.AddScoped<IProfileRepository, ProfileRepository>();
         services.AddScoped<IProjectRepository, ProjectRepository>();
+        services.AddScoped<IProjectDashboardRepository, ProjectDashboardRepository>();
+        services.AddScoped<IProjectMemberRepository, ProjectMemberRepository>();
         services.AddScoped<ITaskRepository, TaskRepository>();
+        services.AddScoped<ILabelRepository, LabelRepository>();
+        services.AddScoped<ITaskLabelRepository, TaskLabelRepository>();
         services.AddScoped<ITaskCommentRepository, TaskCommentRepository>();
         services.AddScoped<ITaskActivityRepository, TaskActivityRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
@@ -37,6 +41,9 @@ public static class DependencyInjection
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IProfileService, ProfileService>();
         services.AddScoped<IProjectService, ProjectService>();
+        services.AddScoped<IProjectDashboardService, ProjectDashboardService>();
+        services.AddScoped<IProjectMemberService, ProjectMemberService>();
+        services.AddScoped<ILabelService, LabelService>();
         services.AddScoped<ITaskService, TaskService>();
         services.AddScoped<ITaskCommentService, TaskCommentService>();
         services.AddScoped<ITaskActivityService, TaskActivityService>();

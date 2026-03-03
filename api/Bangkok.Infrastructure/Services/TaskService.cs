@@ -1,3 +1,4 @@
+using Bangkok.Application.Dto.Projects;
 using Bangkok.Application.Dto.Tasks;
 using Bangkok.Application.Interfaces;
 using Bangkok.Domain;
@@ -12,18 +13,25 @@ public class TaskService : ITaskService
     private const string PermissionEdit = "Task.Edit";
     private const string PermissionDelete = "Task.Delete";
     private const string PermissionAssign = "Task.Assign";
+    private const string AdminPermission = "ViewAdminSettings";
 
     private readonly ITaskRepository _taskRepository;
     private readonly IProjectRepository _projectRepository;
+    private readonly IProjectMemberRepository _memberRepository;
     private readonly ITaskActivityRepository _activityRepository;
+    private readonly ITaskLabelRepository _taskLabelRepository;
+    private readonly ILabelRepository _labelRepository;
     private readonly IUserPermissionChecker _permissionChecker;
     private readonly ILogger<TaskService> _logger;
 
-    public TaskService(ITaskRepository taskRepository, IProjectRepository projectRepository, ITaskActivityRepository activityRepository, IUserPermissionChecker permissionChecker, ILogger<TaskService> logger)
+    public TaskService(ITaskRepository taskRepository, IProjectRepository projectRepository, IProjectMemberRepository memberRepository, ITaskActivityRepository activityRepository, ITaskLabelRepository taskLabelRepository, ILabelRepository labelRepository, IUserPermissionChecker permissionChecker, ILogger<TaskService> logger)
     {
         _taskRepository = taskRepository;
         _projectRepository = projectRepository;
+        _memberRepository = memberRepository;
         _activityRepository = activityRepository;
+        _taskLabelRepository = taskLabelRepository;
+        _labelRepository = labelRepository;
         _permissionChecker = permissionChecker;
         _logger = logger;
     }
@@ -39,10 +47,18 @@ public class TaskService : ITaskService
         var task = await _taskRepository.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
         if (task == null)
             return (GetTaskResult.NotFound, null);
-        return (GetTaskResult.Ok, MapToResponse(task));
+
+        if (!await CanAccessProjectAsync(task.ProjectId, currentUserId, cancellationToken).ConfigureAwait(false))
+        {
+            _logger.LogWarning("User {UserId} attempted to get task {TaskId} without project membership.", currentUserId, id);
+            return (GetTaskResult.Forbidden, null);
+        }
+
+        var labels = await GetLabelsForTaskAsync(task.Id, task.ProjectId, cancellationToken).ConfigureAwait(false);
+        return (GetTaskResult.Ok, MapToResponse(task, labels));
     }
 
-    public async Task<IReadOnlyList<TaskResponse>> GetByProjectIdAsync(Guid projectId, Guid currentUserId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<TaskResponse>> GetByProjectIdAsync(Guid projectId, Guid currentUserId, TaskFilterRequest? filter = null, CancellationToken cancellationToken = default)
     {
         if (!await _permissionChecker.HasPermissionAsync(currentUserId, PermissionView, cancellationToken).ConfigureAwait(false))
         {
@@ -50,8 +66,16 @@ public class TaskService : ITaskService
             return Array.Empty<TaskResponse>();
         }
 
-        var tasks = await _taskRepository.GetByProjectIdAsync(projectId, cancellationToken).ConfigureAwait(false);
-        return tasks.Select(MapToResponse).ToList();
+        if (!await CanAccessProjectAsync(projectId, currentUserId, cancellationToken).ConfigureAwait(false))
+        {
+            _logger.LogWarning("User {UserId} attempted to list tasks for project {ProjectId} without membership.", currentUserId, projectId);
+            return Array.Empty<TaskResponse>();
+        }
+
+        var tasks = await _taskRepository.GetByProjectIdAsync(projectId, filter, cancellationToken).ConfigureAwait(false);
+        var taskIds = tasks.Select(t => t.Id).ToList();
+        var labelsByTask = await GetLabelsByTaskIdsAsync(taskIds, projectId, cancellationToken).ConfigureAwait(false);
+        return tasks.Select(t => MapToResponse(t, labelsByTask.GetValueOrDefault(t.Id) ?? Array.Empty<LabelResponse>())).ToList();
     }
 
     public async Task<(CreateTaskResult Result, TaskResponse? Data, string? ErrorMessage)> CreateAsync(CreateTaskRequest request, Guid currentUserId, CancellationToken cancellationToken = default)
@@ -73,6 +97,12 @@ public class TaskService : ITaskService
         if (project == null)
             return (CreateTaskResult.ProjectNotFound, null, "Project not found.");
 
+        if (!await CanEditProjectAsync(request.ProjectId, currentUserId, cancellationToken).ConfigureAwait(false))
+        {
+            _logger.LogWarning("User {UserId} attempted to create task in project {ProjectId} without Member/Owner role.", currentUserId, request.ProjectId);
+            return (CreateTaskResult.Forbidden, null, "You must be a project member (Member or Owner) to create tasks.");
+        }
+
         var task = new ProjectTask
         {
             Id = Guid.NewGuid(),
@@ -88,10 +118,21 @@ public class TaskService : ITaskService
         };
 
         await _taskRepository.CreateAsync(task, cancellationToken).ConfigureAwait(false);
+
+        var labelIds = request.LabelIds?.Where(x => x != Guid.Empty).Distinct().ToList() ?? new List<Guid>();
+        if (labelIds.Count > 0)
+        {
+            var projectLabels = await _labelRepository.GetByProjectIdAsync(request.ProjectId, cancellationToken).ConfigureAwait(false);
+            var validIds = projectLabels.Select(l => l.Id).ToHashSet();
+            var toSet = labelIds.Where(id => validIds.Contains(id)).ToList();
+            await _taskLabelRepository.SetForTaskAsync(task.Id, toSet, cancellationToken).ConfigureAwait(false);
+        }
+
         await LogActivityAsync(task.Id, currentUserId, "TaskCreated", null, task.Title, cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Task created. TaskId: {TaskId}, ProjectId: {ProjectId}, Title: {Title}, CreatedByUserId: {CreatedByUserId}", task.Id, task.ProjectId, task.Title, currentUserId);
 
-        return (CreateTaskResult.Success, MapToResponse(task), null);
+        var labels = await GetLabelsForTaskAsync(task.Id, task.ProjectId, cancellationToken).ConfigureAwait(false);
+        return (CreateTaskResult.Success, MapToResponse(task, labels), null);
     }
 
     public async Task<(UpdateTaskResult Result, string? ErrorMessage)> UpdateAsync(Guid id, UpdateTaskRequest request, Guid currentUserId, CancellationToken cancellationToken = default)
@@ -105,6 +146,12 @@ public class TaskService : ITaskService
         var task = await _taskRepository.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
         if (task == null)
             return (UpdateTaskResult.NotFound, null);
+
+        if (!await CanEditProjectAsync(task.ProjectId, currentUserId, cancellationToken).ConfigureAwait(false))
+        {
+            _logger.LogWarning("User {UserId} attempted to update task {TaskId} without project Member/Owner role.", currentUserId, id);
+            return (UpdateTaskResult.Forbidden, "You must be a project member (Member or Owner) to edit tasks.");
+        }
 
         var oldStatus = task.Status;
         var oldPriority = task.Priority;
@@ -135,6 +182,14 @@ public class TaskService : ITaskService
 
         await _taskRepository.UpdateAsync(task, cancellationToken).ConfigureAwait(false);
 
+        if (request.LabelIds != null)
+        {
+            var projectLabels = await _labelRepository.GetByProjectIdAsync(task.ProjectId, cancellationToken).ConfigureAwait(false);
+            var validIds = projectLabels.Select(l => l.Id).ToHashSet();
+            var toSet = request.LabelIds.Where(x => x != Guid.Empty && validIds.Contains(x)).Distinct().ToList();
+            await _taskLabelRepository.SetForTaskAsync(task.Id, toSet, cancellationToken).ConfigureAwait(false);
+        }
+
         if (request.Status != null && request.Status.Trim() != oldStatus)
             await LogActivityAsync(task.Id, currentUserId, "StatusChanged", oldStatus, task.Status, cancellationToken).ConfigureAwait(false);
         if (request.Priority != null && request.Priority.Trim() != oldPriority)
@@ -162,6 +217,12 @@ public class TaskService : ITaskService
         if (task == null)
             return DeleteTaskResult.NotFound;
 
+        if (!await CanEditProjectAsync(task.ProjectId, currentUserId, cancellationToken).ConfigureAwait(false))
+        {
+            _logger.LogWarning("User {UserId} attempted to delete task {TaskId} without project Member/Owner role.", currentUserId, id);
+            return DeleteTaskResult.Forbidden;
+        }
+
         await LogActivityAsync(id, currentUserId, "TaskDeleted", task.Title, null, cancellationToken).ConfigureAwait(false);
         await _taskRepository.DeleteAsync(id, cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Task deleted. TaskId: {TaskId}, DeletedByUserId: {UserId}", id, currentUserId);
@@ -185,7 +246,47 @@ public class TaskService : ITaskService
         _logger.LogInformation("Activity created. TaskId: {TaskId}, Action: {Action}, UserId: {UserId}", taskId, action, userId);
     }
 
-    private static TaskResponse MapToResponse(ProjectTask t) => new()
+    private async Task<bool> CanAccessProjectAsync(Guid projectId, Guid userId, CancellationToken cancellationToken)
+    {
+        if (await _permissionChecker.HasPermissionAsync(userId, AdminPermission, cancellationToken).ConfigureAwait(false))
+            return true;
+        var m = await _memberRepository.GetByProjectAndUserAsync(projectId, userId, cancellationToken).ConfigureAwait(false);
+        return m != null;
+    }
+
+    private async Task<bool> CanEditProjectAsync(Guid projectId, Guid userId, CancellationToken cancellationToken)
+    {
+        if (await _permissionChecker.HasPermissionAsync(userId, AdminPermission, cancellationToken).ConfigureAwait(false))
+            return true;
+        var m = await _memberRepository.GetByProjectAndUserAsync(projectId, userId, cancellationToken).ConfigureAwait(false);
+        return m != null && (m.Role == "Member" || m.Role == "Owner");
+    }
+
+    private async Task<IReadOnlyList<LabelResponse>> GetLabelsForTaskAsync(Guid taskId, Guid projectId, CancellationToken cancellationToken)
+    {
+        var labelIds = await _taskLabelRepository.GetLabelIdsByTaskIdAsync(taskId, cancellationToken).ConfigureAwait(false);
+        if (labelIds.Count == 0) return Array.Empty<LabelResponse>();
+        var labels = await _labelRepository.GetByProjectIdAsync(projectId, cancellationToken).ConfigureAwait(false);
+        var idSet = labelIds.ToHashSet();
+        return labels.Where(l => idSet.Contains(l.Id)).Select(l => new LabelResponse { Id = l.Id, Name = l.Name, Color = l.Color, ProjectId = l.ProjectId, CreatedAt = l.CreatedAt }).ToList();
+    }
+
+    private async Task<Dictionary<Guid, IReadOnlyList<LabelResponse>>> GetLabelsByTaskIdsAsync(IReadOnlyList<Guid> taskIds, Guid projectId, CancellationToken cancellationToken)
+    {
+        if (taskIds.Count == 0) return new Dictionary<Guid, IReadOnlyList<LabelResponse>>();
+        var projectLabels = await _labelRepository.GetByProjectIdAsync(projectId, cancellationToken).ConfigureAwait(false);
+        var labelMap = projectLabels.ToDictionary(l => l.Id);
+        var result = new Dictionary<Guid, IReadOnlyList<LabelResponse>>();
+        foreach (var taskId in taskIds)
+        {
+            var labelIds = await _taskLabelRepository.GetLabelIdsByTaskIdAsync(taskId, cancellationToken).ConfigureAwait(false);
+            var list = labelIds.Where(id => labelMap.ContainsKey(id)).Select(id => new LabelResponse { Id = labelMap[id].Id, Name = labelMap[id].Name, Color = labelMap[id].Color, ProjectId = labelMap[id].ProjectId, CreatedAt = labelMap[id].CreatedAt }).ToList<LabelResponse>();
+            result[taskId] = list;
+        }
+        return result;
+    }
+
+    private static TaskResponse MapToResponse(ProjectTask t, IReadOnlyList<LabelResponse> labels) => new()
     {
         Id = t.Id,
         ProjectId = t.ProjectId,
@@ -197,6 +298,7 @@ public class TaskService : ITaskService
         DueDate = t.DueDate,
         CreatedByUserId = t.CreatedByUserId,
         CreatedAt = t.CreatedAt,
-        UpdatedAt = t.UpdatedAt
+        UpdatedAt = t.UpdatedAt,
+        Labels = labels ?? Array.Empty<LabelResponse>()
     };
 }

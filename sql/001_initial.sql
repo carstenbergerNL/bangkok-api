@@ -188,6 +188,55 @@ BEGIN
     CREATE NONCLUSTERED INDEX IX_TaskComment_UserId ON dbo.TaskComment (UserId);
 END;
 
+-- ProjectMembers table
+IF OBJECT_ID(N'dbo.ProjectMember', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ProjectMember
+    (
+        Id        UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+        ProjectId UNIQUEIDENTIFIER NOT NULL,
+        UserId    UNIQUEIDENTIFIER NOT NULL,
+        Role      NVARCHAR(50)     NOT NULL,
+        CreatedAt DATETIME2(7)     NOT NULL,
+        CONSTRAINT FK_ProjectMember_Project FOREIGN KEY (ProjectId) REFERENCES dbo.Project(Id),
+        CONSTRAINT FK_ProjectMember_User FOREIGN KEY (UserId) REFERENCES dbo.[User](Id),
+        CONSTRAINT UQ_ProjectMember_ProjectId_UserId UNIQUE (ProjectId, UserId)
+    );
+    CREATE NONCLUSTERED INDEX IX_ProjectMember_ProjectId ON dbo.ProjectMember (ProjectId);
+    CREATE NONCLUSTERED INDEX IX_ProjectMember_UserId ON dbo.ProjectMember (UserId);
+END;
+
+-- Labels table (project-level)
+IF OBJECT_ID(N'dbo.Label', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.Label
+    (
+        Id        UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+        Name      NVARCHAR(100)    NOT NULL,
+        Color     NVARCHAR(20)      NOT NULL,
+        ProjectId UNIQUEIDENTIFIER  NOT NULL,
+        CreatedAt DATETIME2(7)     NOT NULL,
+        CONSTRAINT FK_Label_Project FOREIGN KEY (ProjectId) REFERENCES dbo.Project(Id)
+    );
+    CREATE NONCLUSTERED INDEX IX_Label_ProjectId ON dbo.Label (ProjectId);
+END;
+
+-- TaskLabels table (many-to-many)
+IF OBJECT_ID(N'dbo.TaskLabel', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.TaskLabel
+    (
+        Id      UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+        TaskId  UNIQUEIDENTIFIER NOT NULL,
+        LabelId UNIQUEIDENTIFIER NOT NULL,
+        CONSTRAINT FK_TaskLabel_Task FOREIGN KEY (TaskId) REFERENCES dbo.Task(Id),
+        CONSTRAINT FK_TaskLabel_Label FOREIGN KEY (LabelId) REFERENCES dbo.Label(Id),
+        CONSTRAINT UQ_TaskLabel_TaskId_LabelId UNIQUE (TaskId, LabelId)
+    );
+    CREATE NONCLUSTERED INDEX IX_TaskLabel_TaskId ON dbo.TaskLabel (TaskId);
+    CREATE NONCLUSTERED INDEX IX_TaskLabel_LabelId ON dbo.TaskLabel (LabelId);
+END;
+
 -- TaskActivities table
 IF OBJECT_ID(N'dbo.TaskActivity', N'U') IS NULL
 BEGIN

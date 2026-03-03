@@ -1,11 +1,21 @@
 import { apiClient } from '../../api/client';
 import { API_PATHS } from '../../constants/api';
 import type { ApiResponse } from '../../models/ApiResponse';
-import type { Task, CreateTaskRequest, UpdateTaskRequest } from './types';
+import type { Task, CreateTaskRequest, UpdateTaskRequest, TaskFilterParams } from './types';
 
-export function getTasks(projectId: string): Promise<ApiResponse<Task[]>> {
+export function getTasks(projectId: string, filter?: TaskFilterParams): Promise<ApiResponse<Task[]>> {
+  const params: Record<string, string> = { projectId };
+  if (filter) {
+    if (filter.status) params.status = filter.status;
+    if (filter.priority) params.priority = filter.priority;
+    if (filter.assignedToUserId) params.assignedToUserId = filter.assignedToUserId;
+    if (filter.labelId) params.labelId = filter.labelId;
+    if (filter.dueBefore) params.dueBefore = filter.dueBefore;
+    if (filter.dueAfter) params.dueAfter = filter.dueAfter;
+    if (filter.search?.trim()) params.search = filter.search.trim();
+  }
   return apiClient
-    .get<ApiResponse<Task[]>>(API_PATHS.TASKS.BASE, { params: { projectId } })
+    .get<ApiResponse<Task[]>>(API_PATHS.TASKS.BASE, { params })
     .then((res) => res.data)
     .catch((err) => err.response?.data ?? { success: false, error: { message: err.message ?? 'Request failed' } });
 }

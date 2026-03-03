@@ -1,4 +1,5 @@
 using System.Data;
+using Bangkok.Application.Dto.Tasks;
 using Bangkok.Application.Interfaces;
 using Bangkok.Domain;
 using Bangkok.Infrastructure.Data;
@@ -30,19 +31,64 @@ public class TaskRepository : ITaskRepository
         }
     }
 
-    public async Task<IReadOnlyList<ProjectTask>> GetByProjectIdAsync(Guid projectId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<ProjectTask>> GetByProjectIdAsync(Guid projectId, TaskFilterRequest? filter, CancellationToken cancellationToken = default)
     {
         var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken).ConfigureAwait(false);
         using (connection)
         {
             connection.Open();
-            const string sql = @"
-                SELECT Id, ProjectId, Title, Description, Status, Priority, AssignedToUserId, DueDate, CreatedByUserId, CreatedAt, UpdatedAt
-                FROM dbo.Task
-                WHERE ProjectId = @ProjectId
-                ORDER BY CreatedAt DESC";
+            var conditions = new List<string> { "t.ProjectId = @ProjectId" };
+            var param = new DynamicParameters();
+            param.Add("ProjectId", projectId);
+
+            if (filter != null)
+            {
+                if (!string.IsNullOrWhiteSpace(filter.Status))
+                {
+                    conditions.Add("t.Status = @Status");
+                    param.Add("Status", filter.Status.Trim());
+                }
+                if (!string.IsNullOrWhiteSpace(filter.Priority))
+                {
+                    conditions.Add("t.Priority = @Priority");
+                    param.Add("Priority", filter.Priority.Trim());
+                }
+                if (filter.AssignedToUserId.HasValue && filter.AssignedToUserId.Value != Guid.Empty)
+                {
+                    conditions.Add("t.AssignedToUserId = @AssignedToUserId");
+                    param.Add("AssignedToUserId", filter.AssignedToUserId.Value);
+                }
+                if (filter.LabelId.HasValue && filter.LabelId.Value != Guid.Empty)
+                {
+                    conditions.Add("EXISTS (SELECT 1 FROM dbo.TaskLabel tl WHERE tl.TaskId = t.Id AND tl.LabelId = @LabelId)");
+                    param.Add("LabelId", filter.LabelId.Value);
+                }
+                if (filter.DueBefore.HasValue)
+                {
+                    conditions.Add("t.DueDate IS NOT NULL AND t.DueDate <= @DueBefore");
+                    param.Add("DueBefore", filter.DueBefore.Value);
+                }
+                if (filter.DueAfter.HasValue)
+                {
+                    conditions.Add("t.DueDate IS NOT NULL AND t.DueDate >= @DueAfter");
+                    param.Add("DueAfter", filter.DueAfter.Value);
+                }
+                if (!string.IsNullOrWhiteSpace(filter.Search))
+                {
+                    var searchTerm = "%" + filter.Search.Trim().Replace("%", "[%]").Replace("[", "[[]") + "%";
+                    conditions.Add("(t.Title LIKE @SearchTerm OR (t.Description IS NOT NULL AND t.Description LIKE @SearchTerm))");
+                    param.Add("SearchTerm", searchTerm);
+                }
+            }
+
+            var whereClause = string.Join(" AND ", conditions);
+            var sql = $@"
+                SELECT t.Id, t.ProjectId, t.Title, t.Description, t.Status, t.Priority, t.AssignedToUserId, t.DueDate, t.CreatedByUserId, t.CreatedAt, t.UpdatedAt
+                FROM dbo.Task t
+                WHERE {whereClause}
+                ORDER BY t.CreatedAt DESC";
             var items = await connection.QueryAsync<ProjectTask>(
-                new CommandDefinition(sql, new { ProjectId = projectId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+                new CommandDefinition(sql, param, cancellationToken: cancellationToken)).ConfigureAwait(false);
             return items.ToList();
         }
     }

@@ -7,20 +7,24 @@ namespace Bangkok.Infrastructure.Services;
 public class TaskActivityService : ITaskActivityService
 {
     private const string PermissionViewActivity = "Task.ViewActivity";
+    private const string AdminPermission = "ViewAdminSettings";
 
     private readonly ITaskActivityRepository _activityRepository;
     private readonly ITaskRepository _taskRepository;
+    private readonly IProjectMemberRepository _memberRepository;
     private readonly IUserRepository _userRepository;
     private readonly IUserPermissionChecker _permissionChecker;
 
     public TaskActivityService(
         ITaskActivityRepository activityRepository,
         ITaskRepository taskRepository,
+        IProjectMemberRepository memberRepository,
         IUserRepository userRepository,
         IUserPermissionChecker permissionChecker)
     {
         _activityRepository = activityRepository;
         _taskRepository = taskRepository;
+        _memberRepository = memberRepository;
         _userRepository = userRepository;
         _permissionChecker = permissionChecker;
     }
@@ -32,6 +36,9 @@ public class TaskActivityService : ITaskActivityService
 
         var task = await _taskRepository.GetByIdAsync(taskId, cancellationToken).ConfigureAwait(false);
         if (task == null)
+            return Array.Empty<TaskActivityResponse>();
+
+        if (!await CanAccessProjectAsync(task.ProjectId, currentUserId, cancellationToken).ConfigureAwait(false))
             return Array.Empty<TaskActivityResponse>();
 
         var activities = await _activityRepository.GetByTaskIdAsync(taskId, cancellationToken).ConfigureAwait(false);
@@ -54,5 +61,13 @@ public class TaskActivityService : ITaskActivityService
             NewValue = a.NewValue,
             CreatedAt = a.CreatedAt
         }).ToList();
+    }
+
+    private async Task<bool> CanAccessProjectAsync(Guid projectId, Guid userId, CancellationToken cancellationToken)
+    {
+        if (await _permissionChecker.HasPermissionAsync(userId, AdminPermission, cancellationToken).ConfigureAwait(false))
+            return true;
+        var m = await _memberRepository.GetByProjectAndUserAsync(projectId, userId, cancellationToken).ConfigureAwait(false);
+        return m != null;
     }
 }

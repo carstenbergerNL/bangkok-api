@@ -61,6 +61,23 @@ function DraggableTaskCardInner({ task, userMap, canDrag, onClick, onDelete, can
       <h4 className="font-medium text-sm truncate" style={{ color: 'var(--card-header-color, #323130)' }}>
         {task.title}
       </h4>
+      {task.labels && task.labels.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {task.labels.slice(0, 4).map((label) => (
+            <span
+              key={label.id}
+              className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium truncate max-w-[72px]"
+              style={{ backgroundColor: label.color, color: label.color === '#ffffff' || label.color === '#fff' ? '#333' : '#fff' }}
+              title={label.name}
+            >
+              {label.name}
+            </span>
+          ))}
+          {task.labels.length > 4 && (
+            <span className="text-[10px] text-gray-500 dark:text-slate-400">+{task.labels.length - 4}</span>
+          )}
+        </div>
+      )}
       <div className="mt-2 flex flex-wrap gap-1.5 items-center">
         <span className={'inline-flex px-2 py-0.5 rounded-lg text-xs font-medium ' + getPriorityClass(task.priority)}>
           {task.priority}

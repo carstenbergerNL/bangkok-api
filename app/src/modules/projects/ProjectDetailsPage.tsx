@@ -4,11 +4,15 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { PERMISSIONS } from '../../constants/permissions';
 import { getUsers } from '../../services/userService';
 import { getProject, updateProject, deleteProject } from './projectService';
+import { getMyProjectRole } from './memberService';
 import { addToast } from '../../utils/toast';
 import { Modal } from '../../components/Modal';
-import type { Project } from './types';
+import type { Project, ProjectMemberRole } from './types';
 import { ProjectFormModal } from './ProjectFormModal';
 import { TaskList } from './TaskList';
+import { ProjectMembersTab } from './ProjectMembersTab';
+import { ProjectDashboardTab } from './ProjectDashboardTab';
+import { ProjectLabelsSettings } from './ProjectLabelsSettings';
 
 function getStatusBadgeClass(status: string): string {
   const s = status?.toLowerCase();
@@ -28,6 +32,8 @@ export function ProjectDetailsPage() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [activeTab, setActiveTab] = useState<'board' | 'members' | 'dashboard' | 'settings'>('dashboard');
+  const [myRole, setMyRole] = useState<ProjectMemberRole | null>(null);
 
   const loadProject = useCallback(() => {
     if (!id) return;
@@ -62,10 +68,23 @@ export function ProjectDetailsPage() {
     });
   }, []);
 
+  const loadMyRole = useCallback(() => {
+    if (!id) return;
+    getMyProjectRole(id).then((res) => {
+      const data = res.data ?? (res as unknown as { data?: { role?: ProjectMemberRole } }).data;
+      const role = data?.role ?? null;
+      setMyRole(role ?? null);
+    });
+  }, [id]);
+
   useEffect(() => {
     loadProject();
     loadUsers();
   }, [loadProject, loadUsers]);
+
+  useEffect(() => {
+    if (project?.id) loadMyRole();
+  }, [project?.id, loadMyRole]);
 
   const handleEditSaved = useCallback(() => {
     loadProject();
@@ -94,6 +113,9 @@ export function ProjectDetailsPage() {
 
   const canEdit = hasPermission(PERMISSIONS.ProjectEdit);
   const canDelete = hasPermission(PERMISSIONS.ProjectDelete);
+  const isAdmin = hasPermission(PERMISSIONS.ViewAdminSettings);
+  const canManageMembers = myRole === 'Owner' || isAdmin;
+  const showMembersTab = myRole != null && myRole !== 'Viewer';
 
   if (notFound) {
     return (
@@ -159,7 +181,76 @@ export function ProjectDetailsPage() {
         </div>
       </div>
 
-      {project.id && <TaskList projectId={project.id} userMap={userMap} />}
+      <div className="rounded-xl shadow-sm border border-gray-100 dark:border-slate-700/50 overflow-hidden" style={{ backgroundColor: 'var(--card-bg, #ffffff)' }}>
+        <div className="flex border-b border-gray-100 dark:border-slate-700/50">
+          <button
+            type="button"
+            onClick={() => setActiveTab('dashboard')}
+            className={`px-5 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'dashboard'
+                ? 'border-b-2 text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
+                : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200'
+            }`}
+          >
+            Dashboard
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('board')}
+            className={`px-5 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'board'
+                ? 'border-b-2 text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
+                : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200'
+            }`}
+          >
+            Board
+          </button>
+          {showMembersTab && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('members')}
+              className={`px-5 py-3 text-sm font-medium transition-colors ${
+                activeTab === 'members'
+                  ? 'border-b-2 text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
+                  : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200'
+              }`}
+            >
+              Members
+            </button>
+          )}
+          {canEdit && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('settings')}
+              className={`px-5 py-3 text-sm font-medium transition-colors ${
+                activeTab === 'settings'
+                  ? 'border-b-2 text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
+                  : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200'
+              }`}
+            >
+              Settings
+            </button>
+          )}
+        </div>
+        <div className="p-4 md:p-6">
+          {activeTab === 'board' && project.id && (
+            <TaskList projectId={project.id} userMap={userMap} />
+          )}
+          {activeTab === 'members' && project.id && (
+            <ProjectMembersTab
+              projectId={project.id}
+              canManageMembers={canManageMembers}
+              onMembersChange={loadMyRole}
+            />
+          )}
+          {activeTab === 'dashboard' && project.id && (
+            <ProjectDashboardTab projectId={project.id} />
+          )}
+          {activeTab === 'settings' && project.id && (
+            <ProjectLabelsSettings projectId={project.id} />
+          )}
+        </div>
+      </div>
 
       <ProjectFormModal
         open={editModalOpen}

@@ -10,9 +10,11 @@ public class TaskCommentService : ITaskCommentService
     private const string PermissionComment = "Task.Comment";
     private const string PermissionView = "Task.View";
     private const string PermissionDelete = "Task.Delete";
+    private const string AdminPermission = "ViewAdminSettings";
 
     private readonly ITaskCommentRepository _commentRepository;
     private readonly ITaskRepository _taskRepository;
+    private readonly IProjectMemberRepository _memberRepository;
     private readonly IUserRepository _userRepository;
     private readonly IUserPermissionChecker _permissionChecker;
     private readonly ILogger<TaskCommentService> _logger;
@@ -20,12 +22,14 @@ public class TaskCommentService : ITaskCommentService
     public TaskCommentService(
         ITaskCommentRepository commentRepository,
         ITaskRepository taskRepository,
+        IProjectMemberRepository memberRepository,
         IUserRepository userRepository,
         IUserPermissionChecker permissionChecker,
         ILogger<TaskCommentService> logger)
     {
         _commentRepository = commentRepository;
         _taskRepository = taskRepository;
+        _memberRepository = memberRepository;
         _userRepository = userRepository;
         _permissionChecker = permissionChecker;
         _logger = logger;
@@ -38,6 +42,9 @@ public class TaskCommentService : ITaskCommentService
 
         var task = await _taskRepository.GetByIdAsync(taskId, cancellationToken).ConfigureAwait(false);
         if (task == null)
+            return Array.Empty<TaskCommentResponse>();
+
+        if (!await CanAccessProjectAsync(task.ProjectId, currentUserId, cancellationToken).ConfigureAwait(false))
             return Array.Empty<TaskCommentResponse>();
 
         var comments = await _commentRepository.GetByTaskIdAsync(taskId, cancellationToken).ConfigureAwait(false);
@@ -72,6 +79,9 @@ public class TaskCommentService : ITaskCommentService
         var task = await _taskRepository.GetByIdAsync(taskId, cancellationToken).ConfigureAwait(false);
         if (task == null)
             return (false, null, "Task not found.");
+
+        if (!await CanEditProjectAsync(task.ProjectId, currentUserId, cancellationToken).ConfigureAwait(false))
+            return (false, null, "You must be a project member (Member or Owner) to comment.");
 
         var content = request?.Content?.Trim();
         if (string.IsNullOrEmpty(content))
@@ -115,6 +125,9 @@ public class TaskCommentService : ITaskCommentService
         var comment = await _commentRepository.GetByIdAsync(commentId, cancellationToken).ConfigureAwait(false);
         if (comment == null)
             return (false, "Comment not found.");
+        var task = await _taskRepository.GetByIdAsync(comment.TaskId, cancellationToken).ConfigureAwait(false);
+        if (task != null && !await CanEditProjectAsync(task.ProjectId, currentUserId, cancellationToken).ConfigureAwait(false))
+            return (false, "You must be a project member to edit comments.");
         if (comment.UserId != currentUserId)
             return (false, "You can only edit your own comment.");
 
@@ -141,6 +154,9 @@ public class TaskCommentService : ITaskCommentService
         var comment = await _commentRepository.GetByIdAsync(commentId, cancellationToken).ConfigureAwait(false);
         if (comment == null)
             return (false, "Comment not found.");
+        var task = await _taskRepository.GetByIdAsync(comment.TaskId, cancellationToken).ConfigureAwait(false);
+        if (task != null && !await CanAccessProjectAsync(task.ProjectId, currentUserId, cancellationToken).ConfigureAwait(false))
+            return (false, "You do not have access to this project.");
 
         var canDeleteAny = await _permissionChecker.HasPermissionAsync(currentUserId, PermissionDelete, cancellationToken).ConfigureAwait(false);
         if (comment.UserId != currentUserId && !canDeleteAny)
@@ -149,5 +165,21 @@ public class TaskCommentService : ITaskCommentService
         await _commentRepository.DeleteAsync(commentId, cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Comment deleted. CommentId: {CommentId}, DeletedByUserId: {UserId}", commentId, currentUserId);
         return (true, null);
+    }
+
+    private async Task<bool> CanAccessProjectAsync(Guid projectId, Guid userId, CancellationToken cancellationToken)
+    {
+        if (await _permissionChecker.HasPermissionAsync(userId, AdminPermission, cancellationToken).ConfigureAwait(false))
+            return true;
+        var m = await _memberRepository.GetByProjectAndUserAsync(projectId, userId, cancellationToken).ConfigureAwait(false);
+        return m != null;
+    }
+
+    private async Task<bool> CanEditProjectAsync(Guid projectId, Guid userId, CancellationToken cancellationToken)
+    {
+        if (await _permissionChecker.HasPermissionAsync(userId, AdminPermission, cancellationToken).ConfigureAwait(false))
+            return true;
+        var m = await _memberRepository.GetByProjectAndUserAsync(projectId, userId, cancellationToken).ConfigureAwait(false);
+        return m != null && (m.Role == "Member" || m.Role == "Owner");
     }
 }

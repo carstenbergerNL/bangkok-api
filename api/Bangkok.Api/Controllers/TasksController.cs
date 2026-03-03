@@ -31,12 +31,21 @@ public class TasksController : ControllerBase
     }
 
     [HttpGet]
-    [SwaggerOperation(Summary = "List tasks by project", Description = "Returns tasks for the given projectId. Query: projectId (required). Requires Task.View. 403 if permission missing.")]
+    [SwaggerOperation(Summary = "List tasks by project", Description = "Returns tasks for the given projectId with optional filters. Query: projectId (required); status, priority, assignedToUserId, labelId, dueBefore, dueAfter, search. Requires Task.View. 403 if permission missing.")]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<TaskResponse>>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    public async Task<ActionResult<ApiResponse<IReadOnlyList<TaskResponse>>>> GetByProjectId([FromQuery] Guid projectId, CancellationToken cancellationToken)
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<TaskResponse>>>> GetByProjectId(
+        [FromQuery] Guid projectId,
+        [FromQuery] string? status,
+        [FromQuery] string? priority,
+        [FromQuery] Guid? assignedToUserId,
+        [FromQuery] Guid? labelId,
+        [FromQuery] DateTime? dueBefore,
+        [FromQuery] DateTime? dueAfter,
+        [FromQuery] string? search,
+        CancellationToken cancellationToken)
     {
         var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
         var currentUserId = GetCurrentUserId();
@@ -46,7 +55,23 @@ public class TasksController : ControllerBase
         if (projectId == Guid.Empty)
             return BadRequest(ApiResponse<IReadOnlyList<TaskResponse>>.Fail(new ErrorResponse { Code = "VALIDATION", Message = "projectId query parameter is required." }, correlationId));
 
-        var list = await _taskService.GetByProjectIdAsync(projectId, currentUserId.Value, cancellationToken).ConfigureAwait(false);
+        TaskFilterRequest? filter = null;
+        if (!string.IsNullOrWhiteSpace(status) || !string.IsNullOrWhiteSpace(priority) || (assignedToUserId.HasValue && assignedToUserId.Value != Guid.Empty) ||
+            (labelId.HasValue && labelId.Value != Guid.Empty) || dueBefore.HasValue || dueAfter.HasValue || !string.IsNullOrWhiteSpace(search))
+        {
+            filter = new TaskFilterRequest
+            {
+                Status = string.IsNullOrWhiteSpace(status) ? null : status,
+                Priority = string.IsNullOrWhiteSpace(priority) ? null : priority,
+                AssignedToUserId = assignedToUserId.HasValue && assignedToUserId.Value != Guid.Empty ? assignedToUserId : null,
+                LabelId = labelId.HasValue && labelId.Value != Guid.Empty ? labelId : null,
+                DueBefore = dueBefore,
+                DueAfter = dueAfter,
+                Search = string.IsNullOrWhiteSpace(search) ? null : search.Trim()
+            };
+        }
+
+        var list = await _taskService.GetByProjectIdAsync(projectId, currentUserId.Value, filter, cancellationToken).ConfigureAwait(false);
         return Ok(ApiResponse<IReadOnlyList<TaskResponse>>.Ok(list, correlationId));
     }
 

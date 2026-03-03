@@ -11,14 +11,17 @@ public class ProjectService : IProjectService
     private const string PermissionCreate = "Project.Create";
     private const string PermissionEdit = "Project.Edit";
     private const string PermissionDelete = "Project.Delete";
+    private const string AdminPermission = "ViewAdminSettings";
 
     private readonly IProjectRepository _projectRepository;
+    private readonly IProjectMemberRepository _memberRepository;
     private readonly IUserPermissionChecker _permissionChecker;
     private readonly ILogger<ProjectService> _logger;
 
-    public ProjectService(IProjectRepository projectRepository, IUserPermissionChecker permissionChecker, ILogger<ProjectService> logger)
+    public ProjectService(IProjectRepository projectRepository, IProjectMemberRepository memberRepository, IUserPermissionChecker permissionChecker, ILogger<ProjectService> logger)
     {
         _projectRepository = projectRepository;
+        _memberRepository = memberRepository;
         _permissionChecker = permissionChecker;
         _logger = logger;
     }
@@ -34,6 +37,18 @@ public class ProjectService : IProjectService
         var project = await _projectRepository.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
         if (project == null)
             return (GetProjectResult.NotFound, null);
+
+        var isAdmin = await _permissionChecker.HasPermissionAsync(currentUserId, AdminPermission, cancellationToken).ConfigureAwait(false);
+        if (!isAdmin)
+        {
+            var membership = await _memberRepository.GetByProjectAndUserAsync(id, currentUserId, cancellationToken).ConfigureAwait(false);
+            if (membership == null)
+            {
+                _logger.LogWarning("User {UserId} attempted to get project {ProjectId} without membership.", currentUserId, id);
+                return (GetProjectResult.Forbidden, null);
+            }
+        }
+
         return (GetProjectResult.Ok, MapToResponse(project));
     }
 
@@ -45,8 +60,14 @@ public class ProjectService : IProjectService
             return Array.Empty<ProjectResponse>();
         }
 
-        var projects = await _projectRepository.GetAllAsync(cancellationToken).ConfigureAwait(false);
-        return projects.Select(MapToResponse).ToList();
+        var allProjects = await _projectRepository.GetAllAsync(cancellationToken).ConfigureAwait(false);
+        var isAdmin = await _permissionChecker.HasPermissionAsync(currentUserId, AdminPermission, cancellationToken).ConfigureAwait(false);
+        if (isAdmin)
+            return allProjects.Select(MapToResponse).ToList();
+
+        var memberProjectIds = await _memberRepository.GetProjectIdsByUserIdAsync(currentUserId, cancellationToken).ConfigureAwait(false);
+        var allowed = new HashSet<Guid>(memberProjectIds);
+        return allProjects.Where(p => allowed.Contains(p.Id)).Select(MapToResponse).ToList();
     }
 
     public async Task<(CreateProjectResult Result, ProjectResponse? Data, string? ErrorMessage)> CreateAsync(CreateProjectRequest request, Guid currentUserId, CancellationToken cancellationToken = default)
@@ -71,6 +92,17 @@ public class ProjectService : IProjectService
         };
 
         await _projectRepository.CreateAsync(project, cancellationToken).ConfigureAwait(false);
+
+        var ownerMember = new ProjectMember
+        {
+            Id = Guid.NewGuid(),
+            ProjectId = project.Id,
+            UserId = currentUserId,
+            Role = "Owner",
+            CreatedAt = DateTime.UtcNow
+        };
+        await _memberRepository.AddAsync(ownerMember, cancellationToken).ConfigureAwait(false);
+
         _logger.LogInformation("Project created. ProjectId: {ProjectId}, Name: {Name}, CreatedByUserId: {CreatedByUserId}", project.Id, project.Name, currentUserId);
 
         return (CreateProjectResult.Success, MapToResponse(project), null);
@@ -87,6 +119,17 @@ public class ProjectService : IProjectService
         var project = await _projectRepository.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
         if (project == null)
             return (UpdateProjectResult.NotFound, null);
+
+        var isAdmin = await _permissionChecker.HasPermissionAsync(currentUserId, AdminPermission, cancellationToken).ConfigureAwait(false);
+        if (!isAdmin)
+        {
+            var membership = await _memberRepository.GetByProjectAndUserAsync(id, currentUserId, cancellationToken).ConfigureAwait(false);
+            if (membership == null || membership.Role != "Owner")
+            {
+                _logger.LogWarning("User {UserId} attempted to update project {ProjectId} without owner role.", currentUserId, id);
+                return (UpdateProjectResult.Forbidden, "Only project owners or admins can edit the project.");
+            }
+        }
 
         if (request.Name != null)
             project.Name = request.Name.Trim();
@@ -114,10 +157,22 @@ public class ProjectService : IProjectService
         if (project == null)
             return DeleteProjectResult.NotFound;
 
+        var isAdmin = await _permissionChecker.HasPermissionAsync(currentUserId, AdminPermission, cancellationToken).ConfigureAwait(false);
+        if (!isAdmin)
+        {
+            var membership = await _memberRepository.GetByProjectAndUserAsync(id, currentUserId, cancellationToken).ConfigureAwait(false);
+            if (membership == null || membership.Role != "Owner")
+            {
+                _logger.LogWarning("User {UserId} attempted to delete project {ProjectId} without owner role.", currentUserId, id);
+                return DeleteProjectResult.Forbidden;
+            }
+        }
+
         var taskCount = await _projectRepository.GetTaskCountByProjectIdAsync(id, cancellationToken).ConfigureAwait(false);
         if (taskCount > 0)
             return DeleteProjectResult.HasTasks;
 
+        await _memberRepository.DeleteByProjectIdAsync(id, cancellationToken).ConfigureAwait(false);
         await _projectRepository.DeleteAsync(id, cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Project deleted. ProjectId: {ProjectId}, DeletedByUserId: {UserId}", id, currentUserId);
 

@@ -1,3 +1,5 @@
+using Bangkok.Application.Dto.Projects;
+
 namespace Bangkok.Application.Dto.Tasks;
 
 public class TaskResponse
@@ -13,4 +15,5 @@ public class TaskResponse
     public Guid CreatedByUserId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
+    public IReadOnlyList<LabelResponse> Labels { get; set; } = Array.Empty<LabelResponse>();
 }

@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { FormSidebar } from '../../components/FormSidebar';
 import { addToast } from '../../utils/toast';
 import { getUsers } from '../../services/userService';
+import { getLabels } from './labelService';
 import type { User } from '../../models/User';
 import { TASK_STATUSES, TASK_PRIORITIES } from './types';
-import type { Task, CreateTaskRequest, UpdateTaskRequest } from './types';
+import type { Task, CreateTaskRequest, UpdateTaskRequest, Label } from './types';
 
 interface TaskFormModalProps {
   open: boolean;
@@ -25,6 +26,8 @@ export function TaskFormModal(props: TaskFormModalProps) {
   const [priority, setPriority] = useState('Medium');
   const [assignedToUserId, setAssignedToUserId] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
+  const [projectLabels, setProjectLabels] = useState<Label[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [saving, setSaving] = useState(false);
   const isEdit = !!task;
@@ -40,14 +43,19 @@ export function TaskFormModal(props: TaskFormModalProps) {
   useEffect(() => {
     if (open) {
       loadUsers();
+      getLabels(projectId).then((res) => {
+        const data = res.data ?? (res as unknown as { Data?: Label[] }).Data;
+        setProjectLabels(Array.isArray(data) ? data : []);
+      });
       setTitle(task?.title ?? '');
       setDescription(task?.description ?? '');
       setStatus(task?.status ?? 'ToDo');
       setPriority(task?.priority ?? 'Medium');
       setAssignedToUserId(task?.assignedToUserId ?? '');
       setDueDate(task?.dueDate ? task.dueDate.slice(0, 10) : '');
+      setSelectedLabelIds(task?.labels?.map((l) => l.id) ?? []);
     }
-  }, [open, task, loadUsers]);
+  }, [open, task, projectId, loadUsers]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,6 +71,7 @@ export function TaskFormModal(props: TaskFormModalProps) {
             priority,
             assignedToUserId: canAssign && assignedToUserId ? assignedToUserId : undefined,
             dueDate: dueDate || null,
+            labelIds: selectedLabelIds.length > 0 ? selectedLabelIds : undefined,
           })
         : await create({
             projectId,
@@ -72,6 +81,7 @@ export function TaskFormModal(props: TaskFormModalProps) {
             priority,
             assignedToUserId: canAssign && assignedToUserId ? assignedToUserId : null,
             dueDate: dueDate || null,
+            labelIds: selectedLabelIds.length > 0 ? selectedLabelIds : undefined,
           });
       if (res.success) {
         addToast('success', isEdit ? 'Task updated.' : 'Task created.');
@@ -83,6 +93,12 @@ export function TaskFormModal(props: TaskFormModalProps) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleLabelToggle = (labelId: string) => {
+    setSelectedLabelIds((prev) =>
+      prev.includes(labelId) ? prev.filter((id) => id !== labelId) : [...prev, labelId]
+    );
   };
 
   return (
@@ -178,6 +194,33 @@ export function TaskFormModal(props: TaskFormModalProps) {
             className="w-full px-3 py-2 rounded-lg border bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
+        {projectLabels.length > 0 && (
+          <div>
+            <span className="block text-sm font-medium mb-2" style={{ color: 'var(--card-header-color, #323130)' }}>
+              Labels
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {projectLabels.map((label) => {
+                const isSelected = selectedLabelIds.includes(label.id);
+                return (
+                  <label
+                    key={label.id}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-gray-200 dark:border-slate-600 cursor-pointer hover:opacity-90 transition-colors"
+                    style={{ backgroundColor: isSelected ? label.color : 'var(--dropdown-bg, #ffffff)', color: isSelected ? (label.color === '#ffffff' || label.color === '#fff' ? '#333' : '#fff') : undefined }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => handleLabelToggle(label.id)}
+                      className="sr-only"
+                    />
+                    {label.name}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
             Cancel

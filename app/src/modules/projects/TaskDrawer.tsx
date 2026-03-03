@@ -4,9 +4,10 @@ import { getUsers } from '../../services/userService';
 import { getCurrentUserId } from '../../services/authService';
 import { getCommentsByTaskId, createComment, updateComment, deleteComment } from './commentService';
 import { getActivitiesByTaskId } from './activityService';
+import { getLabels } from './labelService';
 import type { User } from '../../models/User';
 import { TASK_STATUSES, TASK_PRIORITIES } from './types';
-import type { Task, UpdateTaskRequest, TaskComment, TaskActivity } from './types';
+import type { Task, UpdateTaskRequest, TaskComment, TaskActivity, Label } from './types';
 
 function formatRelativeTime(iso: string): string {
   const d = new Date(iso);
@@ -53,6 +54,8 @@ export function TaskDrawer({
   const [priority, setPriority] = useState('Medium');
   const [assignedToUserId, setAssignedToUserId] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
+  const [projectLabels, setProjectLabels] = useState<Label[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -97,15 +100,24 @@ export function TaskDrawer({
       .finally(() => setActivitiesLoading(false));
   }, [canViewActivity]);
 
+  const loadProjectLabels = useCallback((projectId: string) => {
+    getLabels(projectId).then((res) => {
+      const data = res.data ?? (res as unknown as { Data?: Label[] }).Data;
+      setProjectLabels(Array.isArray(data) ? data : []);
+    });
+  }, []);
+
   useEffect(() => {
     if (open && task) {
       loadUsers();
+      loadProjectLabels(task.projectId);
       setTitle(task.title ?? '');
       setDescription(task.description ?? '');
       setStatus(task.status ?? 'ToDo');
       setPriority(task.priority ?? 'Medium');
       setAssignedToUserId(task.assignedToUserId ?? '');
       setDueDate(task.dueDate ? task.dueDate.slice(0, 10) : '');
+      setSelectedLabelIds(task.labels?.map((l) => l.id) ?? []);
       setActiveTab('details');
       setNewCommentText('');
       setEditingCommentId(null);
@@ -135,6 +147,7 @@ export function TaskDrawer({
         priority,
         assignedToUserId: assignedToUserId || null,
         dueDate: dueDate || null,
+        labelIds: selectedLabelIds,
       });
       if (res.success) {
         addToast('success', 'Task updated.');
@@ -345,6 +358,43 @@ export function TaskDrawer({
                   ))}
                 </select>
               </div>
+              {projectLabels.length > 0 && (
+                <div>
+                  <span className="block text-sm font-medium mb-2" style={{ color: headerColor }}>
+                    Labels
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {projectLabels.map((label) => {
+                      const isSelected = selectedLabelIds.includes(label.id);
+                      return (
+                        <label
+                          key={label.id}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border cursor-pointer transition-colors ${
+                            canEdit ? 'hover:opacity-90' : ''
+                          } ${isSelected ? 'ring-2 ring-offset-1 ring-blue-500' : 'border-gray-200 dark:border-slate-600'}`}
+                          style={{ backgroundColor: isSelected ? label.color : 'var(--dropdown-bg, #ffffff)', color: isSelected ? (label.color === '#ffffff' || label.color === '#fff' ? '#333' : '#fff') : undefined }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              if (!canEdit) return;
+                              setSelectedLabelIds((prev) =>
+                                e.target.checked ? [...prev, label.id] : prev.filter((id) => id !== label.id)
+                              );
+                            }}
+                            disabled={!canEdit}
+                            className="sr-only"
+                          />
+                          <span style={isSelected && (label.color === '#ffffff' || label.color === '#fff') ? { color: '#333' } : undefined}>
+                            {label.name}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               <div>
                 <label htmlFor="drawer-due" className="block text-sm font-medium mb-1" style={{ color: headerColor }}>
                   Due date

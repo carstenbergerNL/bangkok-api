@@ -24,4 +24,5 @@ public class CreateTaskRequest
 
     public Guid? AssignedToUserId { get; set; }
     public DateTime? DueDate { get; set; }
+    public IReadOnlyList<Guid>? LabelIds { get; set; }
 }

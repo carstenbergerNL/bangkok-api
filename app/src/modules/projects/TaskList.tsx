@@ -1,13 +1,16 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { usePermissions } from '../../hooks/usePermissions';
 import { PERMISSIONS } from '../../constants/permissions';
 import { getTasks, deleteTask, createTask, updateTask } from './taskService';
+import { getLabels } from './labelService';
 import { addToast } from '../../utils/toast';
 import { Modal } from '../../components/Modal';
-import type { Task } from './types';
+import type { Task, TaskFilterParams, Label } from './types';
 import { KanbanBoard } from './KanbanBoard';
 import { TaskDrawer } from './TaskDrawer';
 import { TaskFormModal } from './TaskFormModal';
+import { TaskFilterBar } from './TaskFilterBar';
 
 const COLUMN_LABELS: Record<string, string> = {
   ToDo: 'Todo',
@@ -22,17 +25,30 @@ interface TaskListProps {
 
 export function TaskList({ projectId, userMap }: TaskListProps) {
   const { hasPermission } = usePermissions();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [labels, setLabels] = useState<Label[]>([]);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Task | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const filter = useMemo<TaskFilterParams>(() => ({
+    ...(searchParams.get('status') && { status: searchParams.get('status')! }),
+    ...(searchParams.get('priority') && { priority: searchParams.get('priority')! }),
+    ...(searchParams.get('assignedToUserId') && { assignedToUserId: searchParams.get('assignedToUserId')! }),
+    ...(searchParams.get('labelId') && { labelId: searchParams.get('labelId')! }),
+    ...(searchParams.get('dueBefore') && { dueBefore: searchParams.get('dueBefore')! }),
+    ...(searchParams.get('dueAfter') && { dueAfter: searchParams.get('dueAfter')! }),
+    ...(searchParams.get('search') && { search: searchParams.get('search')! }),
+  }), [searchParams]);
+
   const loadTasks = useCallback(() => {
     setLoading(true);
-    getTasks(projectId)
+    const hasFilter = Object.keys(filter).length > 0;
+    getTasks(projectId, hasFilter ? filter : undefined)
       .then((res) => {
         const data = res.data ?? (res as unknown as { Data?: Task[] }).Data;
         if (res.success && Array.isArray(data)) {
@@ -40,11 +56,40 @@ export function TaskList({ projectId, userMap }: TaskListProps) {
         }
       })
       .finally(() => setLoading(false));
+  }, [projectId, filter]);
+
+  useEffect(() => {
+    getLabels(projectId).then((res) => {
+      const data = res.data ?? (res as unknown as { Data?: Label[] }).Data;
+      setLabels(Array.isArray(data) ? data : []);
+    });
   }, [projectId]);
 
   useEffect(() => {
     loadTasks();
   }, [loadTasks]);
+
+  const handleFilterChange = useCallback((newFilter: TaskFilterParams) => {
+    const next = new URLSearchParams();
+    if (newFilter.status) next.set('status', newFilter.status);
+    if (newFilter.priority) next.set('priority', newFilter.priority);
+    if (newFilter.assignedToUserId) next.set('assignedToUserId', newFilter.assignedToUserId);
+    if (newFilter.labelId) next.set('labelId', newFilter.labelId);
+    if (newFilter.dueBefore) next.set('dueBefore', newFilter.dueBefore);
+    if (newFilter.dueAfter) next.set('dueAfter', newFilter.dueAfter);
+    if (newFilter.search?.trim()) next.set('search', newFilter.search.trim());
+    setSearchParams(next, { replace: true });
+  }, [setSearchParams]);
+
+  const handleClearFilters = useCallback(() => {
+    setSearchParams({}, { replace: true });
+  }, [setSearchParams]);
+
+  const usersForFilter = useMemo(() => {
+    const list: { id: string; displayName: string }[] = [];
+    userMap.forEach((displayName, id) => list.push({ id, displayName }));
+    return list;
+  }, [userMap]);
 
   const handleAddTask = () => {
     setAddModalOpen(true);
@@ -155,6 +200,14 @@ export function TaskList({ projectId, userMap }: TaskListProps) {
               </button>
             )}
           </div>
+
+          <TaskFilterBar
+            filter={filter}
+            onChange={handleFilterChange}
+            onClear={handleClearFilters}
+            users={usersForFilter}
+            labels={labels}
+          />
 
           <KanbanBoard
             tasks={tasks}

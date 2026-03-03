@@ -38,6 +38,12 @@ export const API_PATHS = {
   PROJECTS: {
     BASE: '/api/Projects',
     BY_ID: (id: string) => `/api/Projects/${id}`,
+    MEMBERS: (projectId: string) => `/api/Projects/${projectId}/members`,
+    MEMBERS_ME: (projectId: string) => `/api/Projects/${projectId}/members/me`,
+    MEMBER_BY_ID: (projectId: string, memberId: string) => `/api/Projects/${projectId}/members/${memberId}`,
+    LABELS: (projectId: string) => `/api/Projects/${projectId}/labels`,
+    LABEL_BY_ID: (projectId: string, labelId: string) => `/api/Projects/${projectId}/labels/${labelId}`,
+    DASHBOARD: (projectId: string) => `/api/Projects/${projectId}/dashboard`,
   },
   TASKS: {
     BASE: '/api/Tasks',
