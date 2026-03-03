@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Modal } from '../../components/Modal';
+import { FormSidebar } from '../../components/FormSidebar';
 import { addToast } from '../../utils/toast';
 import { getUsers } from '../../services/userService';
 import type { User } from '../../models/User';
@@ -86,7 +86,7 @@ export function TaskFormModal(props: TaskFormModalProps) {
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={isEdit ? 'Edit task' : 'Add task'}>
+    <FormSidebar open={open} onClose={onClose} title={isEdit ? 'Edit task' : 'Add task'} width="wide">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="task-title" className="block text-sm font-medium mb-1" style={{ color: 'var(--card-header-color, #323130)' }}>
@@ -187,6 +187,6 @@ export function TaskFormModal(props: TaskFormModalProps) {
           </button>
         </div>
       </form>
-    </Modal>
+    </FormSidebar>
   );
 }

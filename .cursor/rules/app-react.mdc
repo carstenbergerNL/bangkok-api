@@ -15,7 +15,7 @@ globs: app/**/*.ts,app/**/*.tsx
 - **models/** – Types and DTOs matching API (e.g. `User`, `ApiResponse<T>`, `LoginRequest`, `PagedResult<T>`). Use for request/response shapes.
 - **services/** – `authService` (login, logout, getStoredUser, setAuthFromLoginResponse), `userService` (getUsers, getUserById, createUser, updateUser, deleteUser, restoreUser). Call API here; return promises with `ApiResponse<T>`-like shape.
 - **context/** – `AuthContext`: user, token, isAuthenticated, login, logout, setUser. Use `useAuth()` in components that need current user or role.
-- **components/** – Reusable UI: `PrivateRoute`, `AdminRoute`, `Modal`, `Toast`. Route guards use `useAuth()` and redirect as needed.
+- **components/** – Reusable UI: `PrivateRoute`, `AdminRoute`, `Modal`, `FormSidebar`, `Toast`. Route guards use `useAuth()` and redirect as needed.
 - **layouts/** – `MainLayout`, `Sidebar`, `Topbar`. Sidebar nav items; admin-only items when `user?.role` is Admin (case-insensitive).
 - **pages/** – One component per route. Admin-only logic (e.g. user CRUD, restore) lives under Admin Settings; use `AdminRoute` for `/admin-settings`.
 
@@ -28,9 +28,17 @@ globs: app/**/*.ts,app/**/*.tsx
 - **Routing**: Protected routes wrapped in `PrivateRoute`; admin-only in `AdminRoute`. No route logic inside pages beyond what’s needed for the page.
 - **State**: Prefer local state (`useState`) and `useCallback` for loaders (e.g. `loadUsers`). No global store unless the app grows.
 
+## Forms and insert/edit UI (default)
+
+- **Use sidebars for all insert and edit flows**, not center modals or popups.
+- Use **`FormSidebar`** (from `components/FormSidebar`) for: create forms, edit forms, assign/configure panels, and any multi-field “drawer” that edits or creates data. It’s a fixed right-hand panel: same height as the left nav (`top-12`, `h-[calc(100vh-3rem)]`), same styling (`--sidebar-bg`, `--sidebar-border`).
+- **`FormSidebar` props**: `open`, `onClose`, `title`, `children`. Optional `width="wide"` (w-96) for forms with many fields; default is w-64.
+- Reserve **`Modal`** only for short confirmations (e.g. delete confirmation, enable/disable confirm) where the content is a short message and one or two actions.
+- When adding new create/edit/assign UI in the portal, implement it in a right-hand sidebar using `FormSidebar` unless it’s a simple yes/no confirmation.
+
 ## When adding or changing
 
 - New API call → add or update function in the right **service**; use types from **models**.
 - New page or admin feature → add route in **App.tsx**; use **AdminRoute** if admin-only; add nav item in **Sidebar** (and gate by role if admin-only).
-- New reusable UI (modal, form, list) → **components/** or inline in page if single use.
+- New reusable UI (form, list) → **components/** or inline in page if single use. For insert/edit forms use **FormSidebar** (see “Forms and insert/edit UI” above). Use **Modal** only for short confirmations (e.g. delete).
 - **Always update app/README.md** when you add or change: pages, features, routes, env vars, scripts, setup steps, or API usage. Keep it in sync in the same change as the code (see rule *readme-sync*).

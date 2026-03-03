@@ -17,6 +17,7 @@ import type { Role } from '../../models/Role';
 import type { Permission } from '../../models/Permission';
 import type { User } from '../../models/User';
 import { Modal } from '../../components/Modal';
+import { FormSidebar } from '../../components/FormSidebar';
 import { TableSkeleton } from '../../components/TableSkeleton';
 
 type RoleModal = 'create' | 'edit' | 'delete' | null;
@@ -175,7 +176,7 @@ function CreateRoleModal({ onClose, onSuccess }: { onClose: () => void; onSucces
   };
 
   return (
-    <Modal open={true} title="Create Role" onClose={onClose}>
+    <FormSidebar open title="Create Role" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         {formError && <div className="alert-error">{formError}</div>}
         <div className="form-group">
@@ -191,7 +192,7 @@ function CreateRoleModal({ onClose, onSuccess }: { onClose: () => void; onSucces
           <button type="submit" disabled={submitting} className="btn-primary">{submitting ? 'Creating…' : 'Create'}</button>
         </div>
       </form>
-    </Modal>
+    </FormSidebar>
   );
 }
 
@@ -254,7 +255,7 @@ function EditRoleModal({ role, onClose, onSuccess }: { role: Role; onClose: () =
   };
 
   return (
-    <Modal open={true} title="Edit Role" onClose={onClose}>
+    <FormSidebar open title="Edit Role" onClose={onClose} width="wide">
       <form onSubmit={handleSubmit} className="space-y-4">
         {formError && <div className="alert-error">{formError}</div>}
         <div className="form-group">
@@ -295,7 +296,7 @@ function EditRoleModal({ role, onClose, onSuccess }: { role: Role; onClose: () =
           <button type="submit" disabled={submitting || loadingPerms} className="btn-primary">{submitting ? 'Saving…' : 'Save'}</button>
         </div>
       </form>
-    </Modal>
+    </FormSidebar>
   );
 }
 

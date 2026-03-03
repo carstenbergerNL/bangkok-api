@@ -5,6 +5,7 @@ import { addToast } from '../../utils/toast';
 import type { Permission } from '../../models/Permission';
 import type { Role } from '../../models/Role';
 import { Modal } from '../../components/Modal';
+import { FormSidebar } from '../../components/FormSidebar';
 import { TableSkeleton } from '../../components/TableSkeleton';
 
 export function PermissionsSection() {
@@ -180,7 +181,7 @@ function CreatePermissionModal({ onClose, onSuccess }: { onClose: () => void; on
   };
 
   return (
-    <Modal open={true} title="Add Permission" onClose={onClose}>
+    <FormSidebar open title="Add Permission" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         {formError && <div className="alert-error">{formError}</div>}
         <div className="form-group">
@@ -196,7 +197,7 @@ function CreatePermissionModal({ onClose, onSuccess }: { onClose: () => void; on
           <button type="submit" disabled={submitting} className="btn-primary">{submitting ? 'Creating…' : 'Create'}</button>
         </div>
       </form>
-    </Modal>
+    </FormSidebar>
   );
 }
 
@@ -221,7 +222,7 @@ function EditPermissionModal({ permission, onClose, onSuccess }: { permission: P
   };
 
   return (
-    <Modal open={true} title="Edit Permission" onClose={onClose}>
+    <FormSidebar open title="Edit Permission" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         {formError && <div className="alert-error">{formError}</div>}
         <div className="form-group">
@@ -237,7 +238,7 @@ function EditPermissionModal({ permission, onClose, onSuccess }: { permission: P
           <button type="submit" disabled={submitting} className="btn-primary">{submitting ? 'Saving…' : 'Save'}</button>
         </div>
       </form>
-    </Modal>
+    </FormSidebar>
   );
 }
 

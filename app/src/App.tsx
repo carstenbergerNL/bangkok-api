@@ -14,6 +14,7 @@ import { ProjectListPage } from './modules/projects/ProjectListPage';
 import { ProjectDetailsPage } from './modules/projects/ProjectDetailsPage';
 import { PERMISSIONS } from './constants/permissions';
 import { initAuthUnauthorizedHandler } from './services/authService';
+import { RouteErrorBoundary } from './components/RouteErrorBoundary';
 
 function LoginOrRedirect() {
   const { isAuthenticated } = useAuth();
@@ -46,7 +47,7 @@ function AppRoutes() {
         <Route path="profile" element={<Profile />} />
         <Route path="admin-settings" element={<AdminRoute><AdminSettings /></AdminRoute>} />
         <Route path="projects" element={<PermissionRoute permission={PERMISSIONS.ProjectView}><ProjectListPage /></PermissionRoute>} />
-        <Route path="projects/:id" element={<PermissionRoute permission={PERMISSIONS.ProjectView}><ProjectDetailsPage /></PermissionRoute>} />
+        <Route path="projects/:id" element={<PermissionRoute permission={PERMISSIONS.ProjectView}><RouteErrorBoundary><ProjectDetailsPage /></RouteErrorBoundary></PermissionRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

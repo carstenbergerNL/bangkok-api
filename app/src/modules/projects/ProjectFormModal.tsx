@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Modal } from '../../components/Modal';
+import { FormSidebar } from '../../components/FormSidebar';
 import { addToast } from '../../utils/toast';
 import { PROJECT_STATUSES } from './types';
 import type { Project, CreateProjectRequest, UpdateProjectRequest } from './types';
@@ -51,7 +51,7 @@ export function ProjectFormModal({ open, onClose, onSaved, project, save, create
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={isEdit ? 'Edit project' : 'Create project'}>
+    <FormSidebar open={open} onClose={onClose} title={isEdit ? 'Edit project' : 'Create project'}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="project-name" className="block text-sm font-medium mb-1" style={{ color: 'var(--card-header-color, #323130)' }}>
@@ -105,6 +105,6 @@ export function ProjectFormModal({ open, onClose, onSaved, project, save, create
           </button>
         </div>
       </form>
-    </Modal>
+    </FormSidebar>
   );
 }

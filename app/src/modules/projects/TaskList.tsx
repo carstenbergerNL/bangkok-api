@@ -5,29 +5,15 @@ import { getTasks, deleteTask, createTask, updateTask } from './taskService';
 import { addToast } from '../../utils/toast';
 import { Modal } from '../../components/Modal';
 import type { Task } from './types';
+import { KanbanBoard } from './KanbanBoard';
+import { TaskDrawer } from './TaskDrawer';
 import { TaskFormModal } from './TaskFormModal';
 
-const SECTIONS: { key: string; label: string }[] = [
-  { key: 'ToDo', label: 'Todo' },
-  { key: 'InProgress', label: 'In Progress' },
-  { key: 'Done', label: 'Done' },
-];
-
-function getPriorityClass(priority: string): string {
-  const p = priority?.toLowerCase();
-  if (p === 'high') return 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300';
-  if (p === 'medium') return 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300';
-  return 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300';
-}
-
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  try {
-    return new Date(iso).toLocaleDateString(undefined, { dateStyle: 'medium' });
-  } catch {
-    return iso;
-  }
-}
+const COLUMN_LABELS: Record<string, string> = {
+  ToDo: 'Todo',
+  InProgress: 'In Progress',
+  Done: 'Done',
+};
 
 interface TaskListProps {
   projectId: string;
@@ -38,8 +24,9 @@ export function TaskList({ projectId, userMap }: TaskListProps) {
   const { hasPermission } = usePermissions();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Task | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -60,26 +47,46 @@ export function TaskList({ projectId, userMap }: TaskListProps) {
   }, [loadTasks]);
 
   const handleAddTask = () => {
-    setEditingTask(null);
-    setModalOpen(true);
+    setAddModalOpen(true);
   };
 
-  const handleEditTask = (t: Task) => {
-    setEditingTask(t);
-    setModalOpen(true);
-  };
+  const handleTaskClick = useCallback((task: Task) => {
+    setSelectedTask(task);
+    setDrawerOpen(true);
+  }, []);
 
-  const handleModalSaved = () => {
+  const handleDrawerClose = useCallback(() => {
+    setDrawerOpen(false);
+    setSelectedTask(null);
+  }, []);
+
+  const handleDrawerSaved = useCallback(() => {
     loadTasks();
-  };
+  }, [loadTasks]);
 
-  const handleCloseModal = () => {
-    setModalOpen(false);
-    setEditingTask(null);
-  };
+  const handleMoveTask = useCallback(
+    async (taskId: string, newStatus: string) => {
+      const res = await updateTask(taskId, { status: newStatus });
+      if (!res.success) {
+        addToast('error', res.error?.message ?? 'Failed to move task.');
+        throw new Error('Move failed');
+      }
+      const label = COLUMN_LABELS[newStatus] ?? newStatus;
+      addToast('success', `Task moved to ${label}.`);
+      if (typeof console !== 'undefined' && console.log) {
+        console.log('[Activity] Task moved', { taskId, newStatus, label });
+      }
+    },
+    []
+  );
 
-  const handleDeleteClick = (t: Task) => setDeleteConfirm(t);
-  const handleDeleteCancel = () => setDeleteConfirm(null);
+  const handleDeleteClick = useCallback((task: Task) => {
+    setDrawerOpen(false);
+    setSelectedTask(null);
+    setDeleteConfirm(task);
+  }, []);
+
+  const handleDeleteCancel = useCallback(() => setDeleteConfirm(null), []);
 
   const handleDeleteConfirm = async () => {
     if (!deleteConfirm) return;
@@ -101,78 +108,24 @@ export function TaskList({ projectId, userMap }: TaskListProps) {
   const canCreate = hasPermission(PERMISSIONS.TaskCreate);
   const canEdit = hasPermission(PERMISSIONS.TaskEdit);
   const canDelete = hasPermission(PERMISSIONS.TaskDelete);
+  const canComment = hasPermission(PERMISSIONS.TaskComment);
+  const canViewActivity = hasPermission(PERMISSIONS.TaskViewActivity);
   const canAssign = hasPermission(PERMISSIONS.TaskAssign);
-
-  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
-  const [dropTargetStatus, setDropTargetStatus] = useState<string | null>(null);
-
-  const byStatus = (status: string) => tasks.filter((t) => (t.status || 'ToDo') === status);
-
-  const handleDragStart = useCallback(
-    (e: React.DragEvent, task: Task) => {
-      if (!canEdit) return;
-      setDraggedTaskId(task.id);
-      e.dataTransfer.setData('application/json', JSON.stringify({ taskId: task.id }));
-      e.dataTransfer.effectAllowed = 'move';
-      const card = (e.currentTarget as HTMLElement).closest('[data-task-card]') as HTMLElement | null;
-      if (card) e.dataTransfer.setDragImage(card, 0, 0);
-    },
-    [canEdit]
-  );
-
-  const handleDragEnd = useCallback(() => {
-    setDraggedTaskId(null);
-    setDropTargetStatus(null);
-  }, []);
-
-  const handleDragOver = useCallback((e: React.DragEvent, status: string) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setDropTargetStatus(status);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    const related = e.relatedTarget as Node | null;
-    if (!e.currentTarget.contains(related)) setDropTargetStatus(null);
-  }, []);
-
-  const handleDrop = useCallback(
-    async (e: React.DragEvent, targetStatus: string) => {
-      e.preventDefault();
-      setDropTargetStatus(null);
-      setDraggedTaskId(null);
-      try {
-        const raw = e.dataTransfer.getData('application/json');
-        if (!raw) return;
-        const { taskId } = JSON.parse(raw) as { taskId: string };
-        const task = tasks.find((t) => t.id === taskId);
-        if (!task || (task.status || 'ToDo') === targetStatus) return;
-        const res = await updateTask(taskId, { status: targetStatus });
-        if (res.success) {
-          setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: targetStatus } : t)));
-          addToast('success', 'Task updated.');
-        } else {
-          addToast('error', res.error?.message ?? 'Failed to update task.');
-          loadTasks();
-        }
-      } catch {
-        addToast('error', 'Failed to update task.');
-        loadTasks();
-      }
-    },
-    [tasks, loadTasks]
-  );
 
   if (loading) {
     return (
       <div className="space-y-4">
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="flex gap-4 overflow-x-auto pb-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="rounded-xl border border-gray-100 dark:border-slate-700/50 bg-white dark:bg-slate-800/50 p-4 animate-pulse">
-              <div className="h-5 w-1/2 bg-gray-200 dark:bg-slate-600 rounded mb-3" />
-              <div className="space-y-2">
-                <div className="h-16 bg-gray-100 dark:bg-slate-700 rounded" />
-                <div className="h-16 bg-gray-100 dark:bg-slate-700 rounded" />
+            <div
+              key={i}
+              className="rounded-xl border border-gray-100 dark:border-slate-700/50 min-w-[280px] w-[280px] flex-shrink-0 p-4 animate-pulse bg-gray-50/50 dark:bg-slate-800/50"
+            >
+              <div className="h-5 w-24 bg-gray-200 dark:bg-slate-600 rounded mb-3" />
+              <div className="space-y-3 mt-4">
+                <div className="h-20 bg-gray-100 dark:bg-slate-700 rounded-xl" />
+                <div className="h-20 bg-gray-100 dark:bg-slate-700 rounded-xl" />
+                <div className="h-20 bg-gray-100 dark:bg-slate-700 rounded-xl" />
               </div>
             </div>
           ))}
@@ -182,116 +135,71 @@ export function TaskList({ projectId, userMap }: TaskListProps) {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h2 className="text-lg font-semibold" style={{ color: 'var(--card-header-color, #323130)' }}>Tasks</h2>
-        {canCreate && (
-          <button
-            type="button"
-            onClick={handleAddTask}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-medium shadow-sm hover:bg-blue-700 transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Add task
-          </button>
-        )}
+    <>
+      <div className="min-w-0">
+        <div className="space-y-6 min-w-0">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <h2 className="text-lg font-semibold" style={{ color: 'var(--card-header-color, #323130)' }}>
+              Tasks
+            </h2>
+            {canCreate && (
+              <button
+                type="button"
+                onClick={handleAddTask}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-medium shadow-sm hover:bg-blue-700 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add task
+              </button>
+            )}
+          </div>
+
+          <KanbanBoard
+            tasks={tasks}
+            setTasks={setTasks}
+            userMap={userMap}
+            canDrag={canEdit}
+            onTaskClick={handleTaskClick}
+            onMoveTask={handleMoveTask}
+            onTaskDelete={handleDeleteClick}
+            canDelete={canDelete}
+          />
+        </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        {SECTIONS.map(({ key, label }) => (
-          <div key={key} className="rounded-xl border border-gray-100 dark:border-slate-700/50 bg-white dark:bg-slate-800/50 shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700" style={{ backgroundColor: 'var(--sidebar-bg, #faf9f8)' }}>
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--card-header-color, #323130)' }}>{label}</h3>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--card-description-color, #605e5c)' }}>{byStatus(key).length} task(s)</p>
-            </div>
-            <div
-              className={`p-4 space-y-3 min-h-[120px] transition-colors duration-150 ${dropTargetStatus === key ? 'ring-2 ring-blue-500 ring-inset bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
-              onDragOver={canEdit ? (e) => handleDragOver(e, key) : undefined}
-              onDragLeave={canEdit ? handleDragLeave : undefined}
-              onDrop={canEdit ? (e) => handleDrop(e, key) : undefined}
-            >
-              {byStatus(key).length === 0 ? (
-                <p className="text-sm" style={{ color: 'var(--card-description-color, #605e5c)' }}>No tasks</p>
-              ) : (
-                byStatus(key).map((t) => (
-                  <div
-                    key={t.id}
-                    data-task-card
-                    className={`rounded-lg border border-gray-100 dark:border-slate-700 p-3 bg-white dark:bg-slate-800 shadow-sm hover:shadow transition-shadow ${draggedTaskId === t.id ? 'opacity-50' : ''}`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-start gap-2 min-w-0 flex-1">
-                        {canEdit && (
-                          <span
-                            draggable
-                            onDragStart={(e) => handleDragStart(e, t)}
-                            onDragEnd={handleDragEnd}
-                            className="cursor-grab active:cursor-grabbing touch-none p-0.5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-slate-500 dark:hover:text-slate-300 shrink-0"
-                            aria-label="Drag to move"
-                          >
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                              <path d="M8 6h2v2H8V6zm0 5h2v2H8v-2zm0 5h2v2H8v-2zm5-10h2v2h-2V6zm0 5h2v2h-2v-2zm0 5h2v2h-2v-2z" />
-                            </svg>
-                          </span>
-                        )}
-                        <h4 className="font-medium text-sm truncate" style={{ color: 'var(--card-header-color, #323130)' }}>{t.title}</h4>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        {canEdit && (
-                          <button
-                            type="button"
-                            onClick={() => handleEditTask(t)}
-                            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400"
-                            aria-label="Edit task"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                        )}
-                        {canDelete && (
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteClick(t)}
-                            className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-500 dark:text-slate-400 hover:text-red-600"
-                            aria-label="Delete task"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-1.5 items-center">
-                      <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${getPriorityClass(t.priority)}`}>
-                        {t.priority}
-                      </span>
-                      <span className="text-xs" style={{ color: 'var(--card-description-color, #605e5c)' }}>
-                        {t.assignedToUserId ? userMap.get(t.assignedToUserId) ?? '—' : 'Unassigned'}
-                      </span>
-                      {t.dueDate && (
-                        <span className="text-xs" style={{ color: 'var(--card-description-color, #605e5c)' }}>
-                          Due {formatDate(t.dueDate)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+      {drawerOpen && selectedTask && (
+        <aside
+          className="fixed top-12 right-0 z-40 h-[calc(100vh-3rem)] w-64 flex flex-col shrink-0 border-l transition-[width] duration-200"
+          style={{
+            backgroundColor: 'var(--sidebar-bg, #faf9f8)',
+            borderColor: 'var(--sidebar-border, #edebe9)',
+          }}
+          role="complementary"
+          aria-label="Task details"
+        >
+          <TaskDrawer
+            open
+            onClose={handleDrawerClose}
+            onSaved={handleDrawerSaved}
+            task={selectedTask}
+            save={updateTask}
+            canEdit={canEdit}
+            canDelete={canDelete}
+            canComment={canComment}
+            canViewActivity={canViewActivity}
+            onDelete={handleDeleteClick}
+          />
+        </aside>
+      )}
 
       <TaskFormModal
-        open={modalOpen}
-        onClose={handleCloseModal}
-        onSaved={handleModalSaved}
+        open={addModalOpen}
+        onClose={() => setAddModalOpen(false)}
+        onSaved={loadTasks}
         projectId={projectId}
-        task={editingTask}
+        task={null}
         save={updateTask}
         create={createTask}
         canAssign={canAssign}
@@ -303,15 +211,24 @@ export function TaskList({ projectId, userMap }: TaskListProps) {
             Delete &quot;{deleteConfirm.title}&quot;? This cannot be undone.
           </p>
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={handleDeleteCancel} className="px-4 py-2 rounded-lg border border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
+            <button
+              type="button"
+              onClick={handleDeleteCancel}
+              className="px-4 py-2 rounded-lg border border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+            >
               Cancel
             </button>
-            <button type="button" onClick={handleDeleteConfirm} disabled={deleting} className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors">
+            <button
+              type="button"
+              onClick={handleDeleteConfirm}
+              disabled={deleting}
+              className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+            >
               {deleting ? 'Deleting…' : 'Delete'}
             </button>
           </div>
         </Modal>
       )}
-    </div>
+    </>
   );
 }

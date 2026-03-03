@@ -15,13 +15,15 @@ public class TaskService : ITaskService
 
     private readonly ITaskRepository _taskRepository;
     private readonly IProjectRepository _projectRepository;
+    private readonly ITaskActivityRepository _activityRepository;
     private readonly IUserPermissionChecker _permissionChecker;
     private readonly ILogger<TaskService> _logger;
 
-    public TaskService(ITaskRepository taskRepository, IProjectRepository projectRepository, IUserPermissionChecker permissionChecker, ILogger<TaskService> logger)
+    public TaskService(ITaskRepository taskRepository, IProjectRepository projectRepository, ITaskActivityRepository activityRepository, IUserPermissionChecker permissionChecker, ILogger<TaskService> logger)
     {
         _taskRepository = taskRepository;
         _projectRepository = projectRepository;
+        _activityRepository = activityRepository;
         _permissionChecker = permissionChecker;
         _logger = logger;
     }
@@ -86,6 +88,7 @@ public class TaskService : ITaskService
         };
 
         await _taskRepository.CreateAsync(task, cancellationToken).ConfigureAwait(false);
+        await LogActivityAsync(task.Id, currentUserId, "TaskCreated", null, task.Title, cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Task created. TaskId: {TaskId}, ProjectId: {ProjectId}, Title: {Title}, CreatedByUserId: {CreatedByUserId}", task.Id, task.ProjectId, task.Title, currentUserId);
 
         return (CreateTaskResult.Success, MapToResponse(task), null);
@@ -102,6 +105,10 @@ public class TaskService : ITaskService
         var task = await _taskRepository.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
         if (task == null)
             return (UpdateTaskResult.NotFound, null);
+
+        var oldStatus = task.Status;
+        var oldPriority = task.Priority;
+        var oldAssignedTo = task.AssignedToUserId;
 
         if (request.AssignedToUserId.HasValue && request.AssignedToUserId.Value != Guid.Empty)
         {
@@ -128,6 +135,13 @@ public class TaskService : ITaskService
 
         await _taskRepository.UpdateAsync(task, cancellationToken).ConfigureAwait(false);
 
+        if (request.Status != null && request.Status.Trim() != oldStatus)
+            await LogActivityAsync(task.Id, currentUserId, "StatusChanged", oldStatus, task.Status, cancellationToken).ConfigureAwait(false);
+        if (request.Priority != null && request.Priority.Trim() != oldPriority)
+            await LogActivityAsync(task.Id, currentUserId, "PriorityChanged", oldPriority, task.Priority, cancellationToken).ConfigureAwait(false);
+        if (request.AssignedToUserId != null && request.AssignedToUserId != oldAssignedTo)
+            await LogActivityAsync(task.Id, currentUserId, "AssignedToChanged", oldAssignedTo?.ToString(), task.AssignedToUserId?.ToString(), cancellationToken).ConfigureAwait(false);
+
         if (request.AssignedToUserId.HasValue && request.AssignedToUserId.Value != Guid.Empty)
             _logger.LogInformation("Task assigned. TaskId: {TaskId}, AssignedToUserId: {AssignedToUserId}, UpdatedByUserId: {UserId}", id, request.AssignedToUserId, currentUserId);
         else
@@ -148,10 +162,27 @@ public class TaskService : ITaskService
         if (task == null)
             return DeleteTaskResult.NotFound;
 
+        await LogActivityAsync(id, currentUserId, "TaskDeleted", task.Title, null, cancellationToken).ConfigureAwait(false);
         await _taskRepository.DeleteAsync(id, cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Task deleted. TaskId: {TaskId}, DeletedByUserId: {UserId}", id, currentUserId);
 
         return DeleteTaskResult.Success;
+    }
+
+    private async Task LogActivityAsync(Guid taskId, Guid userId, string action, string? oldValue, string? newValue, CancellationToken cancellationToken)
+    {
+        var activity = new TaskActivity
+        {
+            Id = Guid.NewGuid(),
+            TaskId = taskId,
+            UserId = userId,
+            Action = action,
+            OldValue = oldValue != null && oldValue.Length > 1000 ? oldValue[..1000] : oldValue,
+            NewValue = newValue != null && newValue.Length > 1000 ? newValue[..1000] : newValue,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _activityRepository.CreateAsync(activity, cancellationToken).ConfigureAwait(false);
+        _logger.LogInformation("Activity created. TaskId: {TaskId}, Action: {Action}, UserId: {UserId}", taskId, action, userId);
     }
 
     private static TaskResponse MapToResponse(ProjectTask t) => new()

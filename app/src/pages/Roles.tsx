@@ -11,6 +11,7 @@ import { addToast } from '../utils/toast';
 import type { Role } from '../models/Role';
 import type { User } from '../models/User';
 import { Modal } from '../components/Modal';
+import { FormSidebar } from '../components/FormSidebar';
 
 type ModalState =
   | { type: 'create' }
@@ -180,7 +181,7 @@ function CreateRoleModal({ onClose, onSuccess }: { onClose: () => void; onSucces
   };
 
   return (
-    <Modal open={true} title="Add role" onClose={onClose}>
+    <FormSidebar open title="Add role" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-1">
         {formError && <div className="alert-error mb-4">{formError}</div>}
         <div className="form-group">
@@ -196,7 +197,7 @@ function CreateRoleModal({ onClose, onSuccess }: { onClose: () => void; onSucces
           <button type="submit" disabled={submitting} className="btn-primary">{submitting ? 'Creating…' : 'Create role'}</button>
         </div>
       </form>
-    </Modal>
+    </FormSidebar>
   );
 }
 
@@ -227,7 +228,7 @@ function EditRoleModal({ role, onClose, onSuccess }: { role: Role; onClose: () =
   };
 
   return (
-    <Modal open={true} title="Edit role" onClose={onClose}>
+    <FormSidebar open title="Edit role" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-1">
         {formError && <div className="alert-error mb-4">{formError}</div>}
         <div className="form-group">
@@ -243,7 +244,7 @@ function EditRoleModal({ role, onClose, onSuccess }: { role: Role; onClose: () =
           <button type="submit" disabled={submitting} className="btn-primary">{submitting ? 'Saving…' : 'Save'}</button>
         </div>
       </form>
-    </Modal>
+    </FormSidebar>
   );
 }
 
@@ -318,7 +319,7 @@ function AssignRoleModal({ role, onClose, onSuccess }: { role: Role; onClose: ()
   };
 
   return (
-    <Modal open={true} title={`Assign role: ${role.name}`} onClose={onClose}>
+    <FormSidebar open title={`Assign role: ${role.name}`} onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-1">
         {formError && <div className="alert-error mb-4">{formError}</div>}
         <div className="form-group">
@@ -338,6 +339,6 @@ function AssignRoleModal({ role, onClose, onSuccess }: { role: Role; onClose: ()
           </button>
         </div>
       </form>
-    </Modal>
+    </FormSidebar>
   );
 }

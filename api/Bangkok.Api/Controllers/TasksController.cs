@@ -18,11 +18,15 @@ namespace Bangkok.Api.Controllers;
 public class TasksController : ControllerBase
 {
     private readonly ITaskService _taskService;
+    private readonly ITaskCommentService _commentService;
+    private readonly ITaskActivityService _activityService;
     private readonly ILogger<TasksController> _logger;
 
-    public TasksController(ITaskService taskService, ILogger<TasksController> logger)
+    public TasksController(ITaskService taskService, ITaskCommentService commentService, ITaskActivityService activityService, ILogger<TasksController> logger)
     {
         _taskService = taskService;
+        _commentService = commentService;
+        _activityService = activityService;
         _logger = logger;
     }
 
@@ -142,6 +146,63 @@ public class TasksController : ControllerBase
             return NotFound(ApiResponse<TaskResponse>.Fail(new ErrorResponse { Code = "TASK_NOT_FOUND", Message = "Task not found." }, correlationId));
 
         return NoContent();
+    }
+
+    [HttpGet("{taskId:guid}/comments")]
+    [SwaggerOperation(Summary = "List task comments", Description = "Returns comments for the task. Requires Task.View. 403 if permission missing.")]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<TaskCommentResponse>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<TaskCommentResponse>>>> GetComments([FromRoute] Guid taskId, CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
+        var currentUserId = GetCurrentUserId();
+        if (currentUserId == null)
+            return Unauthorized(ApiResponse<IReadOnlyList<TaskCommentResponse>>.Fail(new ErrorResponse { Code = "UNAUTHORIZED", Message = "Authentication required." }, correlationId));
+
+        var list = await _commentService.GetByTaskIdAsync(taskId, currentUserId.Value, cancellationToken).ConfigureAwait(false);
+        return Ok(ApiResponse<IReadOnlyList<TaskCommentResponse>>.Ok(list, correlationId));
+    }
+
+    [HttpPost("{taskId:guid}/comments")]
+    [SwaggerOperation(Summary = "Add task comment", Description = "Adds a comment to the task. Requires Task.Comment. 403 if permission missing.")]
+    [ProducesResponseType(typeof(ApiResponse<TaskCommentResponse>), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<ApiResponse<TaskCommentResponse>>> CreateComment([FromRoute] Guid taskId, [FromBody] CreateTaskCommentRequest request, CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
+        var currentUserId = GetCurrentUserId();
+        if (currentUserId == null)
+            return Unauthorized(ApiResponse<TaskCommentResponse>.Fail(new ErrorResponse { Code = "UNAUTHORIZED", Message = "Authentication required." }, correlationId));
+
+        var (success, data, error) = await _commentService.CreateAsync(taskId, request, currentUserId.Value, cancellationToken).ConfigureAwait(false);
+        if (!success)
+        {
+            if (error?.Contains("not found") == true)
+                return NotFound(ApiResponse<TaskCommentResponse>.Fail(new ErrorResponse { Code = "TASK_NOT_FOUND", Message = error }, correlationId));
+            if (error?.Contains("permission") == true)
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<TaskCommentResponse>.Fail(new ErrorResponse { Code = "FORBIDDEN", Message = error }, correlationId));
+            return BadRequest(ApiResponse<TaskCommentResponse>.Fail(new ErrorResponse { Code = "VALIDATION", Message = error ?? "Invalid request." }, correlationId));
+        }
+        return StatusCode(StatusCodes.Status201Created, ApiResponse<TaskCommentResponse>.Ok(data!, correlationId));
+    }
+
+    [HttpGet("{taskId:guid}/activities")]
+    [SwaggerOperation(Summary = "List task activities", Description = "Returns activity log for the task. Requires Task.ViewActivity. 403 if permission missing.")]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<TaskActivityResponse>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<TaskActivityResponse>>>> GetActivities([FromRoute] Guid taskId, CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
+        var currentUserId = GetCurrentUserId();
+        if (currentUserId == null)
+            return Unauthorized(ApiResponse<IReadOnlyList<TaskActivityResponse>>.Fail(new ErrorResponse { Code = "UNAUTHORIZED", Message = "Authentication required." }, correlationId));
+
+        var list = await _activityService.GetByTaskIdAsync(taskId, currentUserId.Value, cancellationToken).ConfigureAwait(false);
+        return Ok(ApiResponse<IReadOnlyList<TaskActivityResponse>>.Ok(list, correlationId));
     }
 
     private Guid? GetCurrentUserId()

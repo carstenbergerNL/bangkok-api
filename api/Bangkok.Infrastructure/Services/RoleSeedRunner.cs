@@ -51,6 +51,8 @@ public class RoleSeedRunner
             var taskEditId = Guid.NewGuid();
             var taskDeleteId = Guid.NewGuid();
             var taskAssignId = Guid.NewGuid();
+            var taskCommentId = Guid.NewGuid();
+            var taskViewActivityId = Guid.NewGuid();
             var now = DateTime.UtcNow;
 
             await connection.ExecuteAsync(new CommandDefinition(@"
@@ -73,10 +75,13 @@ public class RoleSeedRunner
                 (@TaskCreateId, N'Task.Create', N'Create tasks'),
                 (@TaskEditId, N'Task.Edit', N'Edit tasks'),
                 (@TaskDeleteId, N'Task.Delete', N'Delete tasks'),
-                (@TaskAssignId, N'Task.Assign', N'Assign tasks')",
+                (@TaskAssignId, N'Task.Assign', N'Assign tasks'),
+                (@TaskCommentId, N'Task.Comment', N'Comment on tasks'),
+                (@TaskViewActivityId, N'Task.ViewActivity', N'View task activity')",
                 new { ManageUsersId = manageUsersId, ManageRolesId = manageRolesId, ViewAdminSettingsId = viewAdminSettingsId,
                     ProjectViewId = projectViewId, ProjectCreateId = projectCreateId, ProjectEditId = projectEditId, ProjectDeleteId = projectDeleteId,
-                    TaskViewId = taskViewId, TaskCreateId = taskCreateId, TaskEditId = taskEditId, TaskDeleteId = taskDeleteId, TaskAssignId = taskAssignId },
+                    TaskViewId = taskViewId, TaskCreateId = taskCreateId, TaskEditId = taskEditId, TaskDeleteId = taskDeleteId, TaskAssignId = taskAssignId,
+                    TaskCommentId = taskCommentId, TaskViewActivityId = taskViewActivityId },
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
 
             await connection.ExecuteAsync(new CommandDefinition(@"
@@ -92,10 +97,13 @@ public class RoleSeedRunner
                 (NEWID(), @AdminId, @TaskCreateId),
                 (NEWID(), @AdminId, @TaskEditId),
                 (NEWID(), @AdminId, @TaskDeleteId),
-                (NEWID(), @AdminId, @TaskAssignId)",
+                (NEWID(), @AdminId, @TaskAssignId),
+                (NEWID(), @AdminId, @TaskCommentId),
+                (NEWID(), @AdminId, @TaskViewActivityId)",
                 new { AdminId = adminId, ManageUsersId = manageUsersId, ManageRolesId = manageRolesId, ViewAdminSettingsId = viewAdminSettingsId,
                     ProjectViewId = projectViewId, ProjectCreateId = projectCreateId, ProjectEditId = projectEditId, ProjectDeleteId = projectDeleteId,
-                    TaskViewId = taskViewId, TaskCreateId = taskCreateId, TaskEditId = taskEditId, TaskDeleteId = taskDeleteId, TaskAssignId = taskAssignId },
+                    TaskViewId = taskViewId, TaskCreateId = taskCreateId, TaskEditId = taskEditId, TaskDeleteId = taskDeleteId, TaskAssignId = taskAssignId,
+                    TaskCommentId = taskCommentId, TaskViewActivityId = taskViewActivityId },
                 cancellationToken: cancellationToken)).ConfigureAwait(false);
 
             _logger.LogInformation("Role management seed completed. Roles: Admin, User. Permissions: ManageUsers, ManageRoles, ViewAdminSettings, Project.*, Task.*.");
@@ -133,7 +141,8 @@ public class RoleSeedRunner
     private static async Task EnsureProjectAndTaskPermissionsAsync(IDbConnection connection, Guid adminRoleId, CancellationToken cancellationToken)
     {
         var permissions = new[] { ("Project.View", "View projects"), ("Project.Create", "Create projects"), ("Project.Edit", "Edit projects"), ("Project.Delete", "Delete projects"),
-            ("Task.View", "View tasks"), ("Task.Create", "Create tasks"), ("Task.Edit", "Edit tasks"), ("Task.Delete", "Delete tasks"), ("Task.Assign", "Assign tasks") };
+            ("Task.View", "View tasks"), ("Task.Create", "Create tasks"), ("Task.Edit", "Edit tasks"), ("Task.Delete", "Delete tasks"), ("Task.Assign", "Assign tasks"),
+            ("Task.Comment", "Comment on tasks"), ("Task.ViewActivity", "View task activity") };
 
         foreach (var (name, description) in permissions)
         {

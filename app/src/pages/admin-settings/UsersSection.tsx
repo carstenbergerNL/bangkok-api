@@ -12,6 +12,7 @@ import { addToast } from '../../utils/toast';
 import type { User } from '../../models/User';
 import type { Role } from '../../models/Role';
 import { Modal } from '../../components/Modal';
+import { FormSidebar } from '../../components/FormSidebar';
 import { TableSkeleton } from '../../components/TableSkeleton';
 
 type UserModal = 'create' | 'edit' | 'assign-role' | 'disable' | 'delete-permanent' | null;
@@ -362,7 +363,7 @@ function CreateUserModal({
   };
 
   return (
-    <Modal open={true} title="Create User" onClose={onClose}>
+    <FormSidebar open title="Create User" onClose={onClose} width="wide">
       <form onSubmit={handleSubmit} className="space-y-4">
         {formError && <div className="alert-error">{formError}</div>}
         <div className="form-group">
@@ -388,7 +389,7 @@ function CreateUserModal({
           <button type="submit" disabled={submitting} className="btn-primary">{submitting ? 'Creating…' : 'Create'}</button>
         </div>
       </form>
-    </Modal>
+    </FormSidebar>
   );
 }
 
@@ -426,7 +427,7 @@ function EditUserModal({
   };
 
   return (
-    <Modal open={true} title="Edit User" onClose={onClose}>
+    <FormSidebar open title="Edit User" onClose={onClose} width="wide">
       <form onSubmit={handleSubmit} className="space-y-4">
         {formError && <div className="alert-error">{formError}</div>}
         <div className="form-group">
@@ -472,7 +473,7 @@ function EditUserModal({
           <button type="submit" disabled={submitting} className="btn-primary">{submitting ? 'Saving…' : 'Save'}</button>
         </div>
       </form>
-    </Modal>
+    </FormSidebar>
   );
 }
 
@@ -526,7 +527,7 @@ function AssignRoleModal({
   };
 
   return (
-    <Modal open={true} title={`Assign roles: ${user.email}`} onClose={onClose}>
+    <FormSidebar open title={`Assign roles: ${user.email}`} onClose={onClose} width="wide">
       <form onSubmit={handleSubmit} className="space-y-4">
         {formError && <div className="alert-error">{formError}</div>}
         <p className="text-sm text-gray-600 dark:text-gray-400">Select all roles this user should have.</p>
@@ -549,7 +550,7 @@ function AssignRoleModal({
           <button type="submit" disabled={submitting} className="btn-primary">{submitting ? 'Saving…' : 'Save'}</button>
         </div>
       </form>
-    </Modal>
+    </FormSidebar>
   );
 }
 
@@ -571,7 +572,7 @@ function DisableUserModal({ user, onClose, onSuccess }: { user: User; onClose: (
   };
 
   return (
-    <Modal open={true} title={enabling ? 'Enable user' : 'Disable user'} onClose={onClose}>
+    <FormSidebar open title={enabling ? 'Enable user' : 'Disable user'} onClose={onClose}>
       <div className="space-y-4">
         {formError && <div className="alert-error">{formError}</div>}
         <p className="text-gray-600 dark:text-gray-400">
@@ -587,7 +588,7 @@ function DisableUserModal({ user, onClose, onSuccess }: { user: User; onClose: (
           </button>
         </div>
       </div>
-    </Modal>
+    </FormSidebar>
   );
 }
 

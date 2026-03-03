@@ -159,7 +159,7 @@ export function ProjectDetailsPage() {
         </div>
       </div>
 
-      <TaskList projectId={project.id} userMap={userMap} />
+      {project.id && <TaskList projectId={project.id} userMap={userMap} />}
 
       <ProjectFormModal
         open={editModalOpen}

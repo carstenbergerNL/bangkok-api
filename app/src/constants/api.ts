@@ -42,5 +42,11 @@ export const API_PATHS = {
   TASKS: {
     BASE: '/api/Tasks',
     BY_ID: (id: string) => `/api/Tasks/${id}`,
+    COMMENTS: (taskId: string) => `/api/Tasks/${taskId}/comments`,
+    ACTIVITIES: (taskId: string) => `/api/Tasks/${taskId}/activities`,
+  },
+  COMMENTS: {
+    BASE: '/api/Comments',
+    BY_ID: (id: string) => `/api/Comments/${id}`,
   },
 } as const;

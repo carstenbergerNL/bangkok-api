@@ -10,6 +10,8 @@ export const PERMISSIONS = {
   TaskEdit: 'Task.Edit',
   TaskDelete: 'Task.Delete',
   TaskAssign: 'Task.Assign',
+  TaskComment: 'Task.Comment',
+  TaskViewActivity: 'Task.ViewActivity',
 } as const;
 
 export type PermissionName = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
