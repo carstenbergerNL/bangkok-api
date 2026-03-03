@@ -48,6 +48,8 @@ export const API_PATHS = {
     CUSTOM_FIELD_BY_ID: (projectId: string, fieldId: string) => `/api/Projects/${projectId}/custom-fields/${fieldId}`,
     DASHBOARD: (projectId: string) => `/api/Projects/${projectId}/dashboard`,
     EXPORT: (projectId: string) => `/api/Projects/${projectId}/export`,
+    AUTOMATION_RULES: (projectId: string) => `/api/Projects/${projectId}/automation-rules`,
+    AUTOMATION_RULE_BY_ID: (projectId: string, ruleId: string) => `/api/Projects/${projectId}/automation-rules/${ruleId}`,
   },
   TASKS: {
     BASE: '/api/Tasks',

@@ -15,6 +15,7 @@ import { ProjectMembersTab } from './ProjectMembersTab';
 import { ProjectDashboardTab } from './ProjectDashboardTab';
 import { ProjectLabelsSettings } from './ProjectLabelsSettings';
 import { ProjectCustomFieldsSettings } from './ProjectCustomFieldsSettings';
+import { ProjectAutomationSettings } from './ProjectAutomationSettings';
 
 function getStatusBadgeClass(status: string): string {
   const s = status?.toLowerCase();
@@ -37,7 +38,7 @@ export function ProjectDetailsPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [activeTab, setActiveTab] = useState<'board' | 'members' | 'dashboard' | 'settings'>('dashboard');
-  const [settingsSubTab, setSettingsSubTab] = useState<'badges' | 'custom-fields'>('badges');
+  const [settingsSubTab, setSettingsSubTab] = useState<'badges' | 'custom-fields' | 'automation'>('badges');
   const [myRole, setMyRole] = useState<ProjectMemberRole | null>(null);
   const [statusChanging, setStatusChanging] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -337,9 +338,21 @@ export function ProjectDetailsPage() {
                 >
                   Custom Fields
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setSettingsSubTab('automation')}
+                  className={`px-4 py-2 text-sm font-medium transition-colors ${
+                    settingsSubTab === 'automation'
+                      ? 'border-b-2 text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
+                      : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200'
+                  }`}
+                >
+                  Automation
+                </button>
               </div>
               {settingsSubTab === 'badges' && <ProjectLabelsSettings projectId={project.id} />}
               {settingsSubTab === 'custom-fields' && <ProjectCustomFieldsSettings projectId={project.id} />}
+              {settingsSubTab === 'automation' && <ProjectAutomationSettings projectId={project.id} />}
             </div>
           )}
         </div>

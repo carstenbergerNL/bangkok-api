@@ -15,9 +15,17 @@ public class TaskService : ITaskService
     private const string PermissionAssign = "Task.Assign";
     private const string AdminPermission = "ViewAdminSettings";
 
+    public const string TriggerTaskCompleted = "TaskCompleted";
+    public const string TriggerTaskOverdue = "TaskOverdue";
+    public const string TriggerTaskAssigned = "TaskAssigned";
+    public const string ActionNotifyUser = "NotifyUser";
+    public const string ActionChangeStatus = "ChangeStatus";
+    public const string ActionAddLabel = "AddLabel";
+
     private readonly ITaskRepository _taskRepository;
     private readonly IProjectRepository _projectRepository;
     private readonly IProjectMemberRepository _memberRepository;
+    private readonly IProjectAutomationRuleRepository _automationRuleRepository;
     private readonly ITaskActivityRepository _activityRepository;
     private readonly ITaskLabelRepository _taskLabelRepository;
     private readonly ITaskCustomFieldValueRepository _taskCustomFieldValueRepository;
@@ -29,11 +37,12 @@ public class TaskService : ITaskService
     private readonly INotificationService _notificationService;
     private readonly ILogger<TaskService> _logger;
 
-    public TaskService(ITaskRepository taskRepository, IProjectRepository projectRepository, IProjectMemberRepository memberRepository, ITaskActivityRepository activityRepository, ITaskLabelRepository taskLabelRepository, ITaskCustomFieldValueRepository taskCustomFieldValueRepository, IProjectCustomFieldRepository projectCustomFieldRepository, ITaskAttachmentRepository attachmentRepository, IAttachmentFileStorage attachmentFileStorage, ILabelRepository labelRepository, IUserPermissionChecker permissionChecker, INotificationService notificationService, ILogger<TaskService> logger)
+    public TaskService(ITaskRepository taskRepository, IProjectRepository projectRepository, IProjectMemberRepository memberRepository, IProjectAutomationRuleRepository automationRuleRepository, ITaskActivityRepository activityRepository, ITaskLabelRepository taskLabelRepository, ITaskCustomFieldValueRepository taskCustomFieldValueRepository, IProjectCustomFieldRepository projectCustomFieldRepository, ITaskAttachmentRepository attachmentRepository, IAttachmentFileStorage attachmentFileStorage, ILabelRepository labelRepository, IUserPermissionChecker permissionChecker, INotificationService notificationService, ILogger<TaskService> logger)
     {
         _taskRepository = taskRepository;
         _projectRepository = projectRepository;
         _memberRepository = memberRepository;
+        _automationRuleRepository = automationRuleRepository;
         _activityRepository = activityRepository;
         _taskLabelRepository = taskLabelRepository;
         _taskCustomFieldValueRepository = taskCustomFieldValueRepository;
@@ -157,6 +166,8 @@ public class TaskService : ITaskService
         await LogActivityAsync(task.Id, currentUserId, "TaskCreated", null, task.Title, cancellationToken).ConfigureAwait(false);
         if (task.AssignedToUserId.HasValue && task.AssignedToUserId.Value != currentUserId && task.AssignedToUserId.Value != Guid.Empty)
             await _notificationService.CreateAsync(task.AssignedToUserId.Value, NotificationService.TypeTaskAssigned, "Task assigned", $"You were assigned to: {task.Title}", task.Id, cancellationToken).ConfigureAwait(false);
+        if (task.AssignedToUserId.HasValue && task.AssignedToUserId.Value != Guid.Empty)
+            await RunAutomationRulesAsync(task.ProjectId, TriggerTaskAssigned, task, currentUserId, cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Task created. TaskId: {TaskId}, ProjectId: {ProjectId}, Title: {Title}, CreatedByUserId: {CreatedByUserId}", task.Id, task.ProjectId, task.Title, currentUserId);
 
         var labels = await GetLabelsForTaskAsync(task.Id, task.ProjectId, cancellationToken).ConfigureAwait(false);
@@ -240,8 +251,17 @@ public class TaskService : ITaskService
         task.UpdatedAt = DateTime.UtcNow;
 
         var statusChangedToDone = request.Status != null && string.Equals(request.Status.Trim(), "Done", StringComparison.OrdinalIgnoreCase) && !string.Equals(oldStatus, "Done", StringComparison.OrdinalIgnoreCase);
+        var assigneeChanged = request.AssignedToUserId != null && request.AssignedToUserId != oldAssignedTo;
+        var isOverdue = task.DueDate.HasValue && task.DueDate.Value < DateTime.UtcNow && !string.Equals(task.Status, "Done", StringComparison.OrdinalIgnoreCase);
 
         await _taskRepository.UpdateAsync(task, cancellationToken).ConfigureAwait(false);
+
+        if (statusChangedToDone)
+            await RunAutomationRulesAsync(task.ProjectId, TriggerTaskCompleted, task, currentUserId, cancellationToken).ConfigureAwait(false);
+        if (assigneeChanged && task.AssignedToUserId.HasValue && task.AssignedToUserId.Value != Guid.Empty)
+            await RunAutomationRulesAsync(task.ProjectId, TriggerTaskAssigned, task, currentUserId, cancellationToken).ConfigureAwait(false);
+        if (isOverdue)
+            await RunAutomationRulesAsync(task.ProjectId, TriggerTaskOverdue, task, currentUserId, cancellationToken).ConfigureAwait(false);
 
         if (statusChangedToDone && task.IsRecurring)
             await CreateNextRecurrenceInstanceAsync(task, currentUserId, cancellationToken).ConfigureAwait(false);
@@ -479,6 +499,70 @@ public class TaskService : ITaskService
             .ToList();
         await _taskCustomFieldValueRepository.SetForTaskAsync(taskId, toSave, cancellationToken).ConfigureAwait(false);
         return toSave.Select(x => new TaskCustomFieldValueResponse { FieldId = x.FieldId, Value = x.Value }).ToList();
+    }
+
+    /// <summary>
+    /// Run project automation rules for the given trigger. Actions: NotifyUser, ChangeStatus, AddLabel.
+    /// </summary>
+    private async Task RunAutomationRulesAsync(Guid projectId, string trigger, ProjectTask task, Guid currentUserId, CancellationToken cancellationToken)
+    {
+        var rules = await _automationRuleRepository.GetByProjectIdAsync(projectId, cancellationToken).ConfigureAwait(false);
+        var matching = rules.Where(r => string.Equals(r.Trigger, trigger, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (matching.Count == 0) return;
+
+        string? newStatus = null;
+        var labelsToAdd = new List<Guid>();
+        var usersToNotify = new List<Guid>();
+
+        foreach (var rule in matching)
+        {
+            if (string.Equals(rule.Action, ActionNotifyUser, StringComparison.OrdinalIgnoreCase) && rule.TargetUserId.HasValue && rule.TargetUserId.Value != Guid.Empty)
+                usersToNotify.Add(rule.TargetUserId.Value);
+            if (string.Equals(rule.Action, ActionChangeStatus, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(rule.TargetValue))
+                newStatus = rule.TargetValue.Trim();
+            if (string.Equals(rule.Action, ActionAddLabel, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(rule.TargetValue) && Guid.TryParse(rule.TargetValue.Trim(), out var labelId))
+                labelsToAdd.Add(labelId);
+        }
+
+        if (newStatus != null)
+        {
+            var toUpdate = await _taskRepository.GetByIdAsync(task.Id, cancellationToken).ConfigureAwait(false);
+            if (toUpdate != null && toUpdate.Status != newStatus)
+            {
+                toUpdate.Status = newStatus;
+                toUpdate.UpdatedAt = DateTime.UtcNow;
+                await _taskRepository.UpdateAsync(toUpdate, cancellationToken).ConfigureAwait(false);
+                await LogActivityAsync(task.Id, currentUserId, "StatusChanged", task.Status, newStatus, cancellationToken).ConfigureAwait(false);
+                _logger.LogInformation("Automation changed task {TaskId} status to {Status}", task.Id, newStatus);
+            }
+        }
+
+        if (labelsToAdd.Count > 0)
+        {
+            var projectLabels = await _labelRepository.GetByProjectIdAsync(projectId, cancellationToken).ConfigureAwait(false);
+            var validLabelIds = projectLabels.Select(l => l.Id).ToHashSet();
+            var currentIds = await _taskLabelRepository.GetLabelIdsByTaskIdAsync(task.Id, cancellationToken).ConfigureAwait(false);
+            var combined = currentIds.Union(labelsToAdd.Where(validLabelIds.Contains)).Distinct().ToList();
+            if (combined.Count != currentIds.Count)
+            {
+                await _taskLabelRepository.SetForTaskAsync(task.Id, combined, cancellationToken).ConfigureAwait(false);
+                _logger.LogInformation("Automation added label(s) to task {TaskId}", task.Id);
+            }
+        }
+
+        var notificationTitle = trigger switch
+        {
+            _ when trigger == TriggerTaskCompleted => "Task completed",
+            _ when trigger == TriggerTaskOverdue => "Task overdue",
+            _ when trigger == TriggerTaskAssigned => "Task assigned",
+            _ => "Task update"
+        };
+        var message = $"{task.Title}";
+        foreach (var userId in usersToNotify.Distinct())
+        {
+            if (userId == currentUserId) continue;
+            await _notificationService.CreateAsync(userId, NotificationService.TypeTaskAssigned, notificationTitle, message, task.Id, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     private static TaskResponse MapToResponse(ProjectTask t, IReadOnlyList<LabelResponse> labels, IReadOnlyList<TaskCustomFieldValueResponse>? customFieldValues = null) => new()

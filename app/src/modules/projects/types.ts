@@ -18,6 +18,23 @@ export interface Label {
   createdAt: string;
 }
 
+/** Project automation rule – matches backend ProjectAutomationRuleResponse */
+export interface ProjectAutomationRule {
+  id: string;
+  projectId: string;
+  trigger: string;
+  action: string;
+  targetUserId?: string | null;
+  targetValue?: string | null;
+}
+
+export interface CreateProjectAutomationRuleRequest {
+  trigger: string;
+  action: string;
+  targetUserId?: string | null;
+  targetValue?: string | null;
+}
+
 /** Project custom field – matches backend ProjectCustomFieldResponse */
 export interface ProjectCustomField {
   id: string;

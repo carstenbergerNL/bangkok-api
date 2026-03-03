@@ -34,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<ITaskRepository, TaskRepository>();
         services.AddScoped<ILabelRepository, LabelRepository>();
         services.AddScoped<IProjectCustomFieldRepository, ProjectCustomFieldRepository>();
+        services.AddScoped<IProjectAutomationRuleRepository, ProjectAutomationRuleRepository>();
         services.AddScoped<ITaskCustomFieldValueRepository, TaskCustomFieldValueRepository>();
         services.AddScoped<ITaskLabelRepository, TaskLabelRepository>();
         services.AddScoped<ITaskCommentRepository, TaskCommentRepository>();
@@ -55,6 +56,7 @@ public static class DependencyInjection
         services.AddScoped<ILabelService, LabelService>();
         services.AddScoped<IProjectCustomFieldService, ProjectCustomFieldService>();
         services.AddScoped<IProjectExportService, ProjectExportService>();
+        services.AddScoped<IProjectAutomationRuleService, ProjectAutomationRuleService>();
         services.AddScoped<ITaskService, TaskService>();
         services.AddScoped<ITaskCommentService, TaskCommentService>();
         services.AddScoped<ITaskActivityService, TaskActivityService>();

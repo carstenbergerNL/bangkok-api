@@ -23,9 +23,10 @@ public class ProjectsController : ControllerBase
     private readonly IProjectCustomFieldService _customFieldService;
     private readonly IProjectExportService _exportService;
     private readonly IProjectDashboardService _dashboardService;
+    private readonly IProjectAutomationRuleService _automationRuleService;
     private readonly ILogger<ProjectsController> _logger;
 
-    public ProjectsController(IProjectService projectService, IProjectMemberService memberService, ILabelService labelService, IProjectCustomFieldService customFieldService, IProjectExportService exportService, IProjectDashboardService dashboardService, ILogger<ProjectsController> logger)
+    public ProjectsController(IProjectService projectService, IProjectMemberService memberService, ILabelService labelService, IProjectCustomFieldService customFieldService, IProjectExportService exportService, IProjectDashboardService dashboardService, IProjectAutomationRuleService automationRuleService, ILogger<ProjectsController> logger)
     {
         _projectService = projectService;
         _memberService = memberService;
@@ -33,6 +34,7 @@ public class ProjectsController : ControllerBase
         _customFieldService = customFieldService;
         _exportService = exportService;
         _dashboardService = dashboardService;
+        _automationRuleService = automationRuleService;
         _logger = logger;
     }
 
@@ -390,6 +392,80 @@ public class ProjectsController : ControllerBase
             if (error?.Contains("permission") == true || error?.Contains("required") == true)
                 return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.Fail(new ErrorResponse { Code = "FORBIDDEN", Message = error }, correlationId));
             return BadRequest(ApiResponse<object>.Fail(new ErrorResponse { Code = "VALIDATION", Message = error }, correlationId));
+        }
+        return NoContent();
+    }
+
+    [HttpGet("{projectId:guid}/automation-rules")]
+    [SwaggerOperation(Summary = "List automation rules", Description = "Returns automation rules for the project. Requires project access.")]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<ProjectAutomationRuleResponse>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<ProjectAutomationRuleResponse>>>> GetAutomationRules([FromRoute] Guid projectId, CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
+        var currentUserId = GetCurrentUserId();
+        if (currentUserId == null)
+            return Unauthorized(ApiResponse<IReadOnlyList<ProjectAutomationRuleResponse>>.Fail(new ErrorResponse { Code = "UNAUTHORIZED", Message = "Authentication required." }, correlationId));
+
+        var (success, data, error) = await _automationRuleService.GetByProjectIdAsync(projectId, currentUserId.Value, cancellationToken).ConfigureAwait(false);
+        if (!success)
+        {
+            if (error?.Contains("not found") == true)
+                return NotFound(ApiResponse<IReadOnlyList<ProjectAutomationRuleResponse>>.Fail(new ErrorResponse { Code = "PROJECT_NOT_FOUND", Message = error }, correlationId));
+            return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<IReadOnlyList<ProjectAutomationRuleResponse>>.Fail(new ErrorResponse { Code = "FORBIDDEN", Message = error }, correlationId));
+        }
+        return Ok(ApiResponse<IReadOnlyList<ProjectAutomationRuleResponse>>.Ok(data ?? Array.Empty<ProjectAutomationRuleResponse>(), correlationId));
+    }
+
+    [HttpPost("{projectId:guid}/automation-rules")]
+    [SwaggerOperation(Summary = "Create automation rule", Description = "Creates an automation rule. Requires Project.Edit and project member. Triggers: TaskCompleted, TaskOverdue, TaskAssigned. Actions: NotifyUser, ChangeStatus, AddLabel.")]
+    [ProducesResponseType(typeof(ApiResponse<ProjectAutomationRuleResponse>), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ApiResponse<ProjectAutomationRuleResponse>>> CreateAutomationRule([FromRoute] Guid projectId, [FromBody] CreateProjectAutomationRuleRequest request, CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
+        var currentUserId = GetCurrentUserId();
+        if (currentUserId == null)
+            return Unauthorized(ApiResponse<ProjectAutomationRuleResponse>.Fail(new ErrorResponse { Code = "UNAUTHORIZED", Message = "Authentication required." }, correlationId));
+
+        var (success, data, error) = await _automationRuleService.CreateAsync(projectId, request ?? new CreateProjectAutomationRuleRequest(), currentUserId.Value, cancellationToken).ConfigureAwait(false);
+        if (!success)
+        {
+            if (error?.Contains("not found") == true)
+                return NotFound(ApiResponse<ProjectAutomationRuleResponse>.Fail(new ErrorResponse { Code = "PROJECT_NOT_FOUND", Message = error }, correlationId));
+            if (error?.Contains("permission") == true || error?.Contains("required") == true)
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<ProjectAutomationRuleResponse>.Fail(new ErrorResponse { Code = "FORBIDDEN", Message = error }, correlationId));
+            return BadRequest(ApiResponse<ProjectAutomationRuleResponse>.Fail(new ErrorResponse { Code = "VALIDATION", Message = error ?? "Invalid request." }, correlationId));
+        }
+        return StatusCode(StatusCodes.Status201Created, ApiResponse<ProjectAutomationRuleResponse>.Ok(data!, correlationId));
+    }
+
+    [HttpDelete("{projectId:guid}/automation-rules/{ruleId:guid}")]
+    [SwaggerOperation(Summary = "Delete automation rule", Description = "Deletes an automation rule. Requires Project.Edit and project member.")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteAutomationRule([FromRoute] Guid projectId, [FromRoute] Guid ruleId, CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
+        var currentUserId = GetCurrentUserId();
+        if (currentUserId == null)
+            return Unauthorized();
+
+        var (success, error) = await _automationRuleService.DeleteAsync(projectId, ruleId, currentUserId.Value, cancellationToken).ConfigureAwait(false);
+        if (!success)
+        {
+            if (error?.Contains("not found") == true)
+                return NotFound(ApiResponse<object>.Fail(new ErrorResponse { Code = "NOT_FOUND", Message = error }, correlationId));
+            if (error?.Contains("permission") == true || error?.Contains("required") == true)
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.Fail(new ErrorResponse { Code = "FORBIDDEN", Message = error }, correlationId));
+            return NotFound(ApiResponse<object>.Fail(new ErrorResponse { Code = "NOT_FOUND", Message = error }, correlationId));
         }
         return NoContent();
     }

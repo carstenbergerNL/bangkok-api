@@ -1,7 +1,7 @@
 import { apiClient } from '../../api/client';
 import { API_PATHS } from '../../constants/api';
 import type { ApiResponse } from '../../models/ApiResponse';
-import type { Project, CreateProjectRequest, UpdateProjectRequest, ProjectTemplate, CreateProjectTemplateRequest, UpdateProjectTemplateRequest } from './types';
+import type { Project, CreateProjectRequest, UpdateProjectRequest, ProjectTemplate, CreateProjectTemplateRequest, UpdateProjectTemplateRequest, ProjectAutomationRule, CreateProjectAutomationRuleRequest } from './types';
 
 export function getProjects(status?: string): Promise<ApiResponse<Project[]>> {
   const params = status?.trim() ? { params: { status: status.trim() } } : {};
@@ -94,6 +94,27 @@ export function updateProject(id: string, request: UpdateProjectRequest): Promis
 export function deleteProject(id: string): Promise<ApiResponse<unknown>> {
   return apiClient
     .delete(API_PATHS.PROJECTS.BY_ID(id))
+    .then(() => ({ success: true } as ApiResponse<unknown>))
+    .catch((err) => err.response?.data ?? { success: false, error: { message: err.message ?? 'Request failed' } });
+}
+
+export function getAutomationRules(projectId: string): Promise<ApiResponse<ProjectAutomationRule[]>> {
+  return apiClient
+    .get<ApiResponse<ProjectAutomationRule[]>>(API_PATHS.PROJECTS.AUTOMATION_RULES(projectId))
+    .then((res) => res.data)
+    .catch((err) => err.response?.data ?? { success: false, error: { message: err.message ?? 'Request failed' } });
+}
+
+export function createAutomationRule(projectId: string, request: CreateProjectAutomationRuleRequest): Promise<ApiResponse<ProjectAutomationRule>> {
+  return apiClient
+    .post<ApiResponse<ProjectAutomationRule>>(API_PATHS.PROJECTS.AUTOMATION_RULES(projectId), request)
+    .then((res) => res.data)
+    .catch((err) => err.response?.data ?? { success: false, error: { message: err.message ?? 'Request failed' } });
+}
+
+export function deleteAutomationRule(projectId: string, ruleId: string): Promise<ApiResponse<unknown>> {
+  return apiClient
+    .delete(API_PATHS.PROJECTS.AUTOMATION_RULE_BY_ID(projectId, ruleId))
     .then(() => ({ success: true } as ApiResponse<unknown>))
     .catch((err) => err.response?.data ?? { success: false, error: { message: err.message ?? 'Request failed' } });
 }

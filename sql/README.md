@@ -27,6 +27,7 @@ Database scripts for the **Bangkok API**. Target: **SQL Server**. Use `UNIQUEIDE
 - **dbo.Label** – Project-level labels: Id, Name, Color, ProjectId, CreatedAt.
 - **dbo.TaskLabel** – Task–Label many-to-many: Id, TaskId, LabelId.
 - **dbo.Notification** – User notifications: Id, UserId, Type, Title, Message, ReferenceId, IsRead, CreatedAt.
+- **dbo.ProjectAutomationRule** – Automation rules: Id, ProjectId, Trigger, Action, TargetUserId, TargetValue. Triggers: TaskCompleted, TaskOverdue, TaskAssigned. Actions: NotifyUser, ChangeStatus, AddLabel.
 
 ## Alter scripts (order)
 
@@ -46,6 +47,11 @@ Database scripts for the **Bangkok API**. Target: **SQL Server**. Use `UNIQUEIDE
 | 013_add_labels.sql | Add Label and TaskLabel |
 | 014_add_notifications.sql | Add Notification |
 | 015_add_task_timelogs.sql | Add TaskTimeLog, add Task.EstimatedHours |
+| 016_add_task_recurrence.sql | Add task recurrence columns |
+| 017_add_task_attachments.sql | Add TaskAttachment, AttachmentsController |
+| 018_add_project_templates.sql | Add ProjectTemplate, ProjectTemplateTask |
+| 019_add_project_custom_fields.sql | Add ProjectCustomField, TaskCustomFieldValue |
+| 020_add_project_automation_rules.sql | Add ProjectAutomationRule (trigger/action rules) |
 
 ## Conventions
 
