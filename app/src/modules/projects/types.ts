@@ -31,7 +31,19 @@ export interface Task {
   createdByUserId: string;
   createdAt: string;
   updatedAt?: string | null;
+  estimatedHours?: number | null;
   labels?: Label[];
+}
+
+/** Task time log – matches backend TaskTimeLogResponse */
+export interface TaskTimeLog {
+  id: string;
+  taskId: string;
+  userId: string;
+  userDisplayName?: string | null;
+  hours: number;
+  description?: string | null;
+  createdAt: string;
 }
 
 export interface CreateProjectRequest {
@@ -54,6 +66,7 @@ export interface CreateTaskRequest {
   priority?: string;
   assignedToUserId?: string | null;
   dueDate?: string | null;
+  estimatedHours?: number | null;
   labelIds?: string[];
 }
 
@@ -64,7 +77,13 @@ export interface UpdateTaskRequest {
   priority?: string | null;
   assignedToUserId?: string | null;
   dueDate?: string | null;
+  estimatedHours?: number | null;
   labelIds?: string[];
+}
+
+export interface CreateTaskTimeLogRequest {
+  hours: number;
+  description?: string | null;
 }
 
 /** Task comment – matches backend TaskCommentResponse */

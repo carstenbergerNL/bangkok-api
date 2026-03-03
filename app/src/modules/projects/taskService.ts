@@ -1,7 +1,7 @@
 import { apiClient } from '../../api/client';
 import { API_PATHS } from '../../constants/api';
 import type { ApiResponse } from '../../models/ApiResponse';
-import type { Task, CreateTaskRequest, UpdateTaskRequest, TaskFilterParams } from './types';
+import type { Task, CreateTaskRequest, UpdateTaskRequest, TaskFilterParams, TaskTimeLog, CreateTaskTimeLogRequest } from './types';
 
 export function getTasks(projectId: string, filter?: TaskFilterParams): Promise<ApiResponse<Task[]>> {
   const params: Record<string, string> = { projectId };
@@ -44,6 +44,27 @@ export function updateTask(id: string, request: UpdateTaskRequest): Promise<ApiR
 export function deleteTask(id: string): Promise<ApiResponse<unknown>> {
   return apiClient
     .delete(API_PATHS.TASKS.BY_ID(id))
+    .then(() => ({ success: true } as ApiResponse<unknown>))
+    .catch((err) => err.response?.data ?? { success: false, error: { message: err.message ?? 'Request failed' } });
+}
+
+export function getTimeLogs(taskId: string): Promise<ApiResponse<TaskTimeLog[]>> {
+  return apiClient
+    .get<ApiResponse<TaskTimeLog[]>>(API_PATHS.TASKS.TIMELOGS(taskId))
+    .then((res) => res.data)
+    .catch((err) => err.response?.data ?? { success: false, error: { message: err.message ?? 'Request failed' } });
+}
+
+export function createTimeLog(taskId: string, request: CreateTaskTimeLogRequest): Promise<ApiResponse<TaskTimeLog>> {
+  return apiClient
+    .post<ApiResponse<TaskTimeLog>>(API_PATHS.TASKS.TIMELOGS(taskId), request)
+    .then((res) => res.data)
+    .catch((err) => err.response?.data ?? { success: false, error: { message: err.message ?? 'Request failed' } });
+}
+
+export function deleteTimeLog(id: string): Promise<ApiResponse<unknown>> {
+  return apiClient
+    .delete(API_PATHS.TIMELOGS.BY_ID(id))
     .then(() => ({ success: true } as ApiResponse<unknown>))
     .catch((err) => err.response?.data ?? { success: false, error: { message: err.message ?? 'Request failed' } });
 }

@@ -24,5 +24,7 @@ public class CreateTaskRequest
 
     public Guid? AssignedToUserId { get; set; }
     public DateTime? DueDate { get; set; }
+    [Range(0, 999.99)]
+    public decimal? EstimatedHours { get; set; }
     public IReadOnlyList<Guid>? LabelIds { get; set; }
 }

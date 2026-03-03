@@ -27,11 +27,29 @@ public class ProjectDashboardRepository : IProjectDashboardRepository
                 SELECT
                     COUNT(*) AS TotalTasks,
                     ISNULL(SUM(CASE WHEN Status = 'Done' THEN 1 ELSE 0 END), 0) AS CompletedTasks,
-                    ISNULL(SUM(CASE WHEN DueDate IS NOT NULL AND DueDate < @UtcNow AND Status <> 'Done' THEN 1 ELSE 0 END), 0) AS OverdueTasks
-                FROM dbo.Task
-                WHERE ProjectId = @ProjectId";
-            var totals = await connection.QuerySingleAsync<(int TotalTasks, int CompletedTasks, int OverdueTasks)>(
+                    ISNULL(SUM(CASE WHEN DueDate IS NOT NULL AND DueDate < @UtcNow AND Status <> 'Done' THEN 1 ELSE 0 END), 0) AS OverdueTasks,
+                    ISNULL(SUM(t.EstimatedHours), 0) AS TotalEstimatedHours
+                FROM dbo.Task t
+                WHERE t.ProjectId = @ProjectId";
+            var totals = await connection.QuerySingleAsync<(int TotalTasks, int CompletedTasks, int OverdueTasks, decimal TotalEstimatedHours)>(
                 new CommandDefinition(totalsSql, new { ProjectId = projectId, UtcNow = utcNow }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+            const string loggedSql = @"
+                SELECT ISNULL(SUM(l.Hours), 0)
+                FROM dbo.TaskTimeLog l
+                INNER JOIN dbo.Task t ON l.TaskId = t.Id
+                WHERE t.ProjectId = @ProjectId";
+            var totalLoggedHours = await connection.ExecuteScalarAsync<decimal>(
+                new CommandDefinition(loggedSql, new { ProjectId = projectId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+            const string overBudgetSql = @"
+                SELECT COUNT(*)
+                FROM dbo.Task t
+                WHERE t.ProjectId = @ProjectId
+                  AND t.EstimatedHours IS NOT NULL
+                  AND (SELECT ISNULL(SUM(l.Hours), 0) FROM dbo.TaskTimeLog l WHERE l.TaskId = t.Id) > t.EstimatedHours";
+            var overBudgetCount = await connection.ExecuteScalarAsync<int>(
+                new CommandDefinition(overBudgetSql, new { ProjectId = projectId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
 
             const string statusSql = @"
                 SELECT Status, COUNT(*) AS Count
@@ -55,6 +73,9 @@ public class ProjectDashboardRepository : IProjectDashboardRepository
                 TotalTasks = totals.TotalTasks,
                 CompletedTasks = totals.CompletedTasks,
                 OverdueTasks = totals.OverdueTasks,
+                TotalEstimatedHours = totals.TotalEstimatedHours,
+                TotalLoggedHours = totalLoggedHours,
+                OverBudgetTaskCount = overBudgetCount,
                 TasksPerStatus = statusRows.Select(x => new TasksPerStatusItem { Status = x.Status, Count = x.Count }).ToList(),
                 TasksPerMember = memberRows.Select(x => new TasksPerMemberItem { UserId = x.UserId, UserDisplayName = x.UserDisplayName, Count = x.Count }).ToList()
             };

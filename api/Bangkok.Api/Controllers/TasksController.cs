@@ -20,13 +20,15 @@ public class TasksController : ControllerBase
     private readonly ITaskService _taskService;
     private readonly ITaskCommentService _commentService;
     private readonly ITaskActivityService _activityService;
+    private readonly ITaskTimeLogService _timeLogService;
     private readonly ILogger<TasksController> _logger;
 
-    public TasksController(ITaskService taskService, ITaskCommentService commentService, ITaskActivityService activityService, ILogger<TasksController> logger)
+    public TasksController(ITaskService taskService, ITaskCommentService commentService, ITaskActivityService activityService, ITaskTimeLogService timeLogService, ILogger<TasksController> logger)
     {
         _taskService = taskService;
         _commentService = commentService;
         _activityService = activityService;
+        _timeLogService = timeLogService;
         _logger = logger;
     }
 
@@ -228,6 +230,47 @@ public class TasksController : ControllerBase
 
         var list = await _activityService.GetByTaskIdAsync(taskId, currentUserId.Value, cancellationToken).ConfigureAwait(false);
         return Ok(ApiResponse<IReadOnlyList<TaskActivityResponse>>.Ok(list, correlationId));
+    }
+
+    [HttpGet("{taskId:guid}/timelogs")]
+    [SwaggerOperation(Summary = "List task time logs", Description = "Returns time logs for the task. Requires Task.View. 403 if permission missing.")]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<TaskTimeLogResponse>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<TaskTimeLogResponse>>>> GetTimeLogs([FromRoute] Guid taskId, CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
+        var currentUserId = GetCurrentUserId();
+        if (currentUserId == null)
+            return Unauthorized(ApiResponse<IReadOnlyList<TaskTimeLogResponse>>.Fail(new ErrorResponse { Code = "UNAUTHORIZED", Message = "Authentication required." }, correlationId));
+
+        var list = await _timeLogService.GetByTaskIdAsync(taskId, currentUserId.Value, cancellationToken).ConfigureAwait(false);
+        return Ok(ApiResponse<IReadOnlyList<TaskTimeLogResponse>>.Ok(list, correlationId));
+    }
+
+    [HttpPost("{taskId:guid}/timelogs")]
+    [SwaggerOperation(Summary = "Log time on task", Description = "Adds a time log entry. Requires Task.Edit. 403 if permission missing.")]
+    [ProducesResponseType(typeof(ApiResponse<TaskTimeLogResponse>), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<ApiResponse<TaskTimeLogResponse>>> CreateTimeLog([FromRoute] Guid taskId, [FromBody] CreateTaskTimeLogRequest request, CancellationToken cancellationToken)
+    {
+        var correlationId = HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? HttpContext.TraceIdentifier;
+        var currentUserId = GetCurrentUserId();
+        if (currentUserId == null)
+            return Unauthorized(ApiResponse<TaskTimeLogResponse>.Fail(new ErrorResponse { Code = "UNAUTHORIZED", Message = "Authentication required." }, correlationId));
+
+        var (success, data, error) = await _timeLogService.CreateAsync(taskId, request ?? new CreateTaskTimeLogRequest(), currentUserId.Value, cancellationToken).ConfigureAwait(false);
+        if (!success)
+        {
+            if (error?.Contains("not found") == true)
+                return NotFound(ApiResponse<TaskTimeLogResponse>.Fail(new ErrorResponse { Code = "TASK_NOT_FOUND", Message = error }, correlationId));
+            if (error?.Contains("permission") == true)
+                return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<TaskTimeLogResponse>.Fail(new ErrorResponse { Code = "FORBIDDEN", Message = error }, correlationId));
+            return BadRequest(ApiResponse<TaskTimeLogResponse>.Fail(new ErrorResponse { Code = "VALIDATION", Message = error ?? "Invalid request." }, correlationId));
+        }
+        return StatusCode(StatusCodes.Status201Created, ApiResponse<TaskTimeLogResponse>.Ok(data!, correlationId));
     }
 
     private Guid? GetCurrentUserId()

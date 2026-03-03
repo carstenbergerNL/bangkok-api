@@ -1,6 +1,6 @@
 # Bangkok Admin App
 
-React frontend for the Bangkok API. Provides login, dashboard, settings, and **admin-only** user management (CRUD, restore deleted users).
+React frontend for the Bangkok API. Provides login, dashboard, **project and task management** (Kanban, labels, members, time tracking), settings, **roles and permissions**, and **admin-only** user management (CRUD, restore deleted users, lock/unlock).
 
 ## Tech stack
 
@@ -16,16 +16,24 @@ React frontend for the Bangkok API. Provides login, dashboard, settings, and **a
 app/
 ├── public/
 ├── src/
-│   ├── api/           # API client (base URL, 401 handling)
+│   ├── api/              # API client (base URL, 401 handling)
 │   ├── assets/
-│   ├── components/    # AdminRoute, Modal, PrivateRoute, Toast
-│   ├── context/       # AuthContext (user, token, login, logout)
-│   ├── hooks/         # useDarkMode
-│   ├── layouts/       # MainLayout, Sidebar, Topbar
-│   ├── models/        # ApiResponse, User, LoginRequest, etc.
-│   ├── pages/         # Login, Dashboard, Settings, AdminSettings
-│   ├── services/      # authService, userService
-│   ├── utils/         # toast
+│   ├── components/       # AdminRoute, Modal, PrivateRoute, PermissionRoute, Toast, etc.
+│   ├── constants/        # api.ts, validation, permissions
+│   ├── context/          # AuthContext (user, token, login, logout)
+│   ├── hooks/            # useDarkMode, usePermissions
+│   ├── layouts/          # MainLayout, Sidebar, Topbar
+│   ├── models/           # ApiResponse, User, LoginRequest, Profile, Role, Permission, etc.
+│   ├── modules/
+│   │   └── projects/     # projectService, taskService, labelService, memberService,
+│   │                     # commentService, activityService, dashboardService;
+│   │                     # ProjectListPage, ProjectDetailsPage, KanbanBoard, TaskDrawer,
+│   │                     # TaskFormModal, TaskList, ProjectFormModal, ProjectMembersTab,
+│   │                     # ProjectDashboardTab, ProjectLabelsSettings, types
+│   ├── pages/            # Login, Dashboard, Profile, Roles, AdminSettings (Users, Roles, Permissions)
+│   ├── services/         # authService, userService, roleService, permissionService,
+│   │                     # profileService, notificationService
+│   ├── utils/            # toast
 │   ├── App.tsx
 │   ├── main.tsx
 │   └── index.css
@@ -71,12 +79,12 @@ app/
 
 ## Scripts
 
-| Command       | Description                    |
-|---------------|--------------------------------|
-| `npm run dev` | Start dev server (Vite, HMR)   |
+| Command         | Description                      |
+|-----------------|----------------------------------|
+| `npm run dev`   | Start dev server (Vite, HMR)     |
 | `npm run build` | TypeScript check + production build |
-| `npm run preview` | Serve production build locally |
-| `npm run lint` | Run ESLint                     |
+| `npm run preview` | Serve production build locally  |
+| `npm run lint`  | Run ESLint                       |
 
 **Dev server:** by default Vite runs at `http://localhost:5173`. In development, the app uses a proxy to `VITE_API_BASE_URL` (see `vite.config.ts`) so the browser talks to the same origin and avoids CORS during local dev.
 
@@ -84,33 +92,51 @@ app/
 
 - **Authentication**
   - Login with email and password (JWT).
-  - Token and user (including role) stored in `localStorage`; 401 from API triggers logout and redirect to login.
+  - Token and user (including roles/permissions) stored in `localStorage`; 401 from API triggers logout and redirect to login.
 
 - **Layout**
-  - **Topbar:** app title, hamburger (toggle sidebar on desktop, open overlay on mobile), dark/light toggle, user dropdown (logout).
-  - **Sidebar:** Dashboard, Settings; **Admin Settings** only for users with role `Admin`.
+  - **Topbar:** app title, hamburger (toggle sidebar), dark/light toggle, notifications, user dropdown (logout).
+  - **Sidebar:** Dashboard, Projects, Profile, Settings; **Roles** (permission-based); **Admin Settings** for users with Admin role.
 
-- **Pages**
-  - **Login** – Email + password; redirects to `/` when already logged in.
-  - **Dashboard** – Home view (placeholder content).
-  - **Settings** – General settings (placeholder).
-  - **Admin Settings** (admin only):
-    - **Users:** list (email, display name, role, active), **Add user** (register), **Edit** (email, display name, role, active; cannot change own “Active”), **Delete** (soft-delete; cannot delete yourself).
-    - **Deleted users:** list of soft-deleted users with **Restore** and “Deleted at” time.
+- **Projects**
+  - **Project list** – List projects; create, edit, delete. Permission-based: Project.View, Project.Create, Project.Edit, Project.Delete.
+  - **Project details** – Tabs: **Board** (Kanban), **Tasks**, **Dashboard**, **Members**, **Labels**. Dashboard shows total/completed/overdue tasks, total estimated hours, total logged hours, over-budget indicator.
+
+- **Tasks**
+  - **Kanban** – Columns by status (ToDo, In Progress, Done); drag-and-drop; create task, open task drawer.
+  - **Task drawer** – Details tab: title, description, status, priority, assignee, due date, **estimated hours**, labels; **Time tracking**: log hours + description, list of time logs, total logged, over-budget indicator; Comments tab; Activity tab. Edit/delete when permitted (Task.Edit, Task.Delete).
+  - **Task list** – Table view with filters (status, priority, assignee, label, due date, search).
+  - Create/update task: title, description, status, priority, assignee, due date, **estimated hours**, labels.
+
+- **Time tracking**
+  - Per task: log hours with optional description; view all time logs (user, hours, date); delete own/logs when Task.Edit. Total logged vs estimated hours; over-budget warning when logged > estimated.
+
+- **Roles and permissions**
+  - **Roles** – List roles; create, edit, delete; assign permissions to roles. Permission-based access.
+  - **Permissions** – List permissions; assign to roles.
+
+- **Admin Settings** (admin only)
+  - **Users:** list (email, display name, role, active), **Add user** (register), **Edit** (email, display name, role, active; cannot change own “Active”), **Delete** (soft-delete; cannot delete yourself), **Lock** / **Unlock**, assign roles.
+  - **Deleted users:** list of soft-deleted users with **Restore** and “Deleted at” time.
+  - **Hard delete** (optional): permanently remove a user with confirm.
 
 - **Guards**
   - **PrivateRoute** – Redirects unauthenticated users to `/login`.
-  - **AdminRoute** – Redirects non-admin users to `/`; used for `/admin-settings`.
+  - **AdminRoute** – Redirects non-admin users; used for `/admin-settings`.
+  - **PermissionRoute** – Checks specific permissions (e.g. Project.View, Task.Create).
 
 ## API usage
 
 - All authenticated requests send `Authorization: Bearer <token>`.
-- Login: `POST /api/Auth/login` (email, password, optional applicationId).
-- User list: `GET /api/Users?pageNumber=1&pageSize=500&includeDeleted=true` (admin only); active and deleted users are split in the UI.
-- Create user: `POST /api/Auth/register` (admin creates users via register).
-- Update user: `PUT /api/Users/:id`.
-- Soft-delete: `DELETE /api/Users/:id`.
-- Restore: `PATCH /api/Users/:id/restore`.
+- **Auth:** Login `POST /api/Auth/login`; Register `POST /api/Auth/register`; Refresh `POST /api/Auth/refresh`; Revoke `POST /api/Auth/revoke`; Forgot password, Reset password, Change password.
+- **Users:** List `GET /api/Users`; Get `GET /api/Users/{id}`; Update `PUT /api/Users/{id}`; Soft-delete `DELETE /api/Users/{id}`; Restore `PATCH /api/Users/{id}/restore`; Lock/Unlock; Hard delete `DELETE /api/Users/{id}/hard?confirm=true`; Mention search `GET /api/Users/mention-search`.
+- **Profile:** Get `GET /api/Profile/{userId}`; Create/Update `POST /api/Profile`, `PUT /api/Profile/{userId}`.
+- **Roles:** List `GET /api/Roles`; CRUD; role permissions GET/POST/DELETE.
+- **Permissions:** List `GET /api/Permissions`; CRUD.
+- **Projects:** List `GET /api/Projects`; Get `GET /api/Projects/{id}`; Create `POST /api/Projects`; Update `PUT /api/Projects/{id}`; Delete `DELETE /api/Projects/{id}`; Dashboard `GET /api/Projects/{id}/dashboard`; Members GET/POST/PUT/DELETE; Labels GET/POST/DELETE.
+- **Tasks:** List by project `GET /api/Tasks?projectId=...`; Get `GET /api/Tasks/{id}`; Create `POST /api/Tasks`; Update `PUT /api/Tasks/{id}`; Delete `DELETE /api/Tasks/{id}`; Comments `GET/POST /api/Tasks/{taskId}/comments`; Activities `GET /api/Tasks/{taskId}/activities`; **Time logs** `GET /api/Tasks/{taskId}/timelogs`, `POST /api/Tasks/{taskId}/timelogs`; Delete time log `DELETE /api/Timelogs/{id}`.
+- **Comments:** Update `PUT /api/Comments/{id}`; Delete `DELETE /api/Comments/{id}` (task comments by comment id).
+- **Notifications:** List `GET /api/Notifications`; Unread count `GET /api/Notifications/unread-count`; Mark read `PUT /api/Notifications/{id}/read`; Mark all read `PUT /api/Notifications/read-all`.
 
 ## Build for production
 

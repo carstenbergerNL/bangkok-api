@@ -15,5 +15,6 @@ public class TaskResponse
     public Guid CreatedByUserId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
+    public decimal? EstimatedHours { get; set; }
     public IReadOnlyList<LabelResponse> Labels { get; set; } = Array.Empty<LabelResponse>();
 }

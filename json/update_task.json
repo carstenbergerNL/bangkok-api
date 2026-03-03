@@ -4,5 +4,7 @@
   "status": "InProgress",
   "priority": "High",
   "assignedToUserId": null,
-  "dueDate": "2025-12-31T23:59:59Z"
+  "dueDate": "2025-12-31T23:59:59Z",
+  "estimatedHours": 8.5,
+  "labelIds": []
 }

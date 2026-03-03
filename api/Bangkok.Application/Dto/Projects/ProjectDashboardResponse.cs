@@ -5,6 +5,9 @@ public class ProjectDashboardResponse
     public int TotalTasks { get; set; }
     public int CompletedTasks { get; set; }
     public int OverdueTasks { get; set; }
+    public decimal TotalEstimatedHours { get; set; }
+    public decimal TotalLoggedHours { get; set; }
+    public int OverBudgetTaskCount { get; set; }
     public IReadOnlyList<TasksPerStatusItem> TasksPerStatus { get; set; } = Array.Empty<TasksPerStatusItem>();
     public IReadOnlyList<TasksPerMemberItem> TasksPerMember { get; set; } = Array.Empty<TasksPerMemberItem>();
 }

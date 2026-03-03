@@ -5,5 +5,7 @@
   "status": "ToDo",
   "priority": "Medium",
   "assignedToUserId": null,
-  "dueDate": null
+  "dueDate": null,
+  "estimatedHours": null,
+  "labelIds": []
 }

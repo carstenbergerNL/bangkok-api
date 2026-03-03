@@ -123,7 +123,8 @@ public class TaskService : ITaskService
             AssignedToUserId = request.AssignedToUserId == Guid.Empty ? null : request.AssignedToUserId,
             DueDate = request.DueDate?.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(request.DueDate.Value, DateTimeKind.Utc) : request.DueDate,
             CreatedByUserId = currentUserId,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            EstimatedHours = request.EstimatedHours
         };
 
         await _taskRepository.CreateAsync(task, cancellationToken).ConfigureAwait(false);
@@ -201,6 +202,8 @@ public class TaskService : ITaskService
             task.AssignedToUserId = request.AssignedToUserId == Guid.Empty ? null : request.AssignedToUserId;
         if (request.DueDate.HasValue)
             task.DueDate = request.DueDate.Value.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(request.DueDate.Value, DateTimeKind.Utc) : request.DueDate.Value;
+        if (request.EstimatedHours.HasValue)
+            task.EstimatedHours = request.EstimatedHours.Value;
         task.UpdatedAt = DateTime.UtcNow;
 
         await _taskRepository.UpdateAsync(task, cancellationToken).ConfigureAwait(false);
@@ -360,6 +363,7 @@ public class TaskService : ITaskService
         CreatedByUserId = t.CreatedByUserId,
         CreatedAt = t.CreatedAt,
         UpdatedAt = t.UpdatedAt,
+        EstimatedHours = t.EstimatedHours,
         Labels = labels ?? Array.Empty<LabelResponse>()
     };
 }

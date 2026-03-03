@@ -64,7 +64,7 @@ app-native/src/
    Use the same endpoints and request/response shapes. Define matching types in `models/` and use `API_PATHS` from `constants/`.
 
 2. **Same features**  
-   Every feature in the web app (auth, profile, users, password change, etc.) should have an equivalent in the native app. UI and navigation differ; behavior and data contract do not.
+   Every feature in the web app (auth, profile, users, roles, permissions, projects, tasks, time tracking, labels, members, dashboard, notifications, password change, etc.) should have an equivalent in the native app. UI and navigation differ; behavior and data contract do not.
 
 3. **Same validation**  
    Keep `VALIDATION` in `constants/` identical to `app/src/constants/validation.ts`.

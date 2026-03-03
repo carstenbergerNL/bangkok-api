@@ -23,7 +23,7 @@ public class TaskRepository : ITaskRepository
         {
             connection.Open();
             const string sql = @"
-                SELECT Id, ProjectId, Title, Description, Status, Priority, AssignedToUserId, DueDate, CreatedByUserId, CreatedAt, UpdatedAt
+                SELECT Id, ProjectId, Title, Description, Status, Priority, AssignedToUserId, DueDate, CreatedByUserId, CreatedAt, UpdatedAt, EstimatedHours
                 FROM dbo.Task
                 WHERE Id = @Id";
             return await connection.QuerySingleOrDefaultAsync<ProjectTask>(
@@ -83,7 +83,7 @@ public class TaskRepository : ITaskRepository
 
             var whereClause = string.Join(" AND ", conditions);
             var sql = $@"
-                SELECT t.Id, t.ProjectId, t.Title, t.Description, t.Status, t.Priority, t.AssignedToUserId, t.DueDate, t.CreatedByUserId, t.CreatedAt, t.UpdatedAt
+                SELECT t.Id, t.ProjectId, t.Title, t.Description, t.Status, t.Priority, t.AssignedToUserId, t.DueDate, t.CreatedByUserId, t.CreatedAt, t.UpdatedAt, t.EstimatedHours
                 FROM dbo.Task t
                 WHERE {whereClause}
                 ORDER BY t.CreatedAt DESC";
@@ -100,8 +100,8 @@ public class TaskRepository : ITaskRepository
         {
             connection.Open();
             const string sql = @"
-                INSERT INTO dbo.Task (Id, ProjectId, Title, Description, Status, Priority, AssignedToUserId, DueDate, CreatedByUserId, CreatedAt)
-                VALUES (@Id, @ProjectId, @Title, @Description, @Status, @Priority, @AssignedToUserId, @DueDate, @CreatedByUserId, @CreatedAt)";
+                INSERT INTO dbo.Task (Id, ProjectId, Title, Description, Status, Priority, AssignedToUserId, DueDate, CreatedByUserId, CreatedAt, EstimatedHours)
+                VALUES (@Id, @ProjectId, @Title, @Description, @Status, @Priority, @AssignedToUserId, @DueDate, @CreatedByUserId, @CreatedAt, @EstimatedHours)";
             await connection.ExecuteAsync(new CommandDefinition(sql, new
             {
                 task.Id,
@@ -113,7 +113,8 @@ public class TaskRepository : ITaskRepository
                 task.AssignedToUserId,
                 task.DueDate,
                 task.CreatedByUserId,
-                task.CreatedAt
+                task.CreatedAt,
+                task.EstimatedHours
             }, cancellationToken: cancellationToken)).ConfigureAwait(false);
             return task.Id;
         }
@@ -128,7 +129,7 @@ public class TaskRepository : ITaskRepository
             const string sql = @"
                 UPDATE dbo.Task
                 SET Title = @Title, Description = @Description, Status = @Status, Priority = @Priority,
-                    AssignedToUserId = @AssignedToUserId, DueDate = @DueDate, UpdatedAt = @UpdatedAt
+                    AssignedToUserId = @AssignedToUserId, DueDate = @DueDate, UpdatedAt = @UpdatedAt, EstimatedHours = @EstimatedHours
                 WHERE Id = @Id";
             await connection.ExecuteAsync(new CommandDefinition(sql, new
             {
@@ -139,7 +140,8 @@ public class TaskRepository : ITaskRepository
                 task.Priority,
                 task.AssignedToUserId,
                 task.DueDate,
-                task.UpdatedAt
+                task.UpdatedAt,
+                task.EstimatedHours
             }, cancellationToken: cancellationToken)).ConfigureAwait(false);
         }
     }

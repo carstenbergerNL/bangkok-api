@@ -18,5 +18,6 @@ public class UpdateTaskRequest
 
     public Guid? AssignedToUserId { get; set; }
     public DateTime? DueDate { get; set; }
+    public decimal? EstimatedHours { get; set; }
     public IReadOnlyList<Guid>? LabelIds { get; set; }
 }

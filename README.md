@@ -10,10 +10,16 @@ sources/
 ├── app/              # Web client (React + Vite)
 ├── app-native/       # Mobile client (Expo / React Native)
 ├── sql/              # Database schema and migrations
-├── .cursor/rules/     # Cursor rules (including sync-architecture.mdc)
+├── json/             # API request body examples (Auth, Users, Projects, Tasks, Timelogs, etc.)
+├── .cursor/rules/    # Cursor rules (including sync-architecture.mdc)
 ├── package.json      # npm workspaces root
 └── README.md         # This file
 ```
+
+## API and request examples
+
+- **REST API** – Controllers: Auth, Users, Profile, Roles, Permissions, Projects, Tasks, Comments, Timelogs, Notifications. All authenticated endpoints use `Authorization: Bearer <token>`.
+- **Request examples** – The **`json/`** folder contains sample request bodies for key endpoints (login, register, create/update project, create/update task, create timelog, etc.). See `json/README.md` for the full endpoint table. Use them for Postman, curl, or as a reference for the frontend.
 
 ## Architecture overview
 

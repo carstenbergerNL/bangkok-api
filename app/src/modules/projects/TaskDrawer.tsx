@@ -5,9 +5,10 @@ import { getCurrentUserId } from '../../services/authService';
 import { getCommentsByTaskId, createComment, updateComment, deleteComment } from './commentService';
 import { getActivitiesByTaskId } from './activityService';
 import { getLabels } from './labelService';
+import { getTimeLogs, createTimeLog, deleteTimeLog, updateTask } from './taskService';
 import type { User } from '../../models/User';
 import { TASK_STATUSES, TASK_PRIORITIES } from './types';
-import type { Task, UpdateTaskRequest, TaskComment, TaskActivity, Label } from './types';
+import type { Task, UpdateTaskRequest, TaskComment, TaskActivity, TaskTimeLog, Label } from './types';
 
 function CommentContentWithMentions({ content }: { content: string }) {
   if (!content) return null;
@@ -72,6 +73,7 @@ export function TaskDrawer({
   const [priority, setPriority] = useState('Medium');
   const [assignedToUserId, setAssignedToUserId] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [estimatedHours, setEstimatedHours] = useState<string>('');
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
   const [projectLabels, setProjectLabels] = useState<Label[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -94,6 +96,12 @@ export function TaskDrawer({
 
   const [activities, setActivities] = useState<TaskActivity[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
+
+  const [timeLogs, setTimeLogs] = useState<TaskTimeLog[]>([]);
+  const [timeLogsLoading, setTimeLogsLoading] = useState(false);
+  const [logHours, setLogHours] = useState('');
+  const [logDescription, setLogDescription] = useState('');
+  const [postingTimeLog, setPostingTimeLog] = useState(false);
 
   const currentUserId = getCurrentUserId();
 
@@ -133,6 +141,16 @@ export function TaskDrawer({
     });
   }, []);
 
+  const loadTimeLogs = useCallback((taskId: string) => {
+    setTimeLogsLoading(true);
+    getTimeLogs(taskId)
+      .then((res) => {
+        const data = res.data ?? (res as unknown as { Data?: TaskTimeLog[] }).Data;
+        setTimeLogs(Array.isArray(data) ? data : []);
+      })
+      .finally(() => setTimeLogsLoading(false));
+  }, []);
+
   useEffect(() => {
     if (open && task) {
       loadUsers();
@@ -143,10 +161,14 @@ export function TaskDrawer({
       setPriority(task.priority ?? 'Medium');
       setAssignedToUserId(task.assignedToUserId ?? '');
       setDueDate(task.dueDate ? task.dueDate.slice(0, 10) : '');
+      setEstimatedHours(task.estimatedHours != null ? String(task.estimatedHours) : '');
       setSelectedLabelIds(task.labels?.map((l) => l.id) ?? []);
       setActiveTab('details');
       setNewCommentText('');
       setEditingCommentId(null);
+      setLogHours('');
+      setLogDescription('');
+      loadTimeLogs(task.id);
       if (activeTab === 'comments') loadComments(task.id);
       if (activeTab === 'activity') loadActivities(task.id);
     }
@@ -226,6 +248,12 @@ export function TaskDrawer({
         priority,
         assignedToUserId: assignedToUserId || null,
         dueDate: dueDate || null,
+        estimatedHours: (() => {
+            const v = estimatedHours.trim();
+            if (v === '') return null;
+            const n = parseFloat(v);
+            return Number.isNaN(n) ? null : n;
+          })(),
         labelIds: selectedLabelIds,
       });
       if (res.success) {
@@ -297,6 +325,43 @@ export function TaskDrawer({
 
   const canEditComment = (c: TaskComment) => canComment && currentUserId && c.userId === currentUserId;
   const canDeleteComment = (c: TaskComment) => (canComment && currentUserId && c.userId === currentUserId) || (canDelete === true);
+
+  const totalLoggedHours = timeLogs.reduce((sum, l) => sum + l.hours, 0);
+
+  const handleAddTimeLog = async () => {
+    if (!task || !canEdit) return;
+    const hoursNum = parseFloat(logHours);
+    if (Number.isNaN(hoursNum) || hoursNum < 0.01 || hoursNum > 999.99) {
+      addToast('error', 'Enter hours between 0.01 and 999.99.');
+      return;
+    }
+    setPostingTimeLog(true);
+    try {
+      const res = await createTimeLog(task.id, { hours: hoursNum, description: logDescription.trim() || null });
+      const data = res.data ?? (res as unknown as { Data?: TaskTimeLog }).Data;
+      if (res.success && data) {
+        setTimeLogs((prev) => [data, ...prev]);
+        setLogHours('');
+        setLogDescription('');
+        addToast('success', 'Time logged.');
+      } else {
+        addToast('error', res.error?.message ?? 'Failed to log time.');
+      }
+    } finally {
+      setPostingTimeLog(false);
+    }
+  };
+
+  const handleDeleteTimeLog = async (log: TaskTimeLog) => {
+    if (!canEdit) return;
+    const res = await deleteTimeLog(log.id);
+    if (res.success) {
+      setTimeLogs((prev) => prev.filter((x) => x.id !== log.id));
+      addToast('success', 'Time log removed.');
+    } else {
+      addToast('error', res.error?.message ?? 'Failed to remove time log.');
+    }
+  };
 
   if (!open) return null;
 
@@ -486,6 +551,135 @@ export function TaskDrawer({
                   disabled={!canEdit}
                   className="w-full px-3 py-2 rounded-lg border bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-600 focus:ring-2 focus:ring-blue-500 disabled:opacity-70 disabled:cursor-not-allowed"
                 />
+              </div>
+              <div>
+                <label htmlFor="drawer-estimated-hours" className="block text-sm font-medium mb-1" style={{ color: headerColor }}>
+                  Estimated hours
+                </label>
+                <input
+                  id="drawer-estimated-hours"
+                  type="number"
+                  min={0}
+                  step={0.25}
+                  placeholder="Optional"
+                  value={estimatedHours}
+                  onChange={(e) => setEstimatedHours(e.target.value)}
+                  disabled={!canEdit}
+                  className="w-full px-3 py-2 rounded-lg border bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-600 focus:ring-2 focus:ring-blue-500 disabled:opacity-70 disabled:cursor-not-allowed"
+                />
+              </div>
+              <div className="border-t border-gray-200 dark:border-slate-600 pt-4 mt-2">
+                <h4 className="text-sm font-semibold mb-3" style={{ color: headerColor }}>
+                  Time tracking
+                </h4>
+                <div className="flex items-end gap-2 mb-3">
+                  <span className="text-sm font-medium" style={{ color: descColor }}>
+                    Total: {totalLoggedHours.toFixed(2)} h
+                    {task?.estimatedHours != null && task.estimatedHours > 0 && (
+                      <span className="ml-2">
+                        {totalLoggedHours > task.estimatedHours ? (
+                          <span className="text-red-600 dark:text-red-400 font-medium">Over budget</span>
+                        ) : (
+                          <span className="text-gray-500 dark:text-slate-400">
+                            / {task.estimatedHours} h estimated
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </span>
+                </div>
+                {canEdit && (
+                  <div className="space-y-2 mb-4">
+                    <div className="flex gap-2 flex-wrap items-end">
+                      <div className="flex-1 min-w-[80px]">
+                        <label htmlFor="drawer-log-hours" className="block text-xs font-medium mb-0.5" style={{ color: descColor }}>
+                          Hours
+                        </label>
+                        <input
+                          id="drawer-log-hours"
+                          type="number"
+                          min={0.01}
+                          max={999.99}
+                          step={0.25}
+                          placeholder="0"
+                          value={logHours}
+                          onChange={(e) => setLogHours(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-600 focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                      </div>
+                      <div className="flex-[2] min-w-[140px]">
+                        <label htmlFor="drawer-log-desc" className="block text-xs font-medium mb-0.5" style={{ color: descColor }}>
+                          Description
+                        </label>
+                        <input
+                          id="drawer-log-desc"
+                          type="text"
+                          placeholder="Optional"
+                          value={logDescription}
+                          onChange={(e) => setLogDescription(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-600 focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAddTimeLog}
+                        disabled={postingTimeLog || !logHours.trim()}
+                        className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                      >
+                        {postingTimeLog ? 'Logging…' : 'Log time'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {timeLogsLoading ? (
+                  <div className="animate-pulse space-y-2">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="h-10 rounded bg-gray-200 dark:bg-slate-600" />
+                    ))}
+                  </div>
+                ) : timeLogs.length === 0 ? (
+                  <p className="text-sm py-2" style={{ color: descColor }}>No time logged yet.</p>
+                ) : (
+                  <ul className="space-y-2 max-h-48 overflow-y-auto">
+                    {timeLogs.map((log) => (
+                      <li
+                        key={log.id}
+                        className="flex items-start justify-between gap-2 py-2 px-3 rounded-lg bg-gray-50 dark:bg-slate-800/60 border border-gray-100 dark:border-slate-700"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium" style={{ color: headerColor }}>
+                              {log.userDisplayName ?? 'Unknown'}
+                            </span>
+                            <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                              {log.hours} h
+                            </span>
+                          </div>
+                          {log.description && (
+                            <p className="text-sm mt-0.5 truncate" style={{ color: descColor }} title={log.description}>
+                              {log.description}
+                            </p>
+                          )}
+                          <p className="text-xs mt-0.5" style={{ color: descColor }}>
+                            {log.createdAt ? new Date(log.createdAt).toLocaleString() : ''}
+                          </p>
+                        </div>
+                        {canEdit && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteTimeLog(log)}
+                            className="shrink-0 p-1.5 rounded text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-900/20 transition-colors"
+                            title="Remove time log"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
               <div className="pt-4 space-y-2">
                 {canEdit && (
