@@ -20,7 +20,7 @@ public class ProjectAutomationRuleRepository : IProjectAutomationRuleRepository
         using (connection)
         {
             connection.Open();
-            const string sql = "SELECT Id, ProjectId, Trigger, Action, TargetUserId, TargetValue FROM dbo.ProjectAutomationRule WHERE ProjectId = @ProjectId ORDER BY Trigger, Action";
+            const string sql = "SELECT Id, ProjectId, [Trigger], [Action], TargetUserId, TargetValue FROM dbo.ProjectAutomationRule WHERE ProjectId = @ProjectId ORDER BY [Trigger], [Action]";
             var list = await connection.QueryAsync<ProjectAutomationRule>(
                 new CommandDefinition(sql, new { ProjectId = projectId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
             return list.ToList();
@@ -46,7 +46,7 @@ public class ProjectAutomationRuleRepository : IProjectAutomationRuleRepository
         {
             connection.Open();
             const string sql = @"
-                INSERT INTO dbo.ProjectAutomationRule (Id, ProjectId, Trigger, Action, TargetUserId, TargetValue)
+                INSERT INTO dbo.ProjectAutomationRule (Id, ProjectId, [Trigger], [Action], TargetUserId, TargetValue)
                 VALUES (@Id, @ProjectId, @Trigger, @Action, @TargetUserId, @TargetValue)";
             await connection.ExecuteAsync(new CommandDefinition(sql, new
             {

@@ -68,6 +68,9 @@ Sample request bodies for **Bangkok API** endpoints. Use them for manual testing
 | `DELETE /api/Projects/{id}` | Delete project; no body. Fails if project has tasks. |
 | `GET /api/Projects/{id}/dashboard` | Dashboard stats (tasks, total estimated hours, total logged hours, over-budget count); no body. |
 | `GET /api/Projects/{id}/export` | Export project tasks as CSV (title, status, priority, assignee, due date, labels, logged hours). Returns file; no body. |
+| `GET /api/Projects/{id}/automation-rules` | List automation rules (trigger, action, targetUserId, targetValue); no body. |
+| `POST /api/Projects/{id}/automation-rules` | Create rule: trigger (TaskCompleted, TaskOverdue, TaskAssigned), action (NotifyUser, ChangeStatus, AddLabel), optional targetUserId, targetValue. |
+| `DELETE /api/Projects/{id}/automation-rules/{ruleId}` | Delete rule; no body. |
 | `GET /api/Projects/{id}/members/me` | Current user's role; no body. |
 | `GET /api/Projects/{id}/members` | List members; no body. |
 | `POST /api/Projects/{id}/members` | Add member (userId, role). |

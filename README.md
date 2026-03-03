@@ -18,7 +18,7 @@ sources/
 
 ## API and request examples
 
-- **REST API** – Controllers: Auth, Users, Profile, Roles, Permissions, Projects (including CSV export), Tasks, Comments, Timelogs, Notifications. All authenticated endpoints use `Authorization: Bearer <token>`.
+- **REST API** – Controllers: Auth, Users, Profile, Roles, Permissions, Projects (CSV export, automation rules), Tasks, Comments, Timelogs, Notifications. All authenticated endpoints use `Authorization: Bearer <token>`.
 - **Request examples** – The **`json/`** folder contains sample request bodies for key endpoints (login, register, create/update project, create/update task, create timelog, etc.). See `json/README.md` for the full endpoint table. Use them for Postman, curl, or as a reference for the frontend.
 
 ## Architecture overview
