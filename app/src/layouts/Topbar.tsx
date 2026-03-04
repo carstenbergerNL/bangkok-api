@@ -36,14 +36,18 @@ export function Topbar({ onMenuClick, sidebarCollapsed }: TopbarProps) {
   const notificationRef = useRef<HTMLDivElement>(null);
 
   const loadNotifications = useCallback(() => {
-    getNotifications().then((res) => {
-      const data = res.data ?? (res as { Data?: Notification[] }).Data;
-      setNotifications(Array.isArray(data) ? data : []);
-    });
-    getUnreadCount().then((res) => {
-      const count = res.data ?? (res as { Data?: number }).Data;
-      setUnreadCount(typeof count === 'number' ? count : 0);
-    });
+    getNotifications()
+      .then((res) => {
+        const data = res.data ?? (res as { Data?: Notification[] }).Data;
+        setNotifications(Array.isArray(data) ? data : []);
+      })
+      .catch(() => setNotifications([]));
+    getUnreadCount()
+      .then((res) => {
+        const count = res.data ?? (res as { Data?: number }).Data;
+        setUnreadCount(typeof count === 'number' ? count : 0);
+      })
+      .catch(() => setUnreadCount(0));
   }, []);
 
   useEffect(() => {
@@ -62,10 +66,13 @@ export function Topbar({ onMenuClick, sidebarCollapsed }: TopbarProps) {
   useEffect(() => {
     if (notificationOpen) {
       setNotificationsLoading(true);
-      getNotifications().then((res) => {
-        const data = res.data ?? (res as { Data?: Notification[] }).Data;
-        setNotifications(Array.isArray(data) ? data : []);
-      }).finally(() => setNotificationsLoading(false));
+      getNotifications()
+        .then((res) => {
+          const data = res.data ?? (res as { Data?: Notification[] }).Data;
+          setNotifications(Array.isArray(data) ? data : []);
+        })
+        .catch(() => setNotifications([]))
+        .finally(() => setNotificationsLoading(false));
     }
   }, [notificationOpen]);
 
@@ -148,7 +155,7 @@ export function Topbar({ onMenuClick, sidebarCollapsed }: TopbarProps) {
           <button
             type="button"
             onClick={onMenuClick}
-            className="flex items-center justify-center p-2 lg:px-3 lg:py-2 rounded transition-colors duration-150 hover:bg-[#f3f2f1] dark:hover:bg-[#3b3a39] focus:outline-none focus:ring-2 focus:ring-[#0078d4] focus:ring-offset-2 shrink-0"
+            className="flex items-center justify-center p-2 lg:px-3 lg:py-2 rounded transition-colors duration-150 hover:bg-[#f3f2f1] dark:hover:bg-[#3b3a39] focus:outline-none focus:ring-2 focus:ring-[#0078d4] focus:ring-offset-2 dark:focus:ring-offset-[#1e2a4a] shrink-0"
             style={{ color: 'var(--topbar-text, #605e5c)' }}
             aria-label="Toggle menu"
           >
@@ -177,7 +184,7 @@ export function Topbar({ onMenuClick, sidebarCollapsed }: TopbarProps) {
           <button
             type="button"
             onClick={() => setNotificationOpen((o) => !o)}
-            className="relative flex items-center justify-center p-2 rounded transition-colors duration-150 hover:bg-[#f3f2f1] dark:hover:bg-[#3b3a39] focus:outline-none focus:ring-2 focus:ring-[#0078d4] focus:ring-offset-2"
+            className="relative flex items-center justify-center p-2 rounded transition-colors duration-150 hover:bg-[#f3f2f1] dark:hover:bg-[#3b3a39] focus:outline-none focus:ring-2 focus:ring-[#0078d4] focus:ring-offset-2 dark:focus:ring-offset-[#1e2a4a]"
             style={{ color: 'var(--topbar-text, #323130)' }}
             aria-label="Notifications"
           >
@@ -257,10 +264,7 @@ export function Topbar({ onMenuClick, sidebarCollapsed }: TopbarProps) {
             {avatarSrc ? (
               <img src={avatarSrc} alt="" className="w-8 h-8 rounded-full object-cover border border-[#edebe9] dark:border-[#3b3a39]" />
             ) : (
-              <span
-                className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold"
-                style={{ backgroundColor: '#e6f4ff', color: '#0078d4' }}
-              >
+              <span className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400">
                 {initial}
               </span>
             )}

@@ -116,7 +116,7 @@ interface TaskDrawerProps {
   onDelete?: (task: Task) => void;
 }
 
-type TabId = 'details' | 'comments' | 'activity';
+type TabId = 'details' | 'comments' | 'activity' | 'time' | 'attachments';
 
 export function TaskDrawer({
   open,
@@ -557,22 +557,41 @@ export function TaskDrawer({
   const borderColor = 'var(--sidebar-border, #edebe9)';
   const headerColor = 'var(--card-header-color, #323130)';
   const descColor = 'var(--card-description-color, #605e5c)';
+  const isActive = (id: TabId) => activeTab === id;
+  const tabBtn = (id: TabId, label: string, count?: number) =>
+    `px-3 py-2.5 text-xs font-medium rounded-t-lg transition-colors ${
+      isActive(id)
+        ? 'bg-white dark:bg-slate-800/80 text-primary-600 dark:text-primary-400 border border-b-0 border-gray-200 dark:border-slate-700 -mb-px'
+        : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800/50'
+    }`;
 
   return (
     <aside
-      className="w-full h-full flex flex-col min-w-0 border-l"
-      style={{ backgroundColor: 'var(--sidebar-bg, #faf9f8)', borderLeft: `1px solid ${borderColor}` }}
+      className="w-full h-full flex flex-col min-w-0 border-l bg-white dark:bg-slate-900/50"
+      style={{ borderLeft: `1px solid ${borderColor}` }}
       role="complementary"
       aria-label="Task details"
     >
-        <div className="flex items-center justify-between border-b px-6 py-4 shrink-0" style={{ borderColor }}>
-          <h2 className="text-lg font-semibold" style={{ color: headerColor }}>
-            {task ? 'Task details' : 'Task'}
-          </h2>
+        <div className="flex items-start justify-between gap-3 border-b px-5 py-4 shrink-0 bg-gray-50/80 dark:bg-slate-800/50" style={{ borderColor }}>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-slate-100 truncate">
+              {task ? task.title : 'Task'}
+            </h2>
+            {task && (
+              <div className="mt-1 flex items-center gap-2 flex-wrap">
+                <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 dark:bg-slate-600 dark:text-slate-200">
+                  {task.status === 'ToDo' ? 'Todo' : task.status === 'InProgress' ? 'In Progress' : task.status}
+                </span>
+                <span className="text-xs text-gray-500 dark:text-slate-400">
+                  {task.priority}
+                </span>
+              </div>
+            )}
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 transition-colors"
+            className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 transition-colors shrink-0"
             aria-label="Close"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -582,28 +601,24 @@ export function TaskDrawer({
         </div>
 
         {task && (
-          <div className="flex border-b shrink-0" style={{ borderColor }}>
-            {['details', 'comments', 'activity'].map((tab) => {
-              const id = tab as TabId;
-              const label = id === 'details' ? 'Details' : id === 'comments' ? 'Comments' : 'Activity';
-              const show = id === 'details' || id === 'comments' || (id === 'activity' && canViewActivity);
-              if (!show) return null;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setActiveTab(id)}
-                  className={`px-4 py-3 text-sm font-medium transition-colors ${
-                    activeTab === id
-                      ? 'border-b-2 text-blue-600 dark:text-blue-400'
-                      : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200'
-                  }`}
-                  style={activeTab === id ? { borderBottomColor: 'var(--primary, #2563eb)' } : undefined}
-                >
-                  {label}
-                </button>
-              );
-            })}
+          <div className="flex flex-wrap gap-1 px-3 pt-2 border-b shrink-0 bg-gray-50/50 dark:bg-slate-800/30" style={{ borderColor }}>
+            <button type="button" onClick={() => setActiveTab('details')} className={tabBtn('details', 'Details')}>
+              Details
+            </button>
+            <button type="button" onClick={() => setActiveTab('comments')} className={tabBtn('comments', 'Comments')}>
+              Comments {comments.length > 0 && <span className="ml-1 opacity-80">({comments.length})</span>}
+            </button>
+            {canViewActivity && (
+              <button type="button" onClick={() => setActiveTab('activity')} className={tabBtn('activity', 'Activity')}>
+                Activity
+              </button>
+            )}
+            <button type="button" onClick={() => setActiveTab('time')} className={tabBtn('time', 'Time')}>
+              Time {timeLogs.length > 0 && <span className="ml-1 opacity-80">({totalLoggedHours.toFixed(1)}h)</span>}
+            </button>
+            <button type="button" onClick={() => setActiveTab('attachments')} className={tabBtn('attachments', 'Attachments')}>
+              Attachments {attachments.length > 0 && <span className="ml-1 opacity-80">({attachments.length})</span>}
+            </button>
           </div>
         )}
 
@@ -846,7 +861,7 @@ export function TaskDrawer({
                 />
               </div>
               {task?.isRecurring && (
-                <div className="flex items-center gap-2 text-sm" style={{ color: descColor }}>
+                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-slate-400">
                   <svg className="w-4 h-4 text-indigo-500 dark:text-indigo-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
@@ -856,212 +871,6 @@ export function TaskDrawer({
                   </span>
                 </div>
               )}
-              <div className="border-t border-gray-200 dark:border-slate-600 pt-4 mt-2">
-                <h4 className="text-sm font-semibold mb-3" style={{ color: headerColor }}>
-                  Attachments
-                </h4>
-                {canEdit && (
-                  <>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      className="hidden"
-                      accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
-                      onChange={handleFileSelect}
-                    />
-                    <div
-                      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                      onDragLeave={() => setDragOver(false)}
-                      onDrop={handleDrop}
-                      className={`mb-3 rounded-lg border-2 border-dashed px-4 py-3 text-center text-sm transition-colors ${dragOver ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400' : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500'}`}
-                      style={{ color: descColor }}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={uploadingAttachment}
-                        className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-                      >
-                        {uploadingAttachment ? (
-                          'Uploading…'
-                        ) : (
-                          <>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                            </svg>
-                            Upload file
-                          </>
-                        )}
-                      </button>
-                      <span className="ml-2">or drag and drop</span>
-                    </div>
-                  </>
-                )}
-                {attachmentsLoading ? (
-                  <div className="animate-pulse space-y-2">
-                    <div className="h-12 rounded bg-gray-200 dark:bg-slate-600" />
-                    <div className="h-12 rounded bg-gray-200 dark:bg-slate-600" />
-                  </div>
-                ) : attachments.length === 0 ? (
-                  <p className="text-sm py-2" style={{ color: descColor }}>No attachments yet.</p>
-                ) : (
-                  <ul className="space-y-2 max-h-48 overflow-y-auto">
-                    {attachments.map((att) => (
-                      <li
-                        key={att.id}
-                        className="flex items-center gap-3 py-2 px-3 rounded-lg bg-gray-50 dark:bg-slate-800/60 border border-gray-100 dark:border-slate-700"
-                      >
-                        <AttachmentIcon contentType={att.contentType} />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium truncate" style={{ color: headerColor }} title={att.fileName}>
-                            {att.fileName}
-                          </p>
-                          <p className="text-xs" style={{ color: descColor }}>
-                            {formatFileSize(att.fileSize)}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => handleDownloadAttachment(att)}
-                            className="p-1.5 rounded text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-900/20"
-                            title="Download"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                            </svg>
-                          </button>
-                          {canEdit && (
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteAttachment(att)}
-                              className="p-1.5 rounded text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-900/20"
-                              title="Remove"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
-                          )}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-              <div className="border-t border-gray-200 dark:border-slate-600 pt-4 mt-2">
-                <h4 className="text-sm font-semibold mb-3" style={{ color: headerColor }}>
-                  Time tracking
-                </h4>
-                <div className="flex items-end gap-2 mb-3">
-                  <span className="text-sm font-medium" style={{ color: descColor }}>
-                    Total: {totalLoggedHours.toFixed(2)} h
-                    {task?.estimatedHours != null && task.estimatedHours > 0 && (
-                      <span className="ml-2">
-                        {totalLoggedHours > task.estimatedHours ? (
-                          <span className="text-red-600 dark:text-red-400 font-medium">Over budget</span>
-                        ) : (
-                          <span className="text-gray-500 dark:text-slate-400">
-                            / {task.estimatedHours} h estimated
-                          </span>
-                        )}
-                      </span>
-                    )}
-                  </span>
-                </div>
-                {canEdit && (
-                  <div className="space-y-2 mb-4">
-                    <div className="flex gap-2 flex-wrap items-end">
-                      <div className="flex-1 min-w-[80px]">
-                        <label htmlFor="drawer-log-hours" className="block text-xs font-medium mb-0.5" style={{ color: descColor }}>
-                          Hours
-                        </label>
-                        <input
-                          id="drawer-log-hours"
-                          type="number"
-                          min={0.01}
-                          max={999.99}
-                          step={0.25}
-                          placeholder="0"
-                          value={logHours}
-                          onChange={(e) => setLogHours(e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg border bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-600 focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
-                      </div>
-                      <div className="flex-[2] min-w-[140px]">
-                        <label htmlFor="drawer-log-desc" className="block text-xs font-medium mb-0.5" style={{ color: descColor }}>
-                          Description
-                        </label>
-                        <input
-                          id="drawer-log-desc"
-                          type="text"
-                          placeholder="Optional"
-                          value={logDescription}
-                          onChange={(e) => setLogDescription(e.target.value)}
-                          className="w-full px-3 py-2 rounded-lg border bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-600 focus:ring-2 focus:ring-blue-500 text-sm"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleAddTimeLog}
-                        disabled={postingTimeLog || !logHours.trim()}
-                        className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                      >
-                        {postingTimeLog ? 'Logging…' : 'Log time'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-                {timeLogsLoading ? (
-                  <div className="animate-pulse space-y-2">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="h-10 rounded bg-gray-200 dark:bg-slate-600" />
-                    ))}
-                  </div>
-                ) : timeLogs.length === 0 ? (
-                  <p className="text-sm py-2" style={{ color: descColor }}>No time logged yet.</p>
-                ) : (
-                  <ul className="space-y-2 max-h-48 overflow-y-auto">
-                    {timeLogs.map((log) => (
-                      <li
-                        key={log.id}
-                        className="flex items-start justify-between gap-2 py-2 px-3 rounded-lg bg-gray-50 dark:bg-slate-800/60 border border-gray-100 dark:border-slate-700"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-medium" style={{ color: headerColor }}>
-                              {log.userDisplayName ?? 'Unknown'}
-                            </span>
-                            <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                              {log.hours} h
-                            </span>
-                          </div>
-                          {log.description && (
-                            <p className="text-sm mt-0.5 truncate" style={{ color: descColor }} title={log.description}>
-                              {log.description}
-                            </p>
-                          )}
-                          <p className="text-xs mt-0.5" style={{ color: descColor }}>
-                            {log.createdAt ? new Date(log.createdAt).toLocaleString() : ''}
-                          </p>
-                        </div>
-                        {canEdit && (
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteTimeLog(log)}
-                            className="shrink-0 p-1.5 rounded text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-900/20 transition-colors"
-                            title="Remove time log"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
               <div className="pt-4 space-y-2">
                 {canEdit && (
                   <button
@@ -1235,34 +1044,173 @@ export function TaskDrawer({
                   ))}
                 </div>
               ) : activities.length === 0 ? (
-                <p className="text-sm py-4" style={{ color: descColor }}>No activity yet.</p>
+                <p className="text-sm py-4 text-gray-500 dark:text-slate-400">No activity yet.</p>
               ) : (
                 <ul className="relative space-y-4">
                   {activities.map((a, idx) => (
                     <li key={a.id} className="flex gap-3 relative">
                       {idx < activities.length - 1 && (
-                        <div
-                          className="absolute left-4 top-8 bottom-0 w-0.5 -mb-4"
-                          style={{ backgroundColor: 'var(--dropdown-border, #edebe9)' }}
-                        />
+                        <div className="absolute left-4 top-8 bottom-0 w-0.5 -mb-4 bg-gray-200 dark:bg-slate-600" />
                       )}
-                      <div
-                        className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center bg-gray-100 dark:bg-slate-700"
-                        style={{ color: headerColor }}
-                        aria-hidden
-                      >
+                      <div className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300" aria-hidden>
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                       </div>
                       <div className="flex-1 min-w-0 pb-4">
-                        <p className="text-sm" style={{ color: headerColor }}>
-                          {a.description}
-                        </p>
-                        <p className="text-xs mt-0.5" style={{ color: descColor }}>
+                        <p className="text-sm text-gray-900 dark:text-slate-100">{a.description}</p>
+                        <p className="text-xs mt-0.5 text-gray-500 dark:text-slate-400">
                           {formatRelativeTime(a.createdAt)}
                           {a.userDisplayName ? ` · ${a.userDisplayName}` : ''}
                         </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : activeTab === 'time' ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-slate-100">Time logged</h3>
+                <span className="text-sm font-medium text-gray-600 dark:text-slate-300">
+                  Total: <strong className="text-primary-600 dark:text-primary-400">{totalLoggedHours.toFixed(2)} h</strong>
+                  {task?.estimatedHours != null && task.estimatedHours > 0 && (
+                    <span className="ml-2 text-gray-500 dark:text-slate-400">
+                      {totalLoggedHours > task.estimatedHours ? (
+                        <span className="text-red-600 dark:text-red-400">Over budget</span>
+                      ) : (
+                        <>/ {task.estimatedHours} h estimated</>
+                      )}
+                    </span>
+                  )}
+                </span>
+              </div>
+              {canEdit && (
+                <div className="rounded-xl border border-gray-200 dark:border-slate-600 bg-gray-50/50 dark:bg-slate-800/30 p-4 space-y-3">
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">Log time</h4>
+                  <div className="flex gap-2 flex-wrap items-end">
+                    <div className="flex-1 min-w-[80px]">
+                      <label htmlFor="drawer-log-hours" className="block text-xs font-medium mb-0.5 text-gray-600 dark:text-slate-400">Hours</label>
+                      <input
+                        id="drawer-log-hours"
+                        type="number"
+                        min={0.01}
+                        max={999.99}
+                        step={0.25}
+                        placeholder="0"
+                        value={logHours}
+                        onChange={(e) => setLogHours(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg border bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-600 focus:ring-2 focus:ring-blue-500 text-sm text-gray-900 dark:text-slate-100"
+                      />
+                    </div>
+                    <div className="flex-[2] min-w-[140px]">
+                      <label htmlFor="drawer-log-desc" className="block text-xs font-medium mb-0.5 text-gray-600 dark:text-slate-400">Description</label>
+                      <input
+                        id="drawer-log-desc"
+                        type="text"
+                        placeholder="Optional"
+                        value={logDescription}
+                        onChange={(e) => setLogDescription(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg border bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-600 focus:ring-2 focus:ring-blue-500 text-sm text-gray-900 dark:text-slate-100"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddTimeLog}
+                      disabled={postingTimeLog || !logHours.trim()}
+                      className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 disabled:opacity-50 transition-colors"
+                    >
+                      {postingTimeLog ? 'Logging…' : 'Log time'}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {timeLogsLoading ? (
+                <div className="animate-pulse space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-14 rounded-lg bg-gray-200 dark:bg-slate-600" />
+                  ))}
+                </div>
+              ) : timeLogs.length === 0 ? (
+                <p className="text-sm py-6 text-center text-gray-500 dark:text-slate-400 rounded-xl border border-dashed border-gray-200 dark:border-slate-600">No time logged yet.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {timeLogs.map((log) => (
+                    <li
+                      key={log.id}
+                      className="flex items-start justify-between gap-2 py-3 px-4 rounded-xl bg-gray-50 dark:bg-slate-800/60 border border-gray-100 dark:border-slate-700"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium text-gray-900 dark:text-slate-100">{log.userDisplayName ?? 'Unknown'}</span>
+                          <span className="text-sm font-semibold text-primary-600 dark:text-primary-400">{log.hours} h</span>
+                        </div>
+                        {log.description && (
+                          <p className="text-sm mt-0.5 text-gray-500 dark:text-slate-400 truncate" title={log.description}>{log.description}</p>
+                        )}
+                        <p className="text-xs mt-0.5 text-gray-400 dark:text-slate-500">{log.createdAt ? new Date(log.createdAt).toLocaleString() : ''}</p>
+                      </div>
+                      {canEdit && (
+                        <button type="button" onClick={() => handleDeleteTimeLog(log)} className="shrink-0 p-1.5 rounded-lg text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-900/20" title="Remove time log">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : activeTab === 'attachments' ? (
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-slate-100">Files</h3>
+              {canEdit && (
+                <>
+                  <input ref={fileInputRef} type="file" className="hidden" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv" onChange={handleFileSelect} />
+                  <div
+                    onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={handleDrop}
+                    className={`rounded-xl border-2 border-dashed px-4 py-6 text-center text-sm transition-colors ${dragOver ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 dark:border-primary-400' : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500 text-gray-500 dark:text-slate-400'}`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadingAttachment}
+                      className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+                    >
+                      {uploadingAttachment ? 'Uploading…' : (<><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg> Upload file</>)}
+                    </button>
+                    <span className="ml-2">or drag and drop</span>
+                  </div>
+                </>
+              )}
+              {attachmentsLoading ? (
+                <div className="animate-pulse space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-16 rounded-xl bg-gray-200 dark:bg-slate-600" />
+                  ))}
+                </div>
+              ) : attachments.length === 0 ? (
+                <p className="text-sm py-8 text-center text-gray-500 dark:text-slate-400 rounded-xl border border-dashed border-gray-200 dark:border-slate-600">No attachments yet.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {attachments.map((att) => (
+                    <li key={att.id} className="flex items-center gap-3 py-3 px-4 rounded-xl bg-gray-50 dark:bg-slate-800/60 border border-gray-100 dark:border-slate-700">
+                      <AttachmentIcon contentType={att.contentType} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-gray-900 dark:text-slate-100 truncate" title={att.fileName}>{att.fileName}</p>
+                        <p className="text-xs text-gray-500 dark:text-slate-400">{formatFileSize(att.fileSize)}</p>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button type="button" onClick={() => handleDownloadAttachment(att)} className="p-2 rounded-lg text-gray-500 hover:text-primary-600 hover:bg-primary-50 dark:hover:text-primary-400 dark:hover:bg-primary-900/20" title="Download">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                        </button>
+                        {canEdit && (
+                          <button type="button" onClick={() => handleDeleteAttachment(att)} className="p-2 rounded-lg text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-900/20" title="Remove">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
+                        )}
                       </div>
                     </li>
                   ))}

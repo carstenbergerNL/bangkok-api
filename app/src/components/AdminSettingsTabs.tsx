@@ -1,4 +1,4 @@
-export type AdminSettingsTab = 'users' | 'roles' | 'permissions' | 'templates' | 'tenant';
+export type AdminSettingsTab = 'users' | 'roles' | 'permissions' | 'templates' | 'tenant' | 'moduleAccess' | 'usersAndAccess';
 
 interface AdminSettingsTabsProps {
   activeTab: AdminSettingsTab;
@@ -7,10 +7,12 @@ interface AdminSettingsTabsProps {
 
 const TABS: { id: AdminSettingsTab; label: string }[] = [
   { id: 'users', label: 'Users' },
+  { id: 'usersAndAccess', label: 'Users & Access' },
   { id: 'roles', label: 'Roles' },
   { id: 'permissions', label: 'Permissions' },
   { id: 'templates', label: 'Templates' },
   { id: 'tenant', label: 'Tenant' },
+  { id: 'moduleAccess', label: 'Module Access' },
 ];
 
 export function AdminSettingsTabs({ activeTab, onTabChange }: AdminSettingsTabsProps) {

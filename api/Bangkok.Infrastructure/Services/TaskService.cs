@@ -8,11 +8,6 @@ namespace Bangkok.Infrastructure.Services;
 
 public class TaskService : ITaskService
 {
-    private const string PermissionView = "Task.View";
-    private const string PermissionCreate = "Task.Create";
-    private const string PermissionEdit = "Task.Edit";
-    private const string PermissionDelete = "Task.Delete";
-    private const string PermissionAssign = "Task.Assign";
     private const string AdminPermission = "ViewAdminSettings";
 
     public const string TriggerTaskCompleted = "TaskCompleted";
@@ -57,12 +52,6 @@ public class TaskService : ITaskService
 
     public async Task<(GetTaskResult Result, TaskResponse? Data)> GetByIdAsync(Guid id, Guid currentUserId, CancellationToken cancellationToken = default)
     {
-        if (!await _permissionChecker.HasPermissionAsync(currentUserId, PermissionView, cancellationToken).ConfigureAwait(false))
-        {
-            _logger.LogWarning("User {UserId} attempted to get task {TaskId} without Task.View", currentUserId, id);
-            return (GetTaskResult.Forbidden, null);
-        }
-
         var task = await _taskRepository.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
         if (task == null)
             return (GetTaskResult.NotFound, null);
@@ -81,12 +70,6 @@ public class TaskService : ITaskService
 
     public async Task<IReadOnlyList<TaskResponse>> GetByProjectIdAsync(Guid projectId, Guid currentUserId, TaskFilterRequest? filter = null, CancellationToken cancellationToken = default)
     {
-        if (!await _permissionChecker.HasPermissionAsync(currentUserId, PermissionView, cancellationToken).ConfigureAwait(false))
-        {
-            _logger.LogWarning("User {UserId} attempted to list tasks without Task.View", currentUserId);
-            return Array.Empty<TaskResponse>();
-        }
-
         if (!await CanAccessProjectAsync(projectId, currentUserId, cancellationToken).ConfigureAwait(false))
         {
             _logger.LogWarning("User {UserId} attempted to list tasks for project {ProjectId} without membership.", currentUserId, projectId);
@@ -101,12 +84,6 @@ public class TaskService : ITaskService
 
     public async Task<(CreateTaskResult Result, TaskResponse? Data, string? ErrorMessage)> CreateAsync(CreateTaskRequest request, Guid currentUserId, CancellationToken cancellationToken = default)
     {
-        if (!await _permissionChecker.HasPermissionAsync(currentUserId, PermissionCreate, cancellationToken).ConfigureAwait(false))
-        {
-            _logger.LogWarning("User {UserId} attempted to create task without Task.Create", currentUserId);
-            return (CreateTaskResult.Forbidden, null, "You do not have permission to create tasks.");
-        }
-
         if (request == null)
             return (CreateTaskResult.ValidationError, null, "Request is required.");
         if (request.ProjectId == Guid.Empty)
@@ -165,7 +142,7 @@ public class TaskService : ITaskService
 
         await LogActivityAsync(task.Id, currentUserId, "TaskCreated", null, task.Title, cancellationToken).ConfigureAwait(false);
         if (task.AssignedToUserId.HasValue && task.AssignedToUserId.Value != currentUserId && task.AssignedToUserId.Value != Guid.Empty)
-            await _notificationService.CreateAsync(task.AssignedToUserId.Value, NotificationService.TypeTaskAssigned, "Task assigned", $"You were assigned to: {task.Title}", task.Id, cancellationToken).ConfigureAwait(false);
+            await TryCreateNotificationAsync(task.AssignedToUserId.Value, NotificationService.TypeTaskAssigned, "Task assigned", $"You were assigned to: {task.Title}", task.Id, cancellationToken).ConfigureAwait(false);
         if (task.AssignedToUserId.HasValue && task.AssignedToUserId.Value != Guid.Empty)
             await RunAutomationRulesAsync(task.ProjectId, TriggerTaskAssigned, task, currentUserId, cancellationToken).ConfigureAwait(false);
         _logger.LogInformation("Task created. TaskId: {TaskId}, ProjectId: {ProjectId}, Title: {Title}, CreatedByUserId: {CreatedByUserId}", task.Id, task.ProjectId, task.Title, currentUserId);
@@ -177,12 +154,6 @@ public class TaskService : ITaskService
 
     public async Task<(UpdateTaskResult Result, string? ErrorMessage)> UpdateAsync(Guid id, UpdateTaskRequest request, Guid currentUserId, CancellationToken cancellationToken = default)
     {
-        if (!await _permissionChecker.HasPermissionAsync(currentUserId, PermissionEdit, cancellationToken).ConfigureAwait(false))
-        {
-            _logger.LogWarning("User {UserId} attempted to update task {TaskId} without Task.Edit", currentUserId, id);
-            return (UpdateTaskResult.Forbidden, "You do not have permission to edit tasks.");
-        }
-
         var task = await _taskRepository.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
         if (task == null)
             return (UpdateTaskResult.NotFound, null);
@@ -208,15 +179,6 @@ public class TaskService : ITaskService
         var oldPriority = task.Priority;
         var oldAssignedTo = task.AssignedToUserId;
         var oldDueDate = task.DueDate;
-
-        if (request.AssignedToUserId.HasValue && request.AssignedToUserId.Value != Guid.Empty)
-        {
-            if (!await _permissionChecker.HasPermissionAsync(currentUserId, PermissionAssign, cancellationToken).ConfigureAwait(false))
-            {
-                _logger.LogWarning("User {UserId} attempted to assign task {TaskId} without Task.Assign", currentUserId, id);
-                return (UpdateTaskResult.AssignForbidden, "You do not have permission to assign tasks.");
-            }
-        }
 
         if (request.Title != null)
             task.Title = request.Title.Trim();
@@ -288,11 +250,11 @@ public class TaskService : ITaskService
         if (assigneeId.HasValue && assigneeId.Value != currentUserId)
         {
             if (request.AssignedToUserId != null && request.AssignedToUserId != oldAssignedTo && assigneeId.Value != Guid.Empty)
-                await _notificationService.CreateAsync(assigneeId.Value, NotificationService.TypeTaskAssigned, "Task assigned", $"You were assigned to: {task.Title}", task.Id, cancellationToken).ConfigureAwait(false);
+                await TryCreateNotificationAsync(assigneeId.Value, NotificationService.TypeTaskAssigned, "Task assigned", $"You were assigned to: {task.Title}", task.Id, cancellationToken).ConfigureAwait(false);
             if (request.DueDate.HasValue && oldDueDate != task.DueDate)
-                await _notificationService.CreateAsync(assigneeId.Value, NotificationService.TypeTaskDueDateChanged, "Due date changed", $"Due date was updated for: {task.Title}", task.Id, cancellationToken).ConfigureAwait(false);
+                await TryCreateNotificationAsync(assigneeId.Value, NotificationService.TypeTaskDueDateChanged, "Due date changed", $"Due date was updated for: {task.Title}", task.Id, cancellationToken).ConfigureAwait(false);
             if (request.Status != null && request.Status.Trim() != oldStatus)
-                await _notificationService.CreateAsync(assigneeId.Value, NotificationService.TypeTaskStatusChanged, "Status changed", $"Status changed to {task.Status} for: {task.Title}", task.Id, cancellationToken).ConfigureAwait(false);
+                await TryCreateNotificationAsync(assigneeId.Value, NotificationService.TypeTaskStatusChanged, "Status changed", $"Status changed to {task.Status} for: {task.Title}", task.Id, cancellationToken).ConfigureAwait(false);
         }
 
         if (request.AssignedToUserId.HasValue && request.AssignedToUserId.Value != Guid.Empty)
@@ -305,12 +267,6 @@ public class TaskService : ITaskService
 
     public async Task<DeleteTaskResult> DeleteAsync(Guid id, Guid currentUserId, CancellationToken cancellationToken = default)
     {
-        if (!await _permissionChecker.HasPermissionAsync(currentUserId, PermissionDelete, cancellationToken).ConfigureAwait(false))
-        {
-            _logger.LogWarning("User {UserId} attempted to delete task {TaskId} without Task.Delete", currentUserId, id);
-            return DeleteTaskResult.Forbidden;
-        }
-
         var task = await _taskRepository.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
         if (task == null)
             return DeleteTaskResult.NotFound;
@@ -561,7 +517,19 @@ public class TaskService : ITaskService
         foreach (var userId in usersToNotify.Distinct())
         {
             if (userId == currentUserId) continue;
-            await _notificationService.CreateAsync(userId, NotificationService.TypeTaskAssigned, notificationTitle, message, task.Id, cancellationToken).ConfigureAwait(false);
+            await TryCreateNotificationAsync(userId, NotificationService.TypeTaskAssigned, notificationTitle, message, task.Id, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task TryCreateNotificationAsync(Guid userId, string type, string title, string message, Guid? referenceId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _notificationService.CreateAsync(userId, type, title, message, referenceId ?? Guid.Empty, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to create notification for user {UserId}, type {Type}. Notifications table may be missing.", userId, type);
         }
     }
 

@@ -33,7 +33,7 @@ public class ProjectAutomationRuleRepository : IProjectAutomationRuleRepository
         using (connection)
         {
             connection.Open();
-            const string sql = "SELECT Id, ProjectId, Trigger, Action, TargetUserId, TargetValue FROM dbo.ProjectAutomationRule WHERE Id = @Id";
+            const string sql = "SELECT Id, ProjectId, [Trigger], [Action], TargetUserId, TargetValue FROM dbo.ProjectAutomationRule WHERE Id = @Id";
             return await connection.QuerySingleOrDefaultAsync<ProjectAutomationRule>(
                 new CommandDefinition(sql, new { Id = id }, cancellationToken: cancellationToken)).ConfigureAwait(false);
         }

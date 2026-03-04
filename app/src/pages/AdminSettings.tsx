@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { AdminSettingsTabs, type AdminSettingsTab } from '../components/AdminSettingsTabs';
 import { UsersSection } from './admin-settings/UsersSection';
+import { UserManagementSection } from './admin-settings/UserManagementSection';
 import { RolesSection } from './admin-settings/RolesSection';
 import { PermissionsSection } from './admin-settings/PermissionsSection';
 import { TemplatesSection } from './admin-settings/TemplatesSection';
 import { ModulesSection } from './admin-settings/ModulesSection';
+import { ModuleAccessSection } from './admin-settings/ModuleAccessSection';
 
 export function AdminSettings() {
   const [activeTab, setActiveTab] = useState<AdminSettingsTab>('users');
@@ -28,10 +30,12 @@ export function AdminSettings() {
       >
         <div className="p-6">
           {activeTab === 'users' && <UsersSection />}
+          {activeTab === 'usersAndAccess' && <UserManagementSection />}
           {activeTab === 'roles' && <RolesSection />}
           {activeTab === 'permissions' && <PermissionsSection />}
           {activeTab === 'templates' && <TemplatesSection />}
           {activeTab === 'tenant' && <ModulesSection />}
+          {activeTab === 'moduleAccess' && <ModuleAccessSection />}
         </div>
       </div>
     </div>

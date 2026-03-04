@@ -33,6 +33,13 @@ export const API_PATHS = {
     PLANS: '/api/Billing/plans',
     CREATE_CHECKOUT_SESSION: '/api/Billing/create-checkout-session',
   },
+  TENANT_MODULES: {
+    BASE: '/api/tenant/modules',
+    MANAGEMENT: '/api/tenant/modules/management',
+    SET_ACTIVE: (moduleKey: string) => `/api/tenant/modules/${moduleKey}/active`,
+    MODULE_USERS: (moduleKey: string) => `/api/tenant/modules/${moduleKey}/users`,
+    MODULE_USER_REVOKE: (moduleKey: string, userId: string) => `/api/tenant/modules/${moduleKey}/users/${userId}`,
+  },
   PLATFORM_ADMIN: {
     DASHBOARD_STATS: '/api/PlatformAdmin/dashboard/stats',
     TENANTS: '/api/PlatformAdmin/tenants',

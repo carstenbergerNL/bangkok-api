@@ -1,9 +1,19 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { getLabels, createLabel, deleteLabel } from './labelService';
 import { addToast } from '../../utils/toast';
 import type { Label, CreateLabelRequest } from './types';
 
-const PRESET_COLORS = ['#6366f1', '#ec4899', '#10b981', '#f59e0b', '#3b82f6', '#8b5cf6', '#ef4444', '#6b7280'];
+/** Extended palette: red, orange, amber, yellow, lime, green, emerald, teal, cyan, sky, blue, indigo, violet, purple, fuchsia, pink, rose, gray, plus neutrals */
+const PRESET_COLORS = [
+  '#dc2626', '#ef4444', '#f87171', '#f97316', '#fb923c', '#f59e0b', '#fbbf24', '#eab308',
+  '#a3e635', '#84cc16', '#22c55e', '#34d399', '#10b981', '#14b8a6', '#2dd4bf', '#06b6d4',
+  '#0ea5e9', '#38bdf8', '#3b82f6', '#60a5fa', '#6366f1', '#818cf8', '#8b5cf6', '#a78bfa',
+  '#a855f7', '#c084fc', '#d946ef', '#e879f9', '#ec4899', '#f472b6', '#f43f5e', '#fb7185',
+  '#e11d48', '#64748b', '#94a3b8', '#6b7280', '#9ca3af', '#4b5563', '#6b7280',
+  '#374151', '#1f2937', '#111827', '#ffffff',
+];
+const DEFAULT_COLOR = PRESET_COLORS[0];
 
 interface ProjectLabelsSettingsProps {
   projectId: string;
@@ -13,7 +23,12 @@ export function ProjectLabelsSettings({ projectId }: ProjectLabelsSettingsProps)
   const [labels, setLabels] = useState<Label[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
-  const [color, setColor] = useState(PRESET_COLORS[0]);
+  const [color, setColor] = useState(DEFAULT_COLOR);
+const [colorPopupOpen, setColorPopupOpen] = useState(false);
+const [popupPosition, setPopupPosition] = useState<{ top: number; left: number } | null>(null);
+const colorPopupRef = useRef<HTMLDivElement>(null);
+const triggerRef = useRef<HTMLButtonElement>(null);
+const popupContentRef = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -32,6 +47,26 @@ export function ProjectLabelsSettings({ projectId }: ProjectLabelsSettingsProps)
     loadLabels();
   }, [loadLabels]);
 
+  useEffect(() => {
+    if (!colorPopupOpen) return;
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (rect) setPopupPosition({ top: rect.bottom + 8, left: rect.left });
+  }, [colorPopupOpen]);
+
+  useEffect(() => {
+    if (!colorPopupOpen) return;
+    const close = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        colorPopupRef.current?.contains(target) ||
+        popupContentRef.current?.contains(target)
+      ) return;
+      setColorPopupOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [colorPopupOpen]);
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = name.trim();
@@ -43,7 +78,7 @@ export function ProjectLabelsSettings({ projectId }: ProjectLabelsSettingsProps)
       if (res.success && res.data) {
         setLabels((prev) => [...prev, res.data!]);
         setName('');
-        setColor(PRESET_COLORS[0]);
+        setColor(DEFAULT_COLOR);
         addToast('success', 'Label added.');
       } else {
         addToast('error', res.error?.message ?? 'Failed to add label.');
@@ -104,22 +139,52 @@ export function ProjectLabelsSettings({ projectId }: ProjectLabelsSettingsProps)
             className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="relative" ref={colorPopupRef}>
           <label className="block text-xs font-medium mb-1" style={{ color: 'var(--card-description-color, #605e5c)' }}>
             Color
           </label>
-          <div className="flex gap-1.5">
-            {PRESET_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setColor(c)}
-                className={`w-8 h-8 rounded-lg border-2 transition-all ${color === c ? 'border-gray-900 dark:border-white scale-110' : 'border-transparent hover:scale-105'}`}
-                style={{ backgroundColor: c }}
-                aria-label={`Color ${c}`}
-              />
-            ))}
-          </div>
+          <button
+            ref={triggerRef}
+            type="button"
+            onClick={() => setColorPopupOpen((o) => !o)}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+            aria-label="Choose color"
+            aria-expanded={colorPopupOpen}
+            aria-haspopup="true"
+          >
+            <span
+              className="w-6 h-6 rounded border border-gray-200 dark:border-slate-500 shrink-0"
+              style={{ backgroundColor: color }}
+            />
+            <span style={{ color: 'var(--card-description-color, #605e5c)' }}>Pick color</span>
+          </button>
+          {colorPopupOpen && popupPosition && createPortal(
+            <div
+              ref={popupContentRef}
+              className="fixed z-[9999] w-max max-w-[min(100vw-2rem,400px)] p-4 rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 shadow-lg"
+              role="dialog"
+              aria-label="Label color palette"
+              style={{ top: popupPosition.top, left: popupPosition.left }}
+            >
+              <p className="text-xs font-medium text-gray-500 dark:text-slate-400 mb-3">Choose color</p>
+              <div className="grid grid-cols-8 gap-2">
+                {PRESET_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => {
+                      setColor(c);
+                      setColorPopupOpen(false);
+                    }}
+                    className={`size-8 rounded-lg border transition-colors shrink-0 ${color === c ? 'ring-2 ring-offset-1 ring-blue-500 border-white dark:border-slate-200 shadow-sm' : 'border-gray-300/80 dark:border-slate-500 hover:border-gray-400 dark:hover:border-slate-400'}`}
+                    style={{ backgroundColor: c }}
+                    aria-label={`Color ${c}`}
+                  />
+                ))}
+              </div>
+            </div>,
+            document.body
+          )}
         </div>
         <button
           type="submit"

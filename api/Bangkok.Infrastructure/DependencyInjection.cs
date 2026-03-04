@@ -30,7 +30,10 @@ public static class DependencyInjection
         services.AddScoped<ITenantUserRepository, TenantUserRepository>();
         services.AddScoped<IModuleRepository, ModuleRepository>();
         services.AddScoped<ITenantModuleRepository, TenantModuleRepository>();
+        services.AddScoped<ITenantModuleUserRepository, TenantModuleUserRepository>();
         services.AddScoped<ITenantModuleService, TenantModuleService>();
+        services.AddScoped<ITenantModuleUserService, TenantModuleUserService>();
+        services.AddScoped<ITenantAdminService, TenantAdminService>();
         services.AddScoped<IPlanRepository, PlanRepository>();
         services.AddScoped<ITenantSubscriptionRepository, TenantSubscriptionRepository>();
         services.AddScoped<ITenantUsageRepository, TenantUsageRepository>();

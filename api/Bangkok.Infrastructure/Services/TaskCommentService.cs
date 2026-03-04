@@ -7,9 +7,6 @@ namespace Bangkok.Infrastructure.Services;
 
 public class TaskCommentService : ITaskCommentService
 {
-    private const string PermissionComment = "Task.Comment";
-    private const string PermissionView = "Task.View";
-    private const string PermissionDelete = "Task.Delete";
     private const string AdminPermission = "ViewAdminSettings";
 
     private readonly ITaskCommentRepository _commentRepository;
@@ -43,9 +40,6 @@ public class TaskCommentService : ITaskCommentService
 
     public async Task<IReadOnlyList<TaskCommentResponse>> GetByTaskIdAsync(Guid taskId, Guid currentUserId, CancellationToken cancellationToken = default)
     {
-        if (!await _permissionChecker.HasPermissionAsync(currentUserId, PermissionView, cancellationToken).ConfigureAwait(false))
-            return Array.Empty<TaskCommentResponse>();
-
         var task = await _taskRepository.GetByIdAsync(taskId, cancellationToken).ConfigureAwait(false);
         if (task == null)
             return Array.Empty<TaskCommentResponse>();
@@ -76,12 +70,6 @@ public class TaskCommentService : ITaskCommentService
 
     public async Task<(bool Success, TaskCommentResponse? Data, string? Error)> CreateAsync(Guid taskId, CreateTaskCommentRequest request, Guid currentUserId, CancellationToken cancellationToken = default)
     {
-        if (!await _permissionChecker.HasPermissionAsync(currentUserId, PermissionComment, cancellationToken).ConfigureAwait(false))
-        {
-            _logger.LogWarning("User {UserId} attempted to add comment without Task.Comment", currentUserId);
-            return (false, null, "You do not have permission to comment on tasks.");
-        }
-
         var task = await _taskRepository.GetByIdAsync(taskId, cancellationToken).ConfigureAwait(false);
         if (task == null)
             return (false, null, "Task not found.");
@@ -135,12 +123,6 @@ public class TaskCommentService : ITaskCommentService
 
     public async Task<(bool Success, string? Error)> UpdateAsync(Guid commentId, UpdateTaskCommentRequest request, Guid currentUserId, CancellationToken cancellationToken = default)
     {
-        if (!await _permissionChecker.HasPermissionAsync(currentUserId, PermissionComment, cancellationToken).ConfigureAwait(false))
-        {
-            _logger.LogWarning("User {UserId} attempted to update comment without Task.Comment", currentUserId);
-            return (false, "You do not have permission to edit comments.");
-        }
-
         var comment = await _commentRepository.GetByIdAsync(commentId, cancellationToken).ConfigureAwait(false);
         if (comment == null)
             return (false, "Comment not found.");
@@ -177,12 +159,6 @@ public class TaskCommentService : ITaskCommentService
 
     public async Task<(bool Success, string? Error)> DeleteAsync(Guid commentId, Guid currentUserId, CancellationToken cancellationToken = default)
     {
-        if (!await _permissionChecker.HasPermissionAsync(currentUserId, PermissionComment, cancellationToken).ConfigureAwait(false))
-        {
-            _logger.LogWarning("User {UserId} attempted to delete comment without Task.Comment", currentUserId);
-            return (false, "You do not have permission to delete comments.");
-        }
-
         var comment = await _commentRepository.GetByIdAsync(commentId, cancellationToken).ConfigureAwait(false);
         if (comment == null)
             return (false, "Comment not found.");
@@ -203,7 +179,10 @@ public class TaskCommentService : ITaskCommentService
                 return (false, "You do not have access to this project.");
         }
 
-        var canDeleteAny = await _permissionChecker.HasPermissionAsync(currentUserId, PermissionDelete, cancellationToken).ConfigureAwait(false);
+        if (task == null)
+            return (false, "Task not found.");
+
+        var canDeleteAny = await CanEditProjectAsync(task.ProjectId, currentUserId, cancellationToken).ConfigureAwait(false);
         if (comment.UserId != currentUserId && !canDeleteAny)
             return (false, "You can only delete your own comment.");
 

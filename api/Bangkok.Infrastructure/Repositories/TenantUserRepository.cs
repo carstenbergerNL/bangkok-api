@@ -74,4 +74,26 @@ public class TenantUserRepository : ITenantUserRepository
             await connection.ExecuteAsync(new CommandDefinition(sql, new { Id = id }, cancellationToken: cancellationToken)).ConfigureAwait(false);
         }
     }
+
+    public async Task UpdateRoleAsync(Guid tenantId, Guid userId, string role, CancellationToken cancellationToken = default)
+    {
+        var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken).ConfigureAwait(false);
+        using (connection)
+        {
+            connection.Open();
+            const string sql = "UPDATE dbo.TenantUser SET Role = @Role WHERE TenantId = @TenantId AND UserId = @UserId";
+            await connection.ExecuteAsync(new CommandDefinition(sql, new { TenantId = tenantId, UserId = userId, Role = role?.Trim() ?? "Member" }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        }
+    }
+
+    public async Task<int> CountAdminsInTenantAsync(Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken).ConfigureAwait(false);
+        using (connection)
+        {
+            connection.Open();
+            const string sql = "SELECT COUNT(1) FROM dbo.TenantUser WHERE TenantId = @TenantId AND LOWER(Role) = N'admin'";
+            return await connection.ExecuteScalarAsync<int>(new CommandDefinition(sql, new { TenantId = tenantId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+        }
+    }
 }

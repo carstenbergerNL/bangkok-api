@@ -8,23 +8,40 @@ public class TenantModuleService : ITenantModuleService
     private readonly ITenantContext _tenantContext;
     private readonly IModuleRepository _moduleRepository;
     private readonly ITenantModuleRepository _tenantModuleRepository;
+    private readonly ITenantModuleUserRepository _tenantModuleUserRepository;
 
     public TenantModuleService(
         ITenantContext tenantContext,
         IModuleRepository moduleRepository,
-        ITenantModuleRepository tenantModuleRepository)
+        ITenantModuleRepository tenantModuleRepository,
+        ITenantModuleUserRepository tenantModuleUserRepository)
     {
         _tenantContext = tenantContext;
         _moduleRepository = moduleRepository;
         _tenantModuleRepository = tenantModuleRepository;
+        _tenantModuleUserRepository = tenantModuleUserRepository;
     }
 
-    public async Task<IReadOnlyList<string>> GetActiveModuleKeysAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<string>> GetActiveModuleKeysForUserAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         var tenantId = _tenantContext.CurrentTenantId;
         if (!tenantId.HasValue)
             return Array.Empty<string>();
-        return await _tenantModuleRepository.GetActiveModuleKeysAsync(tenantId.Value, cancellationToken).ConfigureAwait(false);
+        if (_tenantContext.IsPlatformAdmin)
+            return await _tenantModuleRepository.GetActiveModuleKeysAsync(tenantId.Value, cancellationToken).ConfigureAwait(false);
+        return await _tenantModuleUserRepository.GetActiveModuleKeysForUserAsync(tenantId.Value, userId, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<bool> HasModuleAccessAsync(Guid userId, Guid tenantId, string moduleKey, CancellationToken cancellationToken = default)
+    {
+        var module = await _moduleRepository.GetByKeyAsync(moduleKey, cancellationToken).ConfigureAwait(false);
+        if (module == null)
+            return false;
+        var isActive = await _tenantModuleRepository.IsModuleActiveAsync(tenantId, moduleKey, cancellationToken).ConfigureAwait(false);
+        if (!isActive)
+            return false;
+        var keysForUser = await _tenantModuleUserRepository.GetActiveModuleKeysForUserAsync(tenantId, userId, cancellationToken).ConfigureAwait(false);
+        return keysForUser.Contains(moduleKey);
     }
 
     public async Task<bool> IsModuleActiveAsync(string moduleKey, CancellationToken cancellationToken = default)

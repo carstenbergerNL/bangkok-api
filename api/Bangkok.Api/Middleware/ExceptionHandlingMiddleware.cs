@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Bangkok.Application.Models;
+using Microsoft.AspNetCore.Hosting;
 
 namespace Bangkok.Api.Middleware;
 
@@ -34,10 +35,18 @@ public class ExceptionHandlingMiddleware
         context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
 
         var correlationId = context.TraceIdentifier;
+        var message = "An unexpected error occurred.";
+        if (context.RequestServices.GetService<IWebHostEnvironment>() is IWebHostEnvironment env && env.EnvironmentName == "Development")
+        {
+            var detail = exception.InnerException?.Message ?? exception.Message;
+            if (!string.IsNullOrEmpty(detail))
+                message = detail;
+        }
+
         var errorResponse = ApiResponse<object>.Fail(new ErrorResponse
         {
             Code = "INTERNAL_ERROR",
-            Message = "An unexpected error occurred."
+            Message = message
         }, correlationId);
 
         var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };

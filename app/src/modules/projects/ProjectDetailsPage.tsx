@@ -149,11 +149,15 @@ export function ProjectDetailsPage() {
   if (notFound) {
     return (
       <div className="space-y-6">
-        <div className="card card-body rounded-xl shadow-sm text-center py-12">
-          <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--card-header-color, #323130)' }}>Project not found</h2>
-          <p className="text-sm mb-4" style={{ color: 'var(--card-description-color, #605e5c)' }}>The project may have been removed or you don&apos;t have access.</p>
-          <button type="button" onClick={() => navigate('/projects')} className="text-blue-600 dark:text-blue-400 hover:underline">
-            Back to projects
+        <div className="rounded-2xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 shadow-sm text-center py-16 px-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-1">Project not found</h2>
+          <p className="text-sm text-gray-500 dark:text-slate-400 mb-5">The project may have been removed or you don&apos;t have access.</p>
+          <button
+            type="button"
+            onClick={() => navigate('/projects')}
+            className="text-primary-500 hover:text-primary-600 dark:text-primary-400 dark:hover:text-primary-300 font-medium text-sm"
+          >
+            ← Back to projects
           </button>
         </div>
       </div>
@@ -163,143 +167,126 @@ export function ProjectDetailsPage() {
   if (loading || !project) {
     return (
       <div className="space-y-6">
-        <div className="animate-pulse">
-          <div className="h-8 w-64 bg-gray-200 dark:bg-slate-600 rounded mb-2" />
-          <div className="h-4 w-full max-w-md bg-gray-100 dark:bg-slate-700 rounded mb-6" />
-          <div className="h-32 bg-gray-100 dark:bg-slate-700 rounded-xl" />
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 w-72 bg-gray-200 dark:bg-slate-600 rounded-lg" />
+          <div className="h-4 max-w-md bg-gray-100 dark:bg-slate-700 rounded" />
+          <div className="h-28 bg-gray-100 dark:bg-slate-700 rounded-xl" />
         </div>
       </div>
     );
   }
 
+  const tabClass = (tab: typeof activeTab) =>
+    `px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap ${
+      activeTab === tab
+        ? 'border-primary-500 text-primary-600 dark:text-primary-400 dark:border-primary-400'
+        : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300 hover:border-gray-200 dark:hover:border-slate-600'
+    }`;
+
   return (
     <div className="space-y-6">
-      <div
-        className={`card card-body rounded-xl shadow-sm border border-gray-100 dark:border-slate-700/50 ${isArchived ? 'opacity-75' : ''}`}
+      {/* Project header */}
+      <header
+        className={`rounded-2xl border border-gray-200/80 dark:border-slate-700/80 bg-white dark:bg-slate-800/80 shadow-sm overflow-hidden ${isArchived ? 'opacity-90' : ''}`}
       >
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold" style={{ color: 'var(--card-header-color, #323130)' }}>{project.name}</h1>
-            {project.description && (
-              <p className="mt-1 text-sm" style={{ color: 'var(--card-description-color, #605e5c)' }}>{project.description}</p>
-            )}
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(project.status)}`}>
-                {project.status}
-              </span>
-              {canChangeStatus && (
-                <select
-                  value={project.status}
-                  onChange={(e) => handleStatusChange(e.target.value)}
-                  disabled={statusChanging}
-                  className="text-sm rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-200 px-2.5 py-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
-                  aria-label="Change project status"
+        <div className="p-5 md:p-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-gray-900 dark:text-slate-100">
+                {project.name}
+              </h1>
+              {project.description && (
+                <p className="mt-1.5 text-sm text-gray-500 dark:text-slate-400 max-w-2xl">
+                  {project.description}
+                </p>
+              )}
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(project.status)}`}>
+                  {project.status}
+                </span>
+                {canChangeStatus && (
+                  <select
+                    value={project.status}
+                    onChange={(e) => handleStatusChange(e.target.value)}
+                    disabled={statusChanging}
+                    className="text-sm rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 px-2.5 py-1 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-50"
+                    aria-label="Change project status"
+                  >
+                    {PROJECT_STATUSES.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              {project.id && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!project.id || exporting) return;
+                    setExporting(true);
+                    try {
+                      await exportProjectToCsv(project.id);
+                      addToast('success', 'Export downloaded.');
+                    } catch {
+                      addToast('error', 'Export failed.');
+                    } finally {
+                      setExporting(false);
+                    }
+                  }}
+                  disabled={exporting}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 text-sm font-medium hover:bg-gray-50 dark:hover:bg-slate-700/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {PROJECT_STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
+                  {exporting ? 'Exporting…' : 'Export'}
+                </button>
+              )}
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={() => setEditModalOpen(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 text-sm font-medium hover:bg-gray-50 dark:hover:bg-slate-700/80 transition-colors"
+                >
+                  Edit
+                </button>
+              )}
+              {canDelete && (
+                <button
+                  type="button"
+                  onClick={handleDeleteClick}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 text-sm font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                >
+                  Delete
+                </button>
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {project.id && (
-              <button
-                type="button"
-                onClick={async () => {
-                  if (!project.id || exporting) return;
-                  setExporting(true);
-                  try {
-                    await exportProjectToCsv(project.id);
-                    addToast('success', 'Export downloaded.');
-                  } catch {
-                    addToast('error', 'Export failed.');
-                  } finally {
-                    setExporting(false);
-                  }
-                }}
-                disabled={exporting}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {exporting ? 'Exporting…' : 'Export'}
+        </div>
+      </header>
+
+      {/* Tabs + content */}
+      <div className="rounded-2xl border border-gray-200/80 dark:border-slate-700/80 bg-white dark:bg-slate-800/80 shadow-sm overflow-hidden">
+        <div className="border-b border-gray-200 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-900/50 px-2">
+          <nav className="flex gap-1 overflow-x-auto scrollbar-hide" aria-label="Project sections">
+            <button type="button" onClick={() => setActiveTab('dashboard')} className={tabClass('dashboard')}>
+              Dashboard
+            </button>
+            <button type="button" onClick={() => setActiveTab('board')} className={tabClass('board')}>
+              Board
+            </button>
+            {showMembersTab && (
+              <button type="button" onClick={() => setActiveTab('members')} className={tabClass('members')}>
+                Members
               </button>
             )}
             {canEdit && (
-              <button
-                type="button"
-                onClick={() => setEditModalOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors text-sm font-medium"
-              >
-                Edit
+              <button type="button" onClick={() => setActiveTab('settings')} className={tabClass('settings')}>
+                Settings
               </button>
             )}
-            {canDelete && (
-              <button
-                type="button"
-                onClick={handleDeleteClick}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm font-medium"
-              >
-                Delete
-              </button>
-            )}
-          </div>
+          </nav>
         </div>
-      </div>
-
-      <div className="rounded-xl shadow-sm border border-gray-100 dark:border-slate-700/50 overflow-hidden" style={{ backgroundColor: 'var(--card-bg, #ffffff)' }}>
-        <div className="flex border-b border-gray-100 dark:border-slate-700/50">
-          <button
-            type="button"
-            onClick={() => setActiveTab('dashboard')}
-            className={`px-5 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'dashboard'
-                ? 'border-b-2 text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
-                : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200'
-            }`}
-          >
-            Dashboard
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('board')}
-            className={`px-5 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'board'
-                ? 'border-b-2 text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
-                : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200'
-            }`}
-          >
-            Board
-          </button>
-          {showMembersTab && (
-            <button
-              type="button"
-              onClick={() => setActiveTab('members')}
-              className={`px-5 py-3 text-sm font-medium transition-colors ${
-                activeTab === 'members'
-                  ? 'border-b-2 text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
-                  : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200'
-              }`}
-            >
-              Members
-            </button>
-          )}
-          {canEdit && (
-            <button
-              type="button"
-              onClick={() => setActiveTab('settings')}
-              className={`px-5 py-3 text-sm font-medium transition-colors ${
-                activeTab === 'settings'
-                  ? 'border-b-2 text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
-                  : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200'
-              }`}
-            >
-              Settings
-            </button>
-          )}
-        </div>
-        <div className="p-4 md:p-6">
+        <div className="p-5 md:p-6">
           {activeTab === 'board' && project.id && (
             <TaskList projectId={project.id} userMap={userMap} isProjectArchived={isArchived} />
           )}
@@ -315,40 +302,21 @@ export function ProjectDetailsPage() {
           )}
           {activeTab === 'settings' && project.id && (
             <div>
-              <div className="flex border-b border-gray-200 dark:border-slate-600 mb-4">
-                <button
-                  type="button"
-                  onClick={() => setSettingsSubTab('badges')}
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${
-                    settingsSubTab === 'badges'
-                      ? 'border-b-2 text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
-                      : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200'
-                  }`}
-                >
-                  Badges
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSettingsSubTab('custom-fields')}
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${
-                    settingsSubTab === 'custom-fields'
-                      ? 'border-b-2 text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
-                      : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200'
-                  }`}
-                >
-                  Custom Fields
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSettingsSubTab('automation')}
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${
-                    settingsSubTab === 'automation'
-                      ? 'border-b-2 text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400'
-                      : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200'
-                  }`}
-                >
-                  Automation
-                </button>
+              <div className="flex flex-wrap gap-1 border-b border-gray-200 dark:border-slate-600 pb-3 mb-4">
+                {(['badges', 'custom-fields', 'automation'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setSettingsSubTab(tab)}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      settingsSubTab === tab
+                        ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400'
+                        : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700/80 hover:text-gray-900 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    {tab === 'badges' ? 'Badges' : tab === 'custom-fields' ? 'Custom Fields' : 'Automation'}
+                  </button>
+                ))}
               </div>
               {settingsSubTab === 'badges' && <ProjectLabelsSettings projectId={project.id} />}
               {settingsSubTab === 'custom-fields' && <ProjectCustomFieldsSettings projectId={project.id} />}
@@ -369,14 +337,14 @@ export function ProjectDetailsPage() {
 
       {deleteConfirmOpen && (
         <Modal open={deleteConfirmOpen} onClose={handleDeleteCancel} title="Delete project">
-          <p className="text-sm mb-4" style={{ color: 'var(--card-description-color, #605e5c)' }}>
+          <p className="text-sm text-gray-500 dark:text-slate-400 mb-5">
             Delete &quot;{project.name}&quot;? If the project has tasks, you must delete them first.
           </p>
-          <div className="flex justify-end gap-2">
-            <button type="button" onClick={handleDeleteCancel} className="px-4 py-2 rounded-lg border border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={handleDeleteCancel} className="px-4 py-2 rounded-lg border border-gray-200 dark:border-slate-600 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors font-medium">
               Cancel
             </button>
-            <button type="button" onClick={handleDeleteConfirm} disabled={deleting} className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors">
+            <button type="button" onClick={handleDeleteConfirm} disabled={deleting} className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors font-medium">
               {deleting ? 'Deleting…' : 'Delete'}
             </button>
           </div>

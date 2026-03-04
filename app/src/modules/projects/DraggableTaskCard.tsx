@@ -59,7 +59,7 @@ function DraggableTaskCardInner({ task, userMap, canDrag, onClick, onDelete, can
       }
     >
       <div className="flex items-center gap-1.5 min-w-0">
-        <h4 className="font-medium text-sm truncate flex-1" style={{ color: 'var(--card-header-color, #323130)' }}>
+        <h4 className="font-medium text-sm truncate flex-1 text-gray-900 dark:text-slate-100">
           {task.title}
         </h4>
         {task.isRecurring && (
@@ -91,7 +91,7 @@ function DraggableTaskCardInner({ task, userMap, canDrag, onClick, onDelete, can
         <span className={'inline-flex px-2 py-0.5 rounded-lg text-xs font-medium ' + getPriorityClass(task.priority)}>
           {task.priority}
         </span>
-        <span className="flex items-center gap-1.5 text-xs truncate" style={{ color: 'var(--card-description-color, #605e5c)' }}>
+        <span className="flex items-center gap-1.5 text-xs truncate text-gray-500 dark:text-slate-400">
           {assigneeName ? (
             <>
               <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-200 dark:bg-slate-600 text-[10px] font-medium text-slate-600 dark:text-slate-300">
@@ -104,7 +104,7 @@ function DraggableTaskCardInner({ task, userMap, canDrag, onClick, onDelete, can
           )}
         </span>
         {task.dueDate && (
-          <span className="text-xs" style={{ color: 'var(--card-description-color, #605e5c)' }}>
+          <span className="text-xs text-gray-500 dark:text-slate-400">
             Due {formatDate(task.dueDate)}
           </span>
         )}
@@ -113,7 +113,7 @@ function DraggableTaskCardInner({ task, userMap, canDrag, onClick, onDelete, can
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onDelete(task); }}
-          className="absolute top-2 right-2 p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-600 dark:text-slate-500"
+          className="absolute top-2 right-2 p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400"
           aria-label="Delete task"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

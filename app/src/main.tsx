@@ -17,12 +17,14 @@ class RootErrorBoundary extends Component<{ children: React.ReactNode }, { error
   render() {
     if (this.state.error) {
       return (
-        <div style={{ padding: 24, fontFamily: 'system-ui, sans-serif', maxWidth: 600 }}>
-          <h1 style={{ color: '#c00', marginBottom: 8 }}>Something went wrong</h1>
-          <pre style={{ background: '#f5f5f5', padding: 16, overflow: 'auto', fontSize: 13 }}>
-            {this.state.error.message}
-          </pre>
-          <p style={{ marginTop: 16, fontSize: 14 }}>Check the browser console for details.</p>
+        <div className="min-h-screen p-6 app-bg flex items-center justify-center">
+          <div className="max-w-xl w-full rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50/50 dark:bg-red-900/10 p-6 shadow-sm">
+            <h1 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">Something went wrong</h1>
+            <pre className="p-4 rounded-lg bg-gray-100 dark:bg-slate-800 text-gray-800 dark:text-slate-200 text-sm overflow-auto font-mono">
+              {this.state.error.message}
+            </pre>
+            <p className="mt-4 text-sm text-gray-600 dark:text-slate-400">Check the browser console for details.</p>
+          </div>
         </div>
       )
     }

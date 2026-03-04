@@ -5,6 +5,7 @@ import { PrivateRoute } from './components/PrivateRoute';
 import { AdminRoute } from './components/AdminRoute';
 import { SuperAdminRoute } from './components/SuperAdminRoute';
 import { PermissionRoute } from './components/PermissionRoute';
+import { ModuleRoute } from './components/ModuleRoute';
 import { ToastContainer } from './components/Toast';
 import { MainLayout } from './layouts/MainLayout';
 import { Login } from './pages/Login';
@@ -16,7 +17,6 @@ import { AdminSettings } from './pages/AdminSettings';
 import { PlatformDashboard } from './pages/PlatformDashboard';
 import { ProjectListPage } from './modules/projects/ProjectListPage';
 import { ProjectDetailsPage } from './modules/projects/ProjectDetailsPage';
-import { PERMISSIONS } from './constants/permissions';
 import { initAuthUnauthorizedHandler } from './services/authService';
 import { RouteErrorBoundary } from './components/RouteErrorBoundary';
 
@@ -53,8 +53,8 @@ function AppRoutes() {
         <Route path="billing/:status" element={<BillingReturn />} />
         <Route path="admin-settings" element={<AdminRoute><AdminSettings /></AdminRoute>} />
         <Route path="platform-dashboard" element={<SuperAdminRoute><PlatformDashboard /></SuperAdminRoute>} />
-        <Route path="projects" element={<PermissionRoute permission={PERMISSIONS.ProjectView}><ProjectListPage /></PermissionRoute>} />
-        <Route path="projects/:id" element={<PermissionRoute permission={PERMISSIONS.ProjectView}><RouteErrorBoundary><ProjectDetailsPage /></RouteErrorBoundary></PermissionRoute>} />
+        <Route path="projects" element={<ModuleRoute moduleKey="ProjectManagement"><ProjectListPage /></ModuleRoute>} />
+        <Route path="projects/:id" element={<ModuleRoute moduleKey="ProjectManagement"><RouteErrorBoundary><ProjectDetailsPage /></RouteErrorBoundary></ModuleRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

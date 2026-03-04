@@ -206,6 +206,26 @@ BEGIN
     SELECT NEWID(), '11111111-1111-1111-1111-111111111111', [Id], 1 FROM dbo.[Module] WHERE [Key] = N'ProjectManagement';
 END;
 
+-- TenantModuleUser table (user-level access to modules; Tenant Admin grants/revokes)
+IF OBJECT_ID(N'dbo.TenantModuleUser', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.TenantModuleUser
+    (
+        Id        UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+        TenantId  UNIQUEIDENTIFIER NOT NULL,
+        ModuleId  UNIQUEIDENTIFIER NOT NULL,
+        UserId    UNIQUEIDENTIFIER NOT NULL,
+        CreatedAt DATETIME2(7)     NOT NULL,
+        CONSTRAINT FK_TenantModuleUser_Tenant FOREIGN KEY (TenantId) REFERENCES dbo.Tenant(Id) ON DELETE CASCADE,
+        CONSTRAINT FK_TenantModuleUser_Module FOREIGN KEY (ModuleId) REFERENCES dbo.[Module](Id) ON DELETE CASCADE,
+        CONSTRAINT FK_TenantModuleUser_User   FOREIGN KEY (UserId)   REFERENCES dbo.[User](Id) ON DELETE CASCADE,
+        CONSTRAINT UQ_TenantModuleUser_TenantId_ModuleId_UserId UNIQUE (TenantId, ModuleId, UserId)
+    );
+    CREATE NONCLUSTERED INDEX IX_TenantModuleUser_TenantId ON dbo.TenantModuleUser (TenantId);
+    CREATE NONCLUSTERED INDEX IX_TenantModuleUser_ModuleId ON dbo.TenantModuleUser (ModuleId);
+    CREATE NONCLUSTERED INDEX IX_TenantModuleUser_UserId   ON dbo.TenantModuleUser (UserId);
+END;
+
 -- Plan table (subscription plans)
 IF OBJECT_ID(N'dbo.[Plan]', N'U') IS NULL
 BEGIN
@@ -312,14 +332,22 @@ BEGIN
         [DueDate]           DATETIME2(7)     NULL,
         [CreatedByUserId]   UNIQUEIDENTIFIER NOT NULL,
         [CreatedAt]         DATETIME2(7)     NOT NULL,
-        [UpdatedAt]         DATETIME2(7)     NULL,
+        [UpdatedAt]             DATETIME2(7)     NULL,
+        [EstimatedHours]        DECIMAL(5,2)     NULL,
+        [IsRecurring]           BIT              NOT NULL DEFAULT 0,
+        [RecurrencePattern]     NVARCHAR(100)   NULL,
+        [RecurrenceInterval]    INT              NULL,
+        [RecurrenceEndDate]     DATETIME2(7)     NULL,
+        [RecurrenceSourceTaskId] UNIQUEIDENTIFIER NULL,
         CONSTRAINT [FK_Task_Project] FOREIGN KEY ([ProjectId]) REFERENCES dbo.[Project]([Id]),
         CONSTRAINT [FK_Task_AssignedToUser] FOREIGN KEY ([AssignedToUserId]) REFERENCES dbo.[User]([Id]),
-        CONSTRAINT [FK_Task_CreatedByUser] FOREIGN KEY ([CreatedByUserId]) REFERENCES dbo.[User]([Id])
+        CONSTRAINT [FK_Task_CreatedByUser] FOREIGN KEY ([CreatedByUserId]) REFERENCES dbo.[User]([Id]),
+        CONSTRAINT [FK_Task_RecurrenceSource] FOREIGN KEY ([RecurrenceSourceTaskId]) REFERENCES dbo.[Task]([Id]) ON DELETE NO ACTION ON UPDATE NO ACTION
     );
     CREATE NONCLUSTERED INDEX [IX_Task_ProjectId] ON dbo.[Task] ([ProjectId]);
     CREATE NONCLUSTERED INDEX [IX_Task_AssignedToUserId] ON dbo.[Task] ([AssignedToUserId]);
     CREATE NONCLUSTERED INDEX [IX_Task_Status] ON dbo.[Task] ([Status]);
+    CREATE NONCLUSTERED INDEX [IX_Task_RecurrenceSourceTaskId] ON dbo.[Task] ([RecurrenceSourceTaskId]);
 END;
 
 -- TaskComments table
@@ -338,6 +366,43 @@ BEGIN
     );
     CREATE NONCLUSTERED INDEX [IX_TaskComment_TaskId] ON dbo.[TaskComment] ([TaskId]);
     CREATE NONCLUSTERED INDEX [IX_TaskComment_UserId] ON dbo.[TaskComment] ([UserId]);
+END;
+
+-- Notification table (in-app user notifications)
+IF OBJECT_ID(N'dbo.Notification', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.Notification
+    (
+        Id          UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+        UserId      UNIQUEIDENTIFIER NOT NULL,
+        Type        NVARCHAR(100)    NOT NULL,
+        Title       NVARCHAR(200)    NOT NULL,
+        Message     NVARCHAR(1000)   NOT NULL,
+        ReferenceId UNIQUEIDENTIFIER NULL,
+        IsRead      BIT              NOT NULL DEFAULT 0,
+        CreatedAt   DATETIME2(7)     NOT NULL,
+        CONSTRAINT FK_Notification_User FOREIGN KEY (UserId) REFERENCES dbo.[User](Id)
+    );
+    CREATE NONCLUSTERED INDEX IX_Notification_UserId ON dbo.Notification (UserId);
+    CREATE NONCLUSTERED INDEX IX_Notification_UserId_IsRead_CreatedAt ON dbo.Notification (UserId, IsRead, CreatedAt DESC);
+END;
+
+-- TaskTimeLog table (time tracking per task)
+IF OBJECT_ID(N'dbo.[TaskTimeLog]', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.[TaskTimeLog]
+    (
+        [Id]          UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+        [TaskId]      UNIQUEIDENTIFIER NOT NULL,
+        [UserId]      UNIQUEIDENTIFIER NOT NULL,
+        [Hours]       DECIMAL(5,2)     NOT NULL,
+        [Description] NVARCHAR(500)    NULL,
+        [CreatedAt]   DATETIME2(7)     NOT NULL,
+        CONSTRAINT [FK_TaskTimeLog_Task] FOREIGN KEY ([TaskId]) REFERENCES dbo.[Task]([Id]),
+        CONSTRAINT [FK_TaskTimeLog_User] FOREIGN KEY ([UserId]) REFERENCES dbo.[User]([Id])
+    );
+    CREATE NONCLUSTERED INDEX [IX_TaskTimeLog_TaskId] ON dbo.[TaskTimeLog] ([TaskId]);
+    CREATE NONCLUSTERED INDEX [IX_TaskTimeLog_UserId] ON dbo.[TaskTimeLog] ([UserId]);
 END;
 
 -- ProjectMembers table
@@ -411,6 +476,26 @@ BEGIN
     CREATE NONCLUSTERED INDEX [IX_TaskActivity_CreatedAt] ON dbo.[TaskActivity] ([CreatedAt] DESC);
 END;
 
+-- TaskAttachment table (file attachments metadata; files stored on disk)
+IF OBJECT_ID(N'dbo.TaskAttachment', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.TaskAttachment
+    (
+        Id                UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+        TaskId            UNIQUEIDENTIFIER NOT NULL,
+        FileName          NVARCHAR(255)    NOT NULL,
+        FilePath          NVARCHAR(500)   NOT NULL,
+        FileSize          INT             NOT NULL,
+        ContentType       NVARCHAR(100)   NOT NULL,
+        UploadedByUserId  UNIQUEIDENTIFIER NOT NULL,
+        CreatedAt         DATETIME2(7)    NOT NULL,
+        CONSTRAINT FK_TaskAttachment_Task FOREIGN KEY (TaskId) REFERENCES dbo.Task(Id) ON DELETE CASCADE,
+        CONSTRAINT FK_TaskAttachment_User FOREIGN KEY (UploadedByUserId) REFERENCES dbo.[User](Id)
+    );
+    CREATE NONCLUSTERED INDEX IX_TaskAttachment_TaskId ON dbo.TaskAttachment (TaskId);
+    CREATE NONCLUSTERED INDEX IX_TaskAttachment_UploadedByUserId ON dbo.TaskAttachment (UploadedByUserId);
+END;
+
 -- ProjectCustomField table (custom field definitions per project)
 IF OBJECT_ID(N'dbo.ProjectCustomField', N'U') IS NULL
 BEGIN
@@ -458,6 +543,34 @@ BEGIN
         CONSTRAINT [FK_ProjectAutomationRule_TargetUser] FOREIGN KEY ([TargetUserId]) REFERENCES dbo.[User]([Id])
     );
     CREATE NONCLUSTERED INDEX [IX_ProjectAutomationRule_ProjectId] ON dbo.[ProjectAutomationRule] ([ProjectId]);
+END;
+
+-- ProjectTemplate table (templates for "create project from template")
+IF OBJECT_ID(N'dbo.ProjectTemplate', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ProjectTemplate
+    (
+        Id          UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+        Name        NVARCHAR(200)    NOT NULL,
+        Description NVARCHAR(500)    NULL,
+        CreatedAt   DATETIME2(7)     NOT NULL
+    );
+END;
+
+-- ProjectTemplateTask table (default tasks per template)
+IF OBJECT_ID(N'dbo.ProjectTemplateTask', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ProjectTemplateTask
+    (
+        Id              UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),
+        TemplateId      UNIQUEIDENTIFIER NOT NULL,
+        Title           NVARCHAR(200)    NOT NULL,
+        Description     NVARCHAR(1000)  NULL,
+        DefaultStatus   NVARCHAR(50)     NULL,
+        DefaultPriority NVARCHAR(50)    NULL,
+        CONSTRAINT FK_ProjectTemplateTask_Template FOREIGN KEY (TemplateId) REFERENCES dbo.ProjectTemplate(Id) ON DELETE CASCADE
+    );
+    CREATE NONCLUSTERED INDEX IX_ProjectTemplateTask_TemplateId ON dbo.ProjectTemplateTask (TemplateId);
 END;
 
 GO

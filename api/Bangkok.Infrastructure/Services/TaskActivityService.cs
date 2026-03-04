@@ -6,7 +6,6 @@ namespace Bangkok.Infrastructure.Services;
 
 public class TaskActivityService : ITaskActivityService
 {
-    private const string PermissionViewActivity = "Task.ViewActivity";
     private const string AdminPermission = "ViewAdminSettings";
 
     private readonly ITaskActivityRepository _activityRepository;
@@ -31,9 +30,6 @@ public class TaskActivityService : ITaskActivityService
 
     public async Task<IReadOnlyList<TaskActivityResponse>> GetByTaskIdAsync(Guid taskId, Guid currentUserId, CancellationToken cancellationToken = default)
     {
-        if (!await _permissionChecker.HasPermissionAsync(currentUserId, PermissionViewActivity, cancellationToken).ConfigureAwait(false))
-            return Array.Empty<TaskActivityResponse>();
-
         var task = await _taskRepository.GetByIdAsync(taskId, cancellationToken).ConfigureAwait(false);
         if (task == null)
             return Array.Empty<TaskActivityResponse>();

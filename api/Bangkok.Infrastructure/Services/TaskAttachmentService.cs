@@ -10,8 +10,6 @@ namespace Bangkok.Infrastructure.Services;
 
 public class TaskAttachmentService : ITaskAttachmentService
 {
-    private const string PermissionView = "Task.View";
-    private const string PermissionEdit = "Task.Edit";
     private const string AdminPermission = "ViewAdminSettings";
 
     private readonly ITaskAttachmentRepository _attachmentRepository;
@@ -51,8 +49,6 @@ public class TaskAttachmentService : ITaskAttachmentService
 
     public async Task<IReadOnlyList<TaskAttachmentResponse>> GetByTaskIdAsync(Guid taskId, Guid currentUserId, CancellationToken cancellationToken = default)
     {
-        if (!await _permissionChecker.HasPermissionAsync(currentUserId, PermissionView, cancellationToken).ConfigureAwait(false))
-            return Array.Empty<TaskAttachmentResponse>();
         if (!await CanAccessTaskAsync(taskId, currentUserId, cancellationToken).ConfigureAwait(false))
             return Array.Empty<TaskAttachmentResponse>();
         var list = await _attachmentRepository.GetByTaskIdAsync(taskId, cancellationToken).ConfigureAwait(false);
@@ -61,8 +57,6 @@ public class TaskAttachmentService : ITaskAttachmentService
 
     public async Task<(bool Success, TaskAttachmentResponse? Data, string? Error)> UploadAsync(Guid taskId, string fileName, Stream fileStream, string contentType, int fileSize, Guid currentUserId, CancellationToken cancellationToken = default)
     {
-        if (!await _permissionChecker.HasPermissionAsync(currentUserId, PermissionEdit, cancellationToken).ConfigureAwait(false))
-            return (false, null, "You do not have permission to upload attachments.");
         if (!await CanAccessTaskAsync(taskId, currentUserId, cancellationToken).ConfigureAwait(false))
             return (false, null, "Task not found or access denied.");
         var task = await _taskRepository.GetByIdAsync(taskId, cancellationToken).ConfigureAwait(false);
@@ -134,8 +128,6 @@ public class TaskAttachmentService : ITaskAttachmentService
 
     public async Task<(bool Success, Stream? Content, string? FileName, string? ContentType, string? Error)> GetDownloadStreamAsync(Guid attachmentId, Guid currentUserId, CancellationToken cancellationToken = default)
     {
-        if (!await _permissionChecker.HasPermissionAsync(currentUserId, PermissionView, cancellationToken).ConfigureAwait(false))
-            return (false, null, null, null, "You do not have permission to view attachments.");
         var attachment = await _attachmentRepository.GetByIdAsync(attachmentId, cancellationToken).ConfigureAwait(false);
         if (attachment == null)
             return (false, null, null, null, "Attachment not found.");

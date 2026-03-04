@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { usePermissions } from '../../hooks/usePermissions';
-import { PERMISSIONS } from '../../constants/permissions';
 import { getTasks, deleteTask, createTask, updateTask } from './taskService';
 import { getLabels } from './labelService';
 import { addToast } from '../../utils/toast';
@@ -26,7 +24,6 @@ interface TaskListProps {
 }
 
 export function TaskList({ projectId, userMap, isProjectArchived = false }: TaskListProps) {
-  const { hasPermission } = usePermissions();
   const [searchParams, setSearchParams] = useSearchParams();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -152,12 +149,12 @@ export function TaskList({ projectId, userMap, isProjectArchived = false }: Task
     }
   };
 
-  const canCreate = hasPermission(PERMISSIONS.TaskCreate) && !isProjectArchived;
-  const canEdit = hasPermission(PERMISSIONS.TaskEdit);
-  const canDelete = hasPermission(PERMISSIONS.TaskDelete);
-  const canComment = hasPermission(PERMISSIONS.TaskComment);
-  const canViewActivity = hasPermission(PERMISSIONS.TaskViewActivity);
-  const canAssign = hasPermission(PERMISSIONS.TaskAssign);
+  const canCreate = !isProjectArchived;
+  const canEdit = true;
+  const canDelete = true;
+  const canComment = true;
+  const canViewActivity = true;
+  const canAssign = true;
 
   if (loading) {
     return (

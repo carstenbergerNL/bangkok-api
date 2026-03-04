@@ -52,6 +52,7 @@ Database scripts for the **Bangkok API**. Target: **SQL Server**. Use `UNIQUEIDE
 | 018_add_project_templates.sql | Add ProjectTemplate, ProjectTemplateTask |
 | 019_add_project_custom_fields.sql | Add ProjectCustomField, TaskCustomFieldValue |
 | 020_add_project_automation_rules.sql | Add ProjectAutomationRule (trigger/action rules) |
+| 027_add_user_module_access.sql | Add TenantModuleUser (user-level module access; Tenant Admin grant/revoke) |
 
 ## Conventions
 

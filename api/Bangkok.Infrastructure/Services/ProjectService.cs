@@ -40,12 +40,6 @@ public class ProjectService : IProjectService
 
     public async Task<(GetProjectResult Result, ProjectResponse? Data)> GetByIdAsync(Guid id, Guid currentUserId, CancellationToken cancellationToken = default)
     {
-        if (!await _permissionChecker.HasPermissionAsync(currentUserId, PermissionView, cancellationToken).ConfigureAwait(false))
-        {
-            _logger.LogWarning("User {UserId} attempted to get project {ProjectId} without Project.View", currentUserId, id);
-            return (GetProjectResult.Forbidden, null);
-        }
-
         var project = await _projectRepository.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
         if (project == null)
             return (GetProjectResult.NotFound, null);
@@ -71,12 +65,6 @@ public class ProjectService : IProjectService
 
     public async Task<IReadOnlyList<ProjectResponse>> GetAllAsync(Guid currentUserId, string? status = null, CancellationToken cancellationToken = default)
     {
-        if (!await _permissionChecker.HasPermissionAsync(currentUserId, PermissionView, cancellationToken).ConfigureAwait(false))
-        {
-            _logger.LogWarning("User {UserId} attempted to list projects without Project.View", currentUserId);
-            return Array.Empty<ProjectResponse>();
-        }
-
         var isAdmin = _tenantContext.IsPlatformAdmin || await _permissionChecker.HasPermissionAsync(currentUserId, AdminPermission, cancellationToken).ConfigureAwait(false);
         var tenantId = isAdmin ? null : _tenantContext.CurrentTenantId;
         if (!tenantId.HasValue && !isAdmin)

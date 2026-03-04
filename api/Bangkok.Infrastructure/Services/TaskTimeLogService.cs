@@ -7,8 +7,6 @@ namespace Bangkok.Infrastructure.Services;
 
 public class TaskTimeLogService : ITaskTimeLogService
 {
-    private const string PermissionView = "Task.View";
-    private const string PermissionEdit = "Task.Edit";
     private const string AdminPermission = "ViewAdminSettings";
 
     private readonly ITaskTimeLogRepository _timeLogRepository;
@@ -42,9 +40,6 @@ public class TaskTimeLogService : ITaskTimeLogService
 
     public async Task<IReadOnlyList<TaskTimeLogResponse>> GetByTaskIdAsync(Guid taskId, Guid currentUserId, CancellationToken cancellationToken = default)
     {
-        if (!await _permissionChecker.HasPermissionAsync(currentUserId, PermissionView, cancellationToken).ConfigureAwait(false))
-            return Array.Empty<TaskTimeLogResponse>();
-
         var task = await _taskRepository.GetByIdAsync(taskId, cancellationToken).ConfigureAwait(false);
         if (task == null) return Array.Empty<TaskTimeLogResponse>();
 
@@ -74,12 +69,6 @@ public class TaskTimeLogService : ITaskTimeLogService
 
     public async Task<(bool Success, TaskTimeLogResponse? Data, string? Error)> CreateAsync(Guid taskId, CreateTaskTimeLogRequest request, Guid currentUserId, CancellationToken cancellationToken = default)
     {
-        if (!await _permissionChecker.HasPermissionAsync(currentUserId, PermissionEdit, cancellationToken).ConfigureAwait(false))
-        {
-            _logger.LogWarning("User {UserId} attempted to log time without Task.Edit", currentUserId);
-            return (false, null, "You do not have permission to log time on tasks.");
-        }
-
         var task = await _taskRepository.GetByIdAsync(taskId, cancellationToken).ConfigureAwait(false);
         if (task == null)
             return (false, null, "Task not found.");
@@ -120,12 +109,6 @@ public class TaskTimeLogService : ITaskTimeLogService
 
     public async Task<(bool Success, string? Error)> DeleteAsync(Guid timeLogId, Guid currentUserId, CancellationToken cancellationToken = default)
     {
-        if (!await _permissionChecker.HasPermissionAsync(currentUserId, PermissionEdit, cancellationToken).ConfigureAwait(false))
-        {
-            _logger.LogWarning("User {UserId} attempted to delete time log without Task.Edit", currentUserId);
-            return (false, "You do not have permission to delete time logs.");
-        }
-
         var log = await _timeLogRepository.GetByIdAsync(timeLogId, cancellationToken).ConfigureAwait(false);
         if (log == null)
             return (false, "Time log not found.");

@@ -85,6 +85,8 @@ export const API_PATHS = {
     BASE: '/api/tenant/modules',
     MANAGEMENT: '/api/tenant/modules/management',
     SET_ACTIVE: (moduleKey: string) => `/api/tenant/modules/${moduleKey}/active`,
+    MODULE_USERS: (moduleKey: string) => `/api/tenant/modules/${moduleKey}/users`,
+    MODULE_USER_REVOKE: (moduleKey: string, userId: string) => `/api/tenant/modules/${moduleKey}/users/${userId}`,
   },
   BILLING: {
     USAGE: '/api/Billing/usage',
@@ -98,5 +100,11 @@ export const API_PATHS = {
     TENANT_SUSPEND: (id: string) => `/api/PlatformAdmin/tenants/${id}/suspend`,
     TENANT_STATUS: (id: string) => `/api/PlatformAdmin/tenants/${id}/status`,
     TENANT_UPGRADE: (id: string) => `/api/PlatformAdmin/tenants/${id}/upgrade`,
+  },
+  TENANT_ADMIN: {
+    USERS: '/api/tenant-admin/users',
+    USER_ROLE: (userId: string) => `/api/tenant-admin/users/${userId}/role`,
+    USER_MODULES: (userId: string) => `/api/tenant-admin/users/${userId}/modules`,
+    USER_BY_ID: (userId: string) => `/api/tenant-admin/users/${userId}`,
   },
 } as const;

@@ -6,15 +6,19 @@ namespace Bangkok.Application.Interfaces;
 public interface ITenantModuleService
 {
     /// <summary>
-    /// Returns module keys that are active for the current tenant (from context).
-    /// Used by frontend sidebar and by middleware to allow/deny access.
+    /// Returns module keys the given user can access for the current tenant (active for tenant + user-level access). Used by sidebar. Pass current user id from controller.
     /// </summary>
-    Task<IReadOnlyList<string>> GetActiveModuleKeysAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<string>> GetActiveModuleKeysForUserAsync(Guid userId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Returns true if the given module key is active for the current tenant (or user is platform admin).
     /// </summary>
     Task<bool> IsModuleActiveAsync(string moduleKey, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns true if user has access to the module: user in tenant, module active for tenant, user has entry in TenantModuleUser (or no user-level list for that module).
+    /// </summary>
+    Task<bool> HasModuleAccessAsync(Guid userId, Guid tenantId, string moduleKey, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// All modules with active flag for current tenant. For admin "Manage Modules" UI.

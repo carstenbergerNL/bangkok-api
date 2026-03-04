@@ -27,11 +27,10 @@ public class ProfileController : ControllerBase
     }
 
     [HttpGet("{userId:guid}")]
-    [SwaggerOperation(Summary = "Get profile by user ID", Description = "Returns the profile for the given user. Caller must be the user or Admin.")]
+    [SwaggerOperation(Summary = "Get profile by user ID", Description = "Returns the profile for the given user. Caller must be the user or Admin. Returns 200 with data null when the user has no profile yet.")]
     [ProducesResponseType(typeof(ApiResponse<ProfileDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ApiResponse<ProfileDto>>> GetByUserId(
         [FromRoute] Guid userId,
         CancellationToken cancellationToken)
@@ -48,9 +47,6 @@ public class ProfileController : ControllerBase
         }
 
         var profile = await _profileService.GetByUserIdAsync(userId, cancellationToken).ConfigureAwait(false);
-        if (profile == null)
-            return NotFound(ApiResponse<ProfileDto>.Fail(new ErrorResponse { Code = "PROFILE_NOT_FOUND", Message = "Profile not found." }, correlationId));
-
         return Ok(ApiResponse<ProfileDto>.Ok(profile, correlationId));
     }
 
