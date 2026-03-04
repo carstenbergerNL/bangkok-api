@@ -17,7 +17,7 @@ sources/
 
 ## API and request examples
 
-- **REST API** – Controllers: Auth, Users, Profile, Roles, Permissions, Projects (CSV export, automation rules), Tasks, Comments, Timelogs, Notifications, Billing (usage, plans, Stripe Checkout), **PlatformAdmin** (Super Admin only: dashboard stats, tenant list, tenant usage, suspend/status/upgrade). All authenticated endpoints use `Authorization: Bearer <token>`. **Usage tracking** per tenant (projects, members, storage, time logs) is stored in `TenantUsage` and updated on project create/delete, member add, file upload/delete, and time log create/delete; plan limits are enforced before those actions.
+- **REST API** – Controllers: Auth, Users, Profile, Roles, Permissions, Projects (CSV export, automation rules), Tasks, Comments, Timelogs, Notifications, Billing (usage, plans, Stripe Checkout), **TasksModule** (standalone tasks: `/api/tasks-module`, tenant-scoped, module-activated), **PlatformAdmin** (Super Admin only: dashboard stats, tenant list, tenant usage, suspend/status/upgrade). All authenticated endpoints use `Authorization: Bearer <token>`. **Usage tracking** per tenant (projects, members, storage, time logs, standalone tasks) is stored in `TenantUsage`; plan limits (e.g. MaxStandaloneTasks for Free plan) are enforced before create.
 - **Request examples** – The **`json/`** folder contains sample request bodies for key endpoints (login, register, create/update project, create/update task, create timelog, etc.). See `json/README.md` for the full endpoint table. Use them for Postman, curl, or as a reference for the frontend.
 
 ## Architecture overview

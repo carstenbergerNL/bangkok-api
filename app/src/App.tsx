@@ -17,6 +17,7 @@ import { AdminSettings } from './pages/AdminSettings';
 import { PlatformDashboard } from './pages/PlatformDashboard';
 import { ProjectListPage } from './modules/projects/ProjectListPage';
 import { ProjectDetailsPage } from './modules/projects/ProjectDetailsPage';
+import { TasksListPage } from './modules/tasks/TasksListPage';
 import { initAuthUnauthorizedHandler } from './services/authService';
 import { RouteErrorBoundary } from './components/RouteErrorBoundary';
 
@@ -55,6 +56,7 @@ function AppRoutes() {
         <Route path="platform-dashboard" element={<SuperAdminRoute><PlatformDashboard /></SuperAdminRoute>} />
         <Route path="projects" element={<ModuleRoute moduleKey="ProjectManagement"><ProjectListPage /></ModuleRoute>} />
         <Route path="projects/:id" element={<ModuleRoute moduleKey="ProjectManagement"><RouteErrorBoundary><ProjectDetailsPage /></RouteErrorBoundary></ModuleRoute>} />
+        <Route path="tasks" element={<ModuleRoute moduleKey="Tasks"><TasksListPage /></ModuleRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

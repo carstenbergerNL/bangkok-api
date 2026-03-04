@@ -16,4 +16,6 @@ public class Plan
     public string? StripePriceIdYearly { get; set; }
     /// <summary>Storage limit in MB. Null = unlimited.</summary>
     public decimal? StorageLimitMB { get; set; }
+    /// <summary>Max standalone tasks per tenant. Null = unlimited.</summary>
+    public int? MaxStandaloneTasks { get; set; }
 }

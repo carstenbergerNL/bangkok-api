@@ -20,6 +20,8 @@ public interface ITenantUsageRepository
     Task RemoveStorageMbAsync(Guid tenantId, decimal mb, CancellationToken cancellationToken = default);
     Task IncrementTimeLogsAsync(Guid tenantId, CancellationToken cancellationToken = default);
     Task DecrementTimeLogsAsync(Guid tenantId, CancellationToken cancellationToken = default);
+    Task IncrementStandaloneTasksAsync(Guid tenantId, CancellationToken cancellationToken = default);
+    Task DecrementStandaloneTasksAsync(Guid tenantId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<TenantUsage>> GetAllAsync(CancellationToken cancellationToken = default);
 }

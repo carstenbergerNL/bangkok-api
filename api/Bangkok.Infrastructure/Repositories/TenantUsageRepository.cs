@@ -20,7 +20,7 @@ public class TenantUsageRepository : ITenantUsageRepository
         using (connection)
         {
             connection.Open();
-            const string sql = "SELECT [TenantId], [ProjectsCount], [UsersCount], [StorageUsedMB], [TimeLogsCount], [UpdatedAt] FROM dbo.[TenantUsage] WHERE [TenantId] = @TenantId";
+            const string sql = "SELECT [TenantId], [ProjectsCount], [UsersCount], [StorageUsedMB], [TimeLogsCount], [StandaloneTasksCount], [UpdatedAt] FROM dbo.[TenantUsage] WHERE [TenantId] = @TenantId";
             return await connection.QuerySingleOrDefaultAsync<TenantUsage>(
                 new CommandDefinition(sql, new { TenantId = tenantId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
         }
@@ -34,8 +34,8 @@ public class TenantUsageRepository : ITenantUsageRepository
             connection.Open();
             const string sql = @"
 IF NOT EXISTS (SELECT 1 FROM dbo.[TenantUsage] WHERE [TenantId] = @TenantId)
-    INSERT INTO dbo.[TenantUsage] ([TenantId], [ProjectsCount], [UsersCount], [StorageUsedMB], [TimeLogsCount], [UpdatedAt])
-    VALUES (@TenantId, 0, 0, 0, 0, GETUTCDATE());";
+    INSERT INTO dbo.[TenantUsage] ([TenantId], [ProjectsCount], [UsersCount], [StorageUsedMB], [TimeLogsCount], [StandaloneTasksCount], [UpdatedAt])
+    VALUES (@TenantId, 0, 0, 0, 0, 0, GETUTCDATE());";
             await connection.ExecuteAsync(new CommandDefinition(sql, new { TenantId = tenantId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
         }
     }
@@ -99,13 +99,25 @@ IF NOT EXISTS (SELECT 1 FROM dbo.[TenantUsage] WHERE [TenantId] = @TenantId)
         await ExecuteUpdateAsync(tenantId, sql, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task IncrementStandaloneTasksAsync(Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        await EnsureExistsAsync(tenantId, cancellationToken).ConfigureAwait(false);
+        await UpdateDeltaAsync(tenantId, "StandaloneTasksCount", 1, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task DecrementStandaloneTasksAsync(Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        const string sql = "UPDATE dbo.[TenantUsage] SET [StandaloneTasksCount] = CASE WHEN [StandaloneTasksCount] - 1 < 0 THEN 0 ELSE [StandaloneTasksCount] - 1 END, [UpdatedAt] = GETUTCDATE() WHERE [TenantId] = @TenantId";
+        await ExecuteUpdateAsync(tenantId, sql, cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task<IReadOnlyList<TenantUsage>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken).ConfigureAwait(false);
         using (connection)
         {
             connection.Open();
-            const string sql = "SELECT [TenantId], [ProjectsCount], [UsersCount], [StorageUsedMB], [TimeLogsCount], [UpdatedAt] FROM dbo.[TenantUsage]";
+            const string sql = "SELECT [TenantId], [ProjectsCount], [UsersCount], [StorageUsedMB], [TimeLogsCount], [StandaloneTasksCount], [UpdatedAt] FROM dbo.[TenantUsage]";
             var list = await connection.QueryAsync<TenantUsage>(new CommandDefinition(sql, cancellationToken: cancellationToken)).ConfigureAwait(false);
             return list.ToList();
         }

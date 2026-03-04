@@ -23,4 +23,7 @@ public interface ISubscriptionLimitService
 
     /// <summary>Returns (allowed, errorMessage).</summary>
     Task<(bool Allowed, string? LimitMessage)> CanUseAutomationAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Returns (allowed, errorMessage). Enforce max standalone tasks per plan (e.g. Free 100, Pro unlimited).</summary>
+    Task<(bool Allowed, string? LimitMessage)> CanCreateStandaloneTaskAsync(CancellationToken cancellationToken = default);
 }

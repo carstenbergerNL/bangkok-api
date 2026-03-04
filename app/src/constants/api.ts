@@ -101,6 +101,12 @@ export const API_PATHS = {
     TENANT_STATUS: (id: string) => `/api/PlatformAdmin/tenants/${id}/status`,
     TENANT_UPGRADE: (id: string) => `/api/PlatformAdmin/tenants/${id}/upgrade`,
   },
+  TASKS_MODULE: {
+    BASE: '/api/tasks-module',
+    MY: '/api/tasks-module/my',
+    BY_ID: (id: string) => `/api/tasks-module/${id}`,
+    STATUS: (id: string) => `/api/tasks-module/${id}/status`,
+  },
   TENANT_ADMIN: {
     USERS: '/api/tenant-admin/users',
     USER_ROLE: (userId: string) => `/api/tenant-admin/users/${userId}/role`,

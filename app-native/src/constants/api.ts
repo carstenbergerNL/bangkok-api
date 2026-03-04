@@ -40,6 +40,12 @@ export const API_PATHS = {
     MODULE_USERS: (moduleKey: string) => `/api/tenant/modules/${moduleKey}/users`,
     MODULE_USER_REVOKE: (moduleKey: string, userId: string) => `/api/tenant/modules/${moduleKey}/users/${userId}`,
   },
+  TASKS_MODULE: {
+    BASE: '/api/tasks-module',
+    MY: '/api/tasks-module/my',
+    BY_ID: (id: string) => `/api/tasks-module/${id}`,
+    STATUS: (id: string) => `/api/tasks-module/${id}/status`,
+  },
   PLATFORM_ADMIN: {
     DASHBOARD_STATS: '/api/PlatformAdmin/dashboard/stats',
     TENANTS: '/api/PlatformAdmin/tenants',

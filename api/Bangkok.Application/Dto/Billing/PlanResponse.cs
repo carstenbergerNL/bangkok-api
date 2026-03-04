@@ -12,4 +12,5 @@ public class PlanResponse
     public string? StripePriceIdMonthly { get; set; }
     public string? StripePriceIdYearly { get; set; }
     public decimal? StorageLimitMB { get; set; }
+    public int? MaxStandaloneTasks { get; set; }
 }

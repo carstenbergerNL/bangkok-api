@@ -25,11 +25,13 @@ app/
 │   ├── layouts/          # MainLayout, Sidebar, Topbar
 │   ├── models/           # ApiResponse, User, LoginRequest, Profile, Role, Permission, etc.
 │   ├── modules/
-│   │   └── projects/     # projectService, taskService, labelService, memberService,
-│   │                     # commentService, activityService, dashboardService;
-│   │                     # ProjectListPage, ProjectDetailsPage, KanbanBoard, TaskDrawer,
-│   │                     # TaskFormModal, TaskList, ProjectFormModal, ProjectMembersTab,
-│   │                     # ProjectDashboardTab, ProjectLabelsSettings, types
+│   │   ├── projects/     # projectService, taskService, labelService, memberService,
+│   │   │                 # commentService, activityService, dashboardService;
+│   │   │                 # ProjectListPage, ProjectDetailsPage, KanbanBoard, TaskDrawer,
+│   │   │                 # TaskFormModal, TaskList, ProjectFormModal, ProjectMembersTab,
+│   │   │                 # ProjectDashboardTab, ProjectLabelsSettings, types
+│   │   └── tasks/        # Standalone Tasks module: TasksListPage, TaskCard, TaskDrawer,
+│   │                     # TaskFilterBar, tasksService, types (My Tasks / All Tasks)
 │   ├── pages/            # Login, Dashboard, Profile, Roles, AdminSettings (Users, Roles, Permissions)
 │   ├── services/         # authService, userService, roleService, permissionService,
 │   │                     # profileService, notificationService

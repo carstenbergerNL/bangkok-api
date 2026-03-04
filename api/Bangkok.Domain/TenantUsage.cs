@@ -10,5 +10,6 @@ public class TenantUsage
     public int UsersCount { get; set; }
     public decimal StorageUsedMB { get; set; }
     public int TimeLogsCount { get; set; }
+    public int StandaloneTasksCount { get; set; }
     public DateTime UpdatedAt { get; set; }
 }

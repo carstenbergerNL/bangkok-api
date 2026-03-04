@@ -20,7 +20,7 @@ public class PlanRepository : IPlanRepository
         using (connection)
         {
             connection.Open();
-            const string sql = "SELECT [Id], [Name], [PriceMonthly], [PriceYearly], [MaxProjects], [MaxUsers], [AutomationEnabled], [CreatedAt], [StripePriceIdMonthly], [StripePriceIdYearly], [StorageLimitMB] FROM dbo.[Plan] WHERE [Id] = @Id";
+            const string sql = "SELECT [Id], [Name], [PriceMonthly], [PriceYearly], [MaxProjects], [MaxUsers], [AutomationEnabled], [CreatedAt], [StripePriceIdMonthly], [StripePriceIdYearly], [StorageLimitMB], [MaxStandaloneTasks] FROM dbo.[Plan] WHERE [Id] = @Id";
             return await connection.QuerySingleOrDefaultAsync<Plan>(
                 new CommandDefinition(sql, new { Id = id }, cancellationToken: cancellationToken)).ConfigureAwait(false);
         }
@@ -32,7 +32,7 @@ public class PlanRepository : IPlanRepository
         using (connection)
         {
             connection.Open();
-            const string sql = "SELECT [Id], [Name], [PriceMonthly], [PriceYearly], [MaxProjects], [MaxUsers], [AutomationEnabled], [CreatedAt], [StripePriceIdMonthly], [StripePriceIdYearly], [StorageLimitMB] FROM dbo.[Plan] ORDER BY [PriceMonthly]";
+            const string sql = "SELECT [Id], [Name], [PriceMonthly], [PriceYearly], [MaxProjects], [MaxUsers], [AutomationEnabled], [CreatedAt], [StripePriceIdMonthly], [StripePriceIdYearly], [StorageLimitMB], [MaxStandaloneTasks] FROM dbo.[Plan] ORDER BY [PriceMonthly]";
             var list = await connection.QueryAsync<Plan>(new CommandDefinition(sql, cancellationToken: cancellationToken)).ConfigureAwait(false);
             return list.ToList();
         }
@@ -44,7 +44,7 @@ public class PlanRepository : IPlanRepository
         using (connection)
         {
             connection.Open();
-            const string sql = "SELECT TOP 1 [Id], [Name], [PriceMonthly], [PriceYearly], [MaxProjects], [MaxUsers], [AutomationEnabled], [CreatedAt], [StripePriceIdMonthly], [StripePriceIdYearly], [StorageLimitMB] FROM dbo.[Plan] WHERE [StripePriceIdMonthly] = @PriceId OR [StripePriceIdYearly] = @PriceId";
+            const string sql = "SELECT TOP 1 [Id], [Name], [PriceMonthly], [PriceYearly], [MaxProjects], [MaxUsers], [AutomationEnabled], [CreatedAt], [StripePriceIdMonthly], [StripePriceIdYearly], [StorageLimitMB], [MaxStandaloneTasks] FROM dbo.[Plan] WHERE [StripePriceIdMonthly] = @PriceId OR [StripePriceIdYearly] = @PriceId";
             return await connection.QuerySingleOrDefaultAsync<Plan>(
                 new CommandDefinition(sql, new { PriceId = stripePriceId }, cancellationToken: cancellationToken)).ConfigureAwait(false);
         }

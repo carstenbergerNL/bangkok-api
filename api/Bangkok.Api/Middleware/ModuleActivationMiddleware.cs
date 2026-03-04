@@ -29,6 +29,7 @@ public class ModuleActivationMiddleware
         ("/api/timelogs", "ProjectManagement"),
         ("/api/crm", "CRM"),
         ("/api/analytics", "Analytics"),
+        ("/api/tasks-module", "Tasks"),
     };
 
     private readonly RequestDelegate _next;

@@ -124,6 +124,24 @@ public class SubscriptionLimitService : ISubscriptionLimitService
         return (false, "Automation is not included in your current plan. Upgrade to enable automation rules.");
     }
 
+    public async Task<(bool Allowed, string? LimitMessage)> CanCreateStandaloneTaskAsync(CancellationToken cancellationToken = default)
+    {
+        var tenantId = _tenantContext.CurrentTenantId;
+        if (!tenantId.HasValue)
+            return (true, null);
+
+        var sub = await _subscriptionRepository.GetActiveByTenantIdAsync(tenantId.Value, cancellationToken).ConfigureAwait(false);
+        var plan = sub != null ? await _planRepository.GetByIdAsync(sub.PlanId, cancellationToken).ConfigureAwait(false) : null;
+        if (plan?.MaxStandaloneTasks == null)
+            return (true, null);
+
+        var usage = await _usageRepository.GetByTenantIdAsync(tenantId.Value, cancellationToken).ConfigureAwait(false);
+        var count = usage?.StandaloneTasksCount ?? 0;
+        if (count >= plan.MaxStandaloneTasks.Value)
+            return (false, $"Task limit reached ({plan.MaxStandaloneTasks} tasks). Upgrade your plan to add more.");
+        return (true, null);
+    }
+
     public async Task<(bool Allowed, string? LimitMessage)> CanAddMemberForTenantAsync(Guid tenantId, CancellationToken cancellationToken = default)
     {
         var sub = await _subscriptionRepository.GetActiveByTenantIdAsync(tenantId, cancellationToken).ConfigureAwait(false);
@@ -149,6 +167,7 @@ public class SubscriptionLimitService : ISubscriptionLimitService
         AutomationEnabled = p.AutomationEnabled,
         StripePriceIdMonthly = p.StripePriceIdMonthly,
         StripePriceIdYearly = p.StripePriceIdYearly,
-        StorageLimitMB = p.StorageLimitMB
+        StorageLimitMB = p.StorageLimitMB,
+        MaxStandaloneTasks = p.MaxStandaloneTasks
     };
 }

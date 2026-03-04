@@ -12,6 +12,12 @@ export const PERMISSIONS = {
   TaskAssign: 'Task.Assign',
   TaskComment: 'Task.Comment',
   TaskViewActivity: 'Task.ViewActivity',
+  // Standalone Tasks module
+  TasksView: 'Tasks.View',
+  TasksCreate: 'Tasks.Create',
+  TasksEdit: 'Tasks.Edit',
+  TasksDelete: 'Tasks.Delete',
+  TasksAssign: 'Tasks.Assign',
 } as const;
 
 export type PermissionName = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

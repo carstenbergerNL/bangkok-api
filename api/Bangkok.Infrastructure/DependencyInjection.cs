@@ -54,6 +54,7 @@ public static class DependencyInjection
         services.AddScoped<ITaskActivityRepository, TaskActivityRepository>();
         services.AddScoped<ITaskTimeLogRepository, TaskTimeLogRepository>();
         services.AddScoped<ITaskAttachmentRepository, TaskAttachmentRepository>();
+        services.AddScoped<ITasksStandaloneRepository, TasksStandaloneRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IUserPermissionChecker, UserPermissionChecker>();
@@ -76,6 +77,7 @@ public static class DependencyInjection
         services.AddScoped<ITaskTimeLogService, TaskTimeLogService>();
         services.AddScoped<IAttachmentFileStorage, LocalAttachmentFileStorage>();
         services.AddScoped<ITaskAttachmentService, TaskAttachmentService>();
+        services.AddScoped<ITasksStandaloneService, TasksStandaloneService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IRoleService, RoleService>();
         services.AddScoped<IPermissionService, PermissionService>();
